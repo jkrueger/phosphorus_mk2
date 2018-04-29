@@ -5,6 +5,8 @@
 #include <ImathMatrix.h>
 #pragma clang diagnostic pop
 
+/* The camera data model, used by the rest of the rendering 
+ * system */
 struct camera_t {
   Imath::M44f to_world;
 
