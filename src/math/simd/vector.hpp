@@ -51,6 +51,18 @@ struct vector3_t<8> {
     z = _mm256_load_ps(_z);
   }
 
+  /* loads a vector from an SOA data structure via gather instructions */
+  inline vector3_t(
+    const float*   _x
+  , const float*   _y
+  , const float*   _z
+  , const __m256i& idx)
+  {
+    x = _mm256_i32gather_ps(_x, idx, 1);
+    y = _mm256_i32gather_ps(_y, idx, 1);
+    z = _mm256_i32gather_ps(_z, idx, 1);
+  }
+
   inline vector3_t rcp() const {
     return {_mm256_rcp_ps(x), _mm256_rcp_ps(y), _mm256_rcp_ps(z)};
   }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "simd/int8.hpp"
 #include "simd/float8.hpp"
 #include "simd/matrix.hpp"
 #include "simd/vector.hpp"

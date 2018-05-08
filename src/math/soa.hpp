@@ -28,5 +28,7 @@ namespace soa {
     uint32_t     set[N];
     uint32_t     face[N];
     vector3_t<N> n;
+    float        u[N];
+    float        v[N];
   };
 }

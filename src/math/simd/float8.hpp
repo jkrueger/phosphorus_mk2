@@ -11,8 +11,12 @@ namespace simd {
   template<>
   struct float_t<8> {
     typedef __m256 type;
+
+    static inline __m256 gather(const float* const p, const __m256i& i) {
+      return _mm256_i32gather_ps(p, i, 1);
+    }
   };
-  
+
   inline __m256 load(float x) {
     return _mm256_set1_ps(x);
   }
