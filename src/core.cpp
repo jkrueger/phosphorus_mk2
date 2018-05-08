@@ -61,7 +61,9 @@ bool parse_args(int argc, char** argv, parsed_options_t& parsed) {
 }
 
 template<typename T>
-void preprocess(const T& devices, const scene_t& scene) {
+void preprocess(const T& devices, scene_t& scene) {
+  scene.preprocess();
+
   for(auto& device: devices) { 
     device->preprocess(scene);
   }
@@ -89,16 +91,22 @@ int main(int argc, char** argv) {
     return -1;
   }
 
+  std::cout << "Importing scene: " << options.scene << std::endl;
   scene_t scene;
   codec::scene::import(options.scene, scene);
-
+  
+  std::cout << "Discovering devices" << std::endl;
   // start rendering process
   const auto devices = xpu_t::discover(options);
+
+  std::cout << "Preprocessing" << std::endl;
   preprocess(devices, scene);
 
+  std::cout << "Rendering..." << std::endl;
   frame_state_t state(job::tiles_t::make(1920, 1080, 32));
   start_devices(devices, scene, state);
   join(devices);
-
+  
+  std::cout << "Done" << std::endl;
   return 0;
 }
