@@ -52,7 +52,7 @@ namespace accel {
 	const auto d =
 	  float_t<SIMD_WIDTH>::gather(stream.rays.d, rays);
 
-	const auto tris = simd::load(0);
+	const auto t = simd::load(0);
 	
 	for (auto i=0; i<N; ++i) {
 	  const auto e0 = vector3_t<N>(e0.x[i], e0.y[i], e0.z[i]);
@@ -82,10 +82,13 @@ namespace accel {
 	  d = select(mask, ds, d);
 	  m = _or(mask, m);
 
-	  tris = _select(mask, simd::load(i), tris);
+	  t = _select(mask, simd::load(i), t);
 	}
 
 	auto mask = movemask(m);
+
+	const auto ds = simd::store(d, ds);
+	const auto ts = simd::store(t, ts);
 
 	// TODO: use masked scatter instructions when available
 	while(mask != 0) {
@@ -93,13 +96,13 @@ namespace accel {
 	  if (n < num) {
 	    const auto x = indices + n;
 	    // update shortest hit distance of ray
-	    stream.rays.d[x] = d[x];
+	    stream.rays.d[x] = ds[ts[n]];
 	    // update shading parameters
-	    stream.shading.mesh[x] = meshid[tris[n]];
-	    stream.shading.set[x]  = setid[tris[n]];
-	    stream.shading.face[x] = faceid[tris[n]];
-	    stream.shading.u[x]    = u[tris[n]];
-	    stream.shading.v[x]    = v[tris[n]];
+	    stream.shading.mesh[x] = meshid[ts[n]];
+	    stream.shading.set[x]  = setid[ts[n]];
+	    stream.shading.face[x] = faceid[ts[n]];
+	    stream.shading.u[x]    = u[ts[n]];
+	    stream.shading.v[x]    = v[ts[n]];
 	  }
 	}
       }
