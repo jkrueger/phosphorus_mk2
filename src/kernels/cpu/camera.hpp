@@ -27,45 +27,47 @@ namespace camera {
   }
 }
 
-template<typename Tile, typename Samples, int N>
-inline void generate_camera_rays(
-  const Imath::M44f& to_world
-, const Tile& tile
-, const Samples& samples
-, pipeline_state_t<N>& state)
-{
-  static const float onev[] = {
-    1,1,1,1,1,1,1,1
-  };
+struct camera_kernel_t {
+  template<typename Tile, typename Samples, int N>
+  inline void operator()(
+    const Imath::M44f& to_world
+  , const Tile& tile
+  , const Samples& samples
+  , pipeline_state_t<N>& state)
+  {
+    static const float onev[] = {
+      1,1,1,1,1,1,1,1
+    };
 
-  static const float seqv[] = {
-    0,1,2,3,4,5,6,7
-  };
+    static const float seqv[] = {
+      0,1,2,3,4,5,6,7
+    };
 
-  const simd::matrix44_t m(to_world);
+    const simd::matrix44_t m(to_world);
 
-  auto sample = samples.v;
-  auto ray    = state.rays;
-  auto one    = simd::load(1);
-  auto step   = simd::load(pipeline_state_t<N>::step);
+    auto sample = samples.v;
+    auto ray    = state.rays;
+    auto one    = simd::load(1);
+    auto step   = simd::load(pipeline_state_t<N>::step);
 
-  auto px = simd::load(tile.x) + simd::load(seqv);
-  auto py = simd::load(tile.y);
+    auto px = simd::load(tile.x) + simd::load(seqv);
+    auto py = simd::load(tile.y);
 
-  auto sy = py;
-  for (auto y=0; y<tile.h; ++y) {
-    auto sx = px;
+    auto sy = py;
+    for (auto y=0; y<tile.h; ++y) {
+      auto sx = px;
 
-    for (auto x=0; x<tile.w; x+=pipeline_state_t<N>::step, ++ray, ++sample) {
-      simd::vector3_t s(sample->x, sample->y, onev);
-      s.x += simd::add(s.x, sx);
-      s.y += simd::add(s.y, sy);
+      for (auto x=0; x<tile.w; x+=pipeline_state_t<N>::step, ++ray, ++sample) {
+	simd::vector3_t s(sample->x, sample->y, onev);
+	s.x += simd::add(s.x, sx);
+	s.y += simd::add(s.y, sy);
+	
+	camera::compute_ray(m, s, ray);
 
-      camera::compute_ray(m, s, ray);
-
-      sx += step; 
+	sx = simd::add(sx, step); 
+      }
+      
+      sy = simd::add(sy, one);
     }
-
-    sy += one;
   }
-}
+};

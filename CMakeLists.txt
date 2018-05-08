@@ -5,8 +5,12 @@ SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 
 add_executable(phosphorus
   src/core.cpp
-  src/codecs/scene.cpp
+  src/mesh.cpp
   src/sampling.cpp
+  src/scene.cpp
+  src/accel/bvh.cpp
+  src/codecs/scene.cpp
+  src/kernels/cpu/stream_bvh_kernel.cpp
   src/xpu.cpp
   src/xpu/cpu.cpp)
 
