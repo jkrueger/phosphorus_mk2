@@ -21,4 +21,12 @@ namespace soa {
     vector3_t<N> wi;
     float d[N];
   };
+
+  template<int N>
+  struct shading_t {
+    uint32_t     mesh[N];
+    uint32_t     set[N];
+    uint32_t     face[N];
+    vector3_t<N> n;
+  };
 }

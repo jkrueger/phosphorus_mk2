@@ -48,17 +48,15 @@ void intersect(Stream& stream, const active_t<>& active, const accel::mbvh_t* bv
 
 	typename simd::float_t<accel::mbvh_t::width>::type dist;
 
-	const auto idx0 = *todo ^ ~(accel::mbvh_t::width-1);
-	const auto idx1 = *todo ^ (accel::mbvh_t::width-1);
-
-	const auto& ray = stream.rays[idx0];
+	const auto  ray  = *todo;
+	const auto& rays = stream.rays;
 
 	auto hits =
 	  simd::intersect<accel::mbvh_t::width>(
 	    bounds
-	  , simd::vector3_t(ray.p.x[idx1], ray.p.y[idx1], ray.p.z[idx1])
-	  , simd::vector3_t(ray.wi.x[idx1], ray.wi.y[idx1], ray.wi.z[idx1]).rcp()
-	  , simd::load(ray.d[idx1])
+	  , simd::vector3_t(rays.p.x[ray], rays.p.y[ray], rays.p.z[ray])
+	  , simd::vector3_t(rays.wi.x[ray], rays.wi.y[ray], rays.wi.z[ray]).rcp()
+	  , simd::load(ray.d[ray])
 	  , dist);
 
 	length = simd::add(length, simd::_and(dist, hits));
@@ -109,23 +107,14 @@ void intersect(Stream& stream, const active_t<>& active, const accel::mbvh_t* bv
       auto todo = pop(lanes, cur.lane, cur.num_rays);
       auto end  = todo + cur.num_rays;
       do {
-	const auto index   = cur.offset;
-	const auto offsets = simd::load(todo);
+	const auto index = cur.offset;
 	do {
-	  const auto mask =
-	    bvh->triangles[index].intersect<SIMD_WIDTH>(/* ray packet */);
-	  while(mask != 0) {
-	    const auto x    = *todo + __bscf(mask);
-	    const auto idx0 = x & ~(accel::mbvh_t::width-1);
-	    const auto idx1 = x & (accel::mbvh_t::width-1);
-
-	    stream.shading[idx0].mesh[idx1] = bvh->triangles[index].meshid[x];
-	    stream.shading[idx0].set[idx1]  = bvh->triangles[index].setid[x];
-	    stream.shading[idx0].face[idx1] = bvh->triangles[index].faceid[x];
-	  }
+	  const auto num = std::min(end - todo, accel::mbvh_t::width);
+	  bvh->triangles[index].intersect(stream, todo, num);
 	  index += accel::mbvh_t::width;
+	  // FIXME is this test right?
 	} while(index < cur.prims);
-      } while((todo+=accel::mbvh_t::width) != end);
+      } while((todo+=accel::mbvh_t::width) < end);
     }
   }
 }

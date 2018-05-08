@@ -32,13 +32,11 @@ struct pipeline_state_t {
   static const uint32_t size = N;
   static const uint32_t step = SIMD_WIDTH;
 
-  typedef soa::ray_t<step> ray_t;
+  typedef soa::ray_t<size>     ray_t;
+  typedef soa::shading_t<size> shading_t;
 
-  ray_t rays[size/step];
-
-  struct {
-    // ...
-  } shading[size/step];
+  ray_t     rays;
+  shading_t shading;
 
   uint8_t flags[size];
 
@@ -58,9 +56,9 @@ struct occlusion_query_state_t {
   static const uint32_t size = N;
   static const uint32_t step = SIMD_WIDTH;
 
-  typedef soa::ray_t<step> ray_t;
+  typedef soa::ray_t<size> ray_t;
 
-  ray_t rays[size/step];
+  ray_t rays;
 
 };
 
