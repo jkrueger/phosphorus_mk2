@@ -1,5 +1,7 @@
 #pragma once
 
+#include "float8.hpp"
+
 #include <xmmintrin.h>
 
 template<int N>
@@ -25,9 +27,9 @@ struct vector3_t<8> {
   {}
 
   inline vector3_t(
-      __m256 _x
-    , __m256 _y
-    , __m256 _z)
+      const __m256& _x
+    , const __m256& _y
+    , const __m256& _z)
     : x(_x), y(_y), z(_z)
   {}
 
@@ -65,6 +67,23 @@ struct vector3_t<8> {
 
   inline vector3_t rcp() const {
     return {_mm256_rcp_ps(x), _mm256_rcp_ps(y), _mm256_rcp_ps(z)};
+  }
+
+  inline __m256 dot(const vector3_t<8>& r) const {
+    return simd::madd(x, r.x, simd::madd(y, r.y, simd::mul(z, r.z)));
+  }
+
+  inline vector3_t cross(const vector3_t& r) const {
+    vector3_t<8> out = {
+      simd::msub(y, r.z, simd::mul(z, r.y)),
+      simd::msub(z, r.x, simd::mul(x, r.z)),
+      simd::msub(x, r.y, simd::mul(y, r.x))
+    };
+    return out;
+  }
+
+  inline vector3_t operator-(const vector3_t& r) const {
+    return vector3_t(simd::sub(x, r.x), simd::sub(y, r.y), simd::sub(z, r.z));
   }
 };
 

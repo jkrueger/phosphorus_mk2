@@ -1,6 +1,7 @@
 #pragma once
 
 #include "state.hpp"
+#include "../triangle.hpp"
 #include "math/simd.hpp"
 #include "math/soa.hpp"
 
@@ -16,8 +17,20 @@ namespace accel {
       uint32_t setid[N];
       uint32_t faceid[N];
 
-      inline moeller_trumbore_t()
+      uint32_t num;
+
+      inline moeller_trumbore_t(const triangle_t* triangles, uint32_t num)
+	: num(num)
       {
+	for (auto i=0; i<num; ++i) {
+	  const auto e0 = triangles[i].b() - triangles[i].a();
+	  const auto e1 = triangles[i].c() - triangles[i].a();
+	  const auto v0 = triangles[i].a();
+
+	  _e0.x[i] = e0.x; _e0.y[i] = e0.y; _e0.z[i] = e0.z;
+	  _e1.x[i] = e1.x; _e1.y[i] = e1.y; _e1.z[i] = e1.z;
+	  _v0.x[i] = v0.x; _v0.y[i] = v0.y; _e1.z[i] = v0.z;
+	}
       }
 
       inline void intersect(
@@ -52,62 +65,63 @@ namespace accel {
 	  , stream.rays.wi.z
 	  , rays);
 	
-	const auto d =
-	  simd::float_t<SIMD_WIDTH>::gather(stream.rays.d, rays);
-
-	const auto t = simd::load((int32_t) 0);
+	auto d = simd::float_t<SIMD_WIDTH>::gather(stream.rays.d, rays);
+	auto j = simd::load((int32_t) 0);
 	
 	for (auto i=0; i<N; ++i) {
 	  const auto e0 = vector3_t<N>(_e0.x[i], _e0.y[i], _e0.z[i]);
 	  const auto e1 = vector3_t<N>(_e1.x[i], _e1.y[i], _e1.z[i]);
 	  const auto v0 = vector3_t<N>(_v0.x[i], _v0.y[i], _v0.z[i]);
 
-	  const auto p   = cross(wi, e1);
-	  const auto det = dot(e0, p);
-	  const auto ood = div(one, det);
-	  const auto t   = sub(o, v0);
-	  const auto q   = cross(t, e0);
+	  const auto p   = wi.cross(e1);
+	  const auto det = e0.dot(p);
+	  const auto ood = simd::div(one, det);
+	  const auto t   = o - v0;
+	  const auto q   = t.cross(e0);
 
-	  const auto us  = mul(dot(t, p), ood);
-	  const auto vs  = mul(dot(wi, q), ood);
+	  const auto us  = simd::mul(t.dot(p), ood);
+	  const auto vs  = simd::mul(wi.dot(q), ood);
 
-	  auto ds = mul(dot(e1, q), ood);
+	  auto ds = simd::mul(e1.dot(q), ood);
 
-	  const auto xmask = _or(gt(det, peps), lt(det, meps));
-	  const auto umask = gte(us, zero);
-	  const auto vmask = _and(gte(vs, zero), lte(add(us, vs), one));
-	  const auto dmask = _and(gte(ds, zero), lt(ds, d));
+	  const auto xmask = simd::_or(simd::gt(det, peps), simd::lt(det, meps));
+	  const auto umask = simd::gte(us, zero);
+	  const auto vmask = simd::_and(simd::gte(vs, zero), simd::lte(simd::add(us, vs), one));
+	  const auto dmask = simd::_and(simd::gte(ds, zero), simd::lt(ds, d));
 
-	  const auto mask = _and(_and(_and(vmask, umask), dmask), xmask);
+	  const auto mask = simd::_and(simd::_and(simd::_and(vmask, umask), dmask), xmask);
 
-	  u = select(mask, us, u);
-	  v = select(mask, vs, v);
-	  d = select(mask, ds, d);
-	  m = _or(mask, m);
+	  u = simd::select(mask, us, u);
+	  v = simd::select(mask, vs, v);
+	  d = simd::select(mask, ds, d);
+	  m = simd::_or(mask, m);
 
-	  t = _select(mask, simd::load(i), t);
+	  j = simd::select(mask, simd::load(i), j);
 	}
 
 	auto mask = simd::movemask(m);
 
-	float ds[N], ts[N];
+	float   ds[N];
+	int32_t ts[N];
 	
 	simd::store(d, ds);
-	simd::store(t, ts);
+	simd::store(j, ts);
 
 	// TODO: use masked scatter instructions when available
 	while(mask != 0) {
 	  const auto n = __bscf(mask);
 	  if (n < num) {
 	    const auto x = *(indices + n);
+	    const auto t = ts[n];
 	    // update shortest hit distance of ray
-	    stream.rays.d[x] = ds[ts[n]];
+	    stream.rays.d[x] = ds[t];
 	    // update shading parameters
-	    stream.shading.mesh[x] = meshid[ts[n]];
-	    stream.shading.set[x]  = setid[ts[n]];
-	    stream.shading.face[x] = faceid[ts[n]];
-	    stream.shading.u[x]    = u[ts[n]];
-	    stream.shading.v[x]    = v[ts[n]];
+	    stream.shading.mesh[x] = meshid[t];
+	    stream.shading.set[x]  = setid[t];
+	    stream.shading.face[x] = faceid[t];
+	    stream.shading.u[x]    = u[t];
+	    stream.shading.v[x]    = v[t];
+	    stream.hit(x);
 	  }
 	}
       }

@@ -49,10 +49,16 @@ namespace accel {
       uint32_t begin
     , uint32_t end
     , const std::vector<bvh::primitive_t>& primitives
-    , const std::vector<triangle_t>& tiangles)
+    , const std::vector<triangle_t>& things)
     {
-      // ...
-      return 0;
+      uint32_t off = triangles.size();
+      uint32_t num = end - begin;
+
+      for (auto i=begin; i<end; i+=mbvh_t::width) {
+	triangles.emplace_back(things.data() + i, num);
+      }
+
+      return off;
     }
   };
 

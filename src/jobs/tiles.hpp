@@ -41,8 +41,8 @@ namespace job {
 
       auto queue = new tiles_t(htiles*vtiles);
 
-      for (uint32_t y=0; y<height; y+=tile_size) {
-	for (uint32_t x=0; x<width; x+=tile_size) {
+      for (uint32_t y=0; y<vtiles; ++y) {
+	for (uint32_t x=0; x<htiles; ++x) {
 	  queue->tiles[y * htiles + x] = { x, y, tile_size, tile_size };
 	}
       }
