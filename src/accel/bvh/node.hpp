@@ -27,13 +27,22 @@ namespace mbvh {
       memset(flags, 0, N*sizeof(uint32_t));
     }
 
-    inline void set_offset(uint32_t i, uint32_t offset) {
+    inline void set_offset(uint32_t i, uint32_t n) {
+      offset[i] = n;
     }
 
-    inline void set_bounds(uint32_t i, Imath::Box3f& bounds) {
+    inline void set_bounds(uint32_t i, Imath::Box3f& b) {
+      bounds[i     ] = b.min.x;
+      bounds[i +  8] = b.min.y;
+      bounds[i + 16] = b.min.z;
+      bounds[i + 24] = b.max.x;
+      bounds[i + 32] = b.max.y;
+      bounds[i + 40] = b.max.z;
     }
 
     inline void set_leaf(uint32_t i, uint32_t index, uint32_t count) {
+      flags[i] = 0x1;
+      num[i]   = count;
     }
   };
 }

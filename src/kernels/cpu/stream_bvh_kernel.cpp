@@ -5,6 +5,8 @@
 #include "math/simd/aabb.hpp"
 #include "utils/compiler.hpp"
 
+/* Implements MBVH-RS algorithm for tracing a set of rays through 
+ * the scene */
 template<typename Stream>
 void intersect(Stream& stream, const active_t<>& active, const accel::mbvh_t* bvh) {
   static thread_local stream::lanes_t<accel::mbvh_t::width> lanes;
@@ -56,7 +58,7 @@ void intersect(Stream& stream, const active_t<>& active, const accel::mbvh_t* bv
 	    bounds
 	  , simd::vector3_t(rays.p.x[ray], rays.p.y[ray], rays.p.z[ray])
 	  , simd::vector3_t(rays.wi.x[ray], rays.wi.y[ray], rays.wi.z[ray]).rcp()
-	  , simd::load(ray.d[ray])
+	  , simd::load(rays.d[ray])
 	  , dist);
 
 	length = simd::add(length, simd::_and(dist, hits));
@@ -107,9 +109,9 @@ void intersect(Stream& stream, const active_t<>& active, const accel::mbvh_t* bv
       auto todo = pop(lanes, cur.lane, cur.num_rays);
       auto end  = todo + cur.num_rays;
       do {
-	const auto index = cur.offset;
+	auto index = cur.offset;
 	do {
-	  const auto num = std::min(end - todo, accel::mbvh_t::width);
+	  const auto num = std::min(end - todo, (long) accel::mbvh_t::width);
 	  bvh->triangles[index].intersect(stream, todo, num);
 	  index += accel::mbvh_t::width;
 	  // FIXME is this test right?

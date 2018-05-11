@@ -51,9 +51,8 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
       [&](const scene_t& scene, frame_state_t& frame) {
 	// TODO: if no shading work is to be done...
 	pipeline_state_t<>* state = new pipeline_state_t<>();
-	
 	job::tiles_t::tile_t tile;
-	if (frame.tiles->next(tile)) {
+	while (frame.tiles->next(tile)) {
 	  // acquire a set of samples from the unit square, to generate
 	  // rays for this tile
 	  const auto& samples = frame.sampler.next_pixel_samples();
@@ -61,7 +60,7 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 
 	  active_t<> active;
 
-	  details->camera_rays(camera.to_world, tile, samples, *state);
+	  details->camera_rays(camera.to_world, tile, samples, state);
 	  details->trace(*state, active);
 	  //
 	  //  sort results by material
@@ -84,8 +83,8 @@ void cpu_t::join() {
 }
 
 cpu_t* cpu_t::make(const parsed_options_t& options) {
-  const auto concurrency =
-    options.single_threaded ? 1 : std::thread::hardware_concurrency();
+  const auto concurrency = 1;
+    // options.single_threaded ? 1 : std::thread::hardware_concurrency();
 
   return new cpu_t(concurrency);
 }

@@ -5,8 +5,8 @@
 #include <functional> 
 
 sampler_t::sampler_t() {
-  static std::mt19937 gen;
-  static std::uniform_real_distribution<float> dis(0.0f,1.0f);
+  std::mt19937 gen;
+  std::uniform_real_distribution<float> dis(0.0f,1.0f);
   
   for (auto i=0; i<128; ++i) {
     for (auto j=0; j<8; ++j) {

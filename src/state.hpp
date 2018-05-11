@@ -40,6 +40,10 @@ struct pipeline_state_t {
 
   uint8_t flags[size];
 
+  inline pipeline_state_t() {
+    memset(flags, 0, sizeof(flags));
+  }
+
   inline void miss(uint32_t i) {
     flags[i] &= (~(HIT << 16));
   }
@@ -68,4 +72,15 @@ template<int N = 1024>
 struct active_t {
   uint32_t num;
   uint32_t index[N];
+
+  inline active_t() {
+    reset(0);
+  }
+
+  inline void reset(uint32_t base) {
+    num = N;
+    for (auto i=0; i<N; ++i) {
+      index[i] = i;
+    }
+  }
 };

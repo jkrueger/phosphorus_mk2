@@ -9,7 +9,7 @@
 
 #include <getopt.h>
 
-/* ! available arguments to the renderer */
+/* available arguments to the renderer */
 static option options[] = {
   { "output",     0,           NULL, 'o' },
   { "no-gpu",     0,           NULL, 'c' },

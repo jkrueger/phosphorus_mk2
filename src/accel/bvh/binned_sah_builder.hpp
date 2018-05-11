@@ -248,7 +248,7 @@ namespace bvh {
       child_indices[i] = from(children[i], things, bvh);
     }
 
-    auto node = bvh->resolve(node_index);
+    auto& node = bvh->resolve(node_index);
     for (int i=0; i<num_children; ++i) {
       node.set_bounds(i, children[i].bounds);
 
