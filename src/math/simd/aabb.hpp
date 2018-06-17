@@ -9,8 +9,8 @@ namespace simd {
     ::vector3_t<N> min, max;
 
     inline aabb_t(const float* const bounds)
-      : min(&bounds[0*N], &(bounds[1*N]), &(bounds[2*N]))
-      , max(&bounds[3*N], &(bounds[4*N]), &(bounds[5*N]))
+      : min(&(bounds[0*N]), &(bounds[1*N]), &(bounds[2*N]))
+      , max(&(bounds[3*N]), &(bounds[4*N]), &(bounds[5*N]))
     {}
   };
 

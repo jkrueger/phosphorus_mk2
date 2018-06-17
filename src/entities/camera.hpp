@@ -13,6 +13,16 @@ struct camera_t {
   float focal_length;
   float sensor_width;
 
+  struct film_t {
+    uint32_t width;
+    uint32_t height;
+
+    inline film_t()
+      : width(1980)
+      , height(1080)
+    {}
+  } film;
+
   inline camera_t()
     : focal_length(35.0f)
     , sensor_width(32.0f)

@@ -10,8 +10,8 @@ sampler_t::sampler_t() {
   
   for (auto i=0; i<128; ++i) {
     for (auto j=0; j<8; ++j) {
-      pixel_samples.v[i].x[j] = dis(gen);
-      pixel_samples.v[i].y[j] = dis(gen);
+      pixel_samples.v[i].x[j] = dis(gen) - 0.5f;
+      pixel_samples.v[i].y[j] = dis(gen) - 0.5f;
     }
   }
 }

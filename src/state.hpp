@@ -1,5 +1,6 @@
 #pragma once
 
+#include "film.hpp"
 #include "sampling.hpp"
 #include "jobs/tiles.hpp"
 #include "math/simd.hpp"
@@ -10,9 +11,11 @@
 struct frame_state_t {
   sampler_t     sampler;
   job::tiles_t* tiles;
+  film_t<>* film;
 
-  inline frame_state_t(job::tiles_t* tiles)
+  inline frame_state_t(job::tiles_t* tiles, film_t<>* film)
     : tiles(tiles)
+    , film(film)
   {}
 
   inline ~frame_state_t() {
@@ -39,18 +42,23 @@ struct pipeline_state_t {
   shading_t shading;
 
   uint8_t flags[size];
+  bsdf_t* bsdf[size];
 
   inline pipeline_state_t() {
-    memset(flags, 0, sizeof(flags));
+    memset(flags, 0, size);
   }
 
   inline void miss(uint32_t i) {
-    flags[i] &= (~(HIT << 16));
+    flags[i] &= ~HIT;
   }
 
   inline void hit(uint32_t i) {
-    flags[i] |= (HIT << 16);
-  } 
+    flags[i] |= HIT;
+  }
+
+  inline bool is_hit(uint32_t i) const {
+    return (flags[i] & HIT) == HIT;
+  }
 };
 
 /* The state kept while evaluating a stream of occlusion
@@ -63,7 +71,6 @@ struct occlusion_query_state_t {
   typedef soa::ray_t<size> ray_t;
 
   ray_t rays;
-
 };
 
 /* active masks for the pipeline and occlusion query states, 
@@ -73,14 +80,22 @@ struct active_t {
   uint32_t num;
   uint32_t index[N];
 
-  inline active_t() {
-    reset(0);
-  }
+  inline active_t()
+    : num(0)
+  {}
 
   inline void reset(uint32_t base) {
     num = N;
     for (auto i=0; i<N; ++i) {
-      index[i] = i;
+      index[i] = base + i;
     }
+  }
+
+  inline void add(uint32_t i) {
+    index[i] = i;
+  }
+
+  inline bool has_live_paths() const {
+    return num > 0;
   }
 };

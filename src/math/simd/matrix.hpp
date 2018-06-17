@@ -2,7 +2,10 @@
 
 #include "vector.hpp"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-register"
 #include <ImathMatrix.h>
+#pragma clang diagnostic pop
 
 template<int N>
 struct matrix44_t
@@ -27,17 +30,26 @@ struct matrix44_t<8> {
   }
 
   /* transform a 3 dimensional vector, by multiplying it with this matrix
-   * while skipping the 4th column (i.e. the vector will not get traanslated)
+   * while skipping the 4th column (i.e. the vector will not get translated)
    * FIXME: provide a function to actually extract a 3x3 matrix from this matrix */
   inline vector3_t<8> operator* (const vector3_t<8>& v) const {
     vector3_t<8> out;
-    for (auto i=0; i<3; ++i) {
-      auto x = _mm256_mul_ps(v.v[i], m[i][0]);
-      for (auto j=1; j<3; j++) {
-	x = _mm256_fmadd_ps(v.v[j], m[i][j], x);
-      }
-      out.v[i] = x;
-    }
+
+    auto x = _mm256_mul_ps(v.x, m[0][0]);
+    x = _mm256_fmadd_ps(v.y, m[0][1], x);
+    x = _mm256_fmadd_ps(v.z, m[0][2], x);
+    out.x = x;
+
+    auto y = _mm256_mul_ps(v.x, m[1][0]);
+    y = _mm256_fmadd_ps(v.y, m[1][1], y);
+    y = _mm256_fmadd_ps(v.z, m[1][2], y);
+    out.y = y;
+
+    auto z = _mm256_mul_ps(v.x, m[2][0]);
+    z = _mm256_fmadd_ps(v.y, m[2][1], z);
+    z = _mm256_fmadd_ps(v.z, m[2][2], z);
+    out.z = z;
+
     return out;
   }
 };

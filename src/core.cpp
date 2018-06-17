@@ -1,4 +1,6 @@
 #include "codecs/scene.hpp"
+#include "film/file.hpp"
+#include "material.hpp"
 #include "options.hpp"
 #include "scene.hpp"
 #include "state.hpp"
@@ -31,9 +33,11 @@ bool parse_args(int argc, char** argv, parsed_options_t& parsed) {
       parsed.output = optarg;
       break;
     case '1':
+      std::cout << "Single threaded mode" << std::endl;
       parsed.single_threaded = true;
       break;
     case 'c':
+      std::cout << "CPU only mode" << std::endl;
       parsed.host_only = true;
       break;
     case '?':
@@ -91,22 +95,34 @@ int main(int argc, char** argv) {
     return -1;
   }
 
+  material_t::boot(options);
+
   std::cout << "Importing scene: " << options.scene << std::endl;
   scene_t scene;
   codec::scene::import(options.scene, scene);
-  
+
   std::cout << "Discovering devices" << std::endl;
-  // start rendering process
   const auto devices = xpu_t::discover(options);
 
   std::cout << "Preprocessing" << std::endl;
   preprocess(devices, scene);
 
   std::cout << "Rendering..." << std::endl;
-  frame_state_t state(job::tiles_t::make(1920, 1080, 32));
+
+  film::file_t* sink = new film::file_t(scene.camera.film, options.output);
+  
+  frame_state_t state(
+    job::tiles_t::make(
+      scene.camera.film.width
+    , scene.camera.film.height
+    , 32)
+  , sink);
+
   start_devices(devices, scene, state);
   join(devices);
-  
+
+  sink->finalize();
+
   std::cout << "Done" << std::endl;
   return 0;
 }

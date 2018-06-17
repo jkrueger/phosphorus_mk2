@@ -6,10 +6,15 @@ namespace accel {
   struct mbvh_t;
 }
 
-struct stream_mbvh_kernel_t {
+/**
+ * Iterates all leafs of the tree and tests against all triangles.
+ * This exists only for debugging purposes
+ *
+ */
+struct linear_mbvh_kernel_t {
   const accel::mbvh_t* bvh;
 
-  stream_mbvh_kernel_t(const accel::mbvh_t* bvh);
+  linear_mbvh_kernel_t(const accel::mbvh_t* bvh);
 
   /* find the closest intersection point for all rays in the
    * current work item in the pipeline */

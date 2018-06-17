@@ -5,10 +5,10 @@
 #include <yaml-cpp/yaml.h>
 
 /**
- * ! YAML importer code for all common renderer entities
+ * YAML importer code for all common renderer entities
  */
 namespace YAML {
-  /* ! Camera importer */
+  /* Camera importer */
   template<>
   struct convert<camera_t> {
     static bool decode(const Node& node, camera_t& camera) {

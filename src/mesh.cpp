@@ -23,6 +23,7 @@ struct builder_impl_t : public mesh_t::builder_t {
     mesh->normals  = mesh->details->normals.data();
     mesh->uvs      = mesh->details->uvs.data();
     mesh->faces    = mesh->details->faces.data();
+    mesh->sets     = mesh->details->sets.data();
   }
 
   void add_vertex(const Imath::V3f& v) {
@@ -84,13 +85,68 @@ void mesh_t::preprocess() const {
 void mesh_t::triangles(std::vector<triangle_t>& triangles) const {
   for (auto i=0; i<details->sets.size(); ++i) {
     for (auto j=0; j<details->sets[i].faces.size(); j++) {
-      triangles.emplace_back(this, i, j);
+      triangles.emplace_back(this, i, details->sets[i].faces[j]*3);
     }
   }
 }
 
+void mesh_t::shading_parameters(pipeline_state_t<>* state, uint32_t i) const {
+  const auto& face = state->shading.face[i];
+
+  const auto u = state->shading.u[i];
+  const auto v = state->shading.v[i];
+
+  const auto w = 1 - u - v;
+  const auto a = faces[face];
+  const auto b = faces[face+1];
+  const auto c = faces[face+2];
+
+  auto na = a, nb = b, nc = c;
+
+  if (!has_per_vertex_normals()) {
+    na = face;
+    nb = face+1;
+    nc = face+2;
+  }
+
+  const auto& n0 = normals[na];
+  const auto& n1 = normals[nb];
+  const auto& n2 = normals[nc];
+
+  const auto n = (w*n0+u*n1+v*n2).normalize();
+
+  state->shading.n.x[i] = n.x;
+  state->shading.n.y[i] = n.y;
+  state->shading.n.z[i] = n.z;
+
+  if (details->uvs.size() == 0) {
+    state->shading.u[i] = 0;
+    state->shading.v[i] = 0;
+  }
+  else {
+    auto uva = a, uvb = b, uvc = c;
+
+    if (!has_per_vertex_uvs()) {
+      uva = face;
+      uvb = face+1;
+      uvc = face+2;
+    }
+
+    const auto uv0 = uvs[uva];
+    const auto uv1 = uvs[uvb];
+    const auto uv2 = uvs[uvc];
+
+    const auto uv = w*uv0+u*uv1+v*uv2;
+
+    state->shading.s[i] = uv.x;
+    state->shading.t[i] = uv.y;
+  }
+}
+
 triangle_t::triangle_t(const mesh_t* m, uint32_t set, uint32_t face)
-  : mesh(m), set(set), face(face)
+  : mesh(m)
+  , set(set)
+  , face(face)
 {}
 
 uint32_t triangle_t::meshid() const {
@@ -108,13 +164,13 @@ Imath::Box3f triangle_t::bounds() const {
 }
 
 const Imath::V3f& triangle_t::a() const {
-  return mesh->details->vertices[mesh->faces[face]];
+  return mesh->vertices[mesh->faces[face]];
 }
 
 const Imath::V3f& triangle_t::b() const {
-  return mesh->details->vertices[mesh->faces[face+1]];
+  return mesh->vertices[mesh->faces[face+1]];
 }
 
 const Imath::V3f& triangle_t::c() const {
-  return mesh->details->vertices[mesh->faces[face+2]];
+  return mesh->vertices[mesh->faces[face+2]];
 }
