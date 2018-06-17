@@ -2,7 +2,10 @@
 
 #include "vector.hpp"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-register"
 #include <ImathMatrix.h>
+#pragma clang diagnostic pop
 
 template<int N>
 struct matrix44_t

@@ -1,12 +1,15 @@
 #include "cpu.hpp"
+#include "material.hpp"
 #include "options.hpp"
 #include "scene.hpp"
 #include "state.hpp"
 
-#include "kernels/cpu/camera.hpp"
-#include "kernels/cpu/stream_bvh_kernel.hpp"
 #include "accel/bvh.hpp"
 #include "accel/bvh/binned_sah_builder.hpp"
+
+#include "kernels/cpu/camera.hpp"
+#include "kernels/cpu/stream_bvh_kernel.hpp"
+#include "kernels/cpu/deferred_shading_kernel.hpp"
 
 #include <thread>
 #include <vector>
@@ -16,8 +19,9 @@ struct cpu_t::details_t {
 
   accel::mbvh_t accel;
 
-  camera_kernel_t      camera_rays;
-  stream_mbvh_kernel_t trace;
+  camera_kernel_t           camera_rays;
+  stream_mbvh_kernel_t      trace;
+  deferred_shading_kernel_t shade;
 
   details_t()
     : trace(&accel)
@@ -49,8 +53,12 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
   for (auto i=0; i<concurrency; ++i) {
     details->threads.push_back(std::thread(
       [&](const scene_t& scene, frame_state_t& frame) {
+	// create per thread state in the shading system
+	material_t::attach();
+	
 	// TODO: if no shading work is to be done...
 	pipeline_state_t<>* state = new pipeline_state_t<>();
+	
 	job::tiles_t::tile_t tile;
 	while (frame.tiles->next(tile)) {
 	  // acquire a set of samples from the unit square, to generate
@@ -59,16 +67,17 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	  const auto& camera  = scene.camera;
 
 	  active_t<> active;
+	  active.reset(0);
 
 	  details->camera_rays(camera.to_world, tile, samples, state);
-	  details->trace(*state, active);
+	  details->trace(state, active);
+
+	  details->shade(scene, state, active);
+	  // details->integrate(state, deferred);
 	  //
-	  //  sort results by material
-	  //
-	  //  generate secondary rays
-	  //  trace shadow rays
-	  //  shade
-	  //  compute next path elements
+	  // write to film
+
+	  // compute next path elements
 	}
 	delete state;
 	

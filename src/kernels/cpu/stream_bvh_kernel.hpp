@@ -13,9 +13,9 @@ struct stream_mbvh_kernel_t {
 
   /* find the closest intersection point for all rays in the
    * current work item in the pipeline */
-  void trace(pipeline_state_t<>& state, active_t<>& active) const;
+  void trace(pipeline_state_t<>* state, active_t<>& active) const;
 
-  inline void operator()(pipeline_state_t<>& state, active_t<>& active) const {
+  inline void operator()(pipeline_state_t<>* state, active_t<>& active) const {
     trace(state, active);
   }
 };

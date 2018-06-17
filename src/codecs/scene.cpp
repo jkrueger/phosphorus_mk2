@@ -1,7 +1,8 @@
 #include "scene.hpp"
 #include "../scene.hpp"
-#include "scene/entities.hpp"
 #include "scene/alembic.hpp"
+#include "scene/entities.hpp"
+#include "scene/material.hpp"
 #include "utils/filesystem.hpp"
 
 #include <yaml-cpp/yaml.h>
@@ -31,6 +32,17 @@ namespace codec {
     void import(const std::string& path, scene_t& scene) {
       const auto config = YAML::LoadFile(path);
       const auto base   = fs::basepath(path);
+
+      std::cout << "Importing materials" << std::endl;
+
+      // import materials
+      const auto materials = config["materials"];
+      for (auto i=materials.begin(); i!=materials.end(); ++i) {
+	std::cout << "Importing: " << i->first.as<std::string>() << std::endl;
+	scene.add(i->second.as<material_t*>());
+      }
+
+      std::cout << "Importing scene data" << std::endl;
 
       // import scene data from files
       const auto scene_data = config["data"];

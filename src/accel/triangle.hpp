@@ -34,7 +34,7 @@ namespace accel {
       }
 
       inline void intersect(
-        pipeline_state_t<>& stream
+        pipeline_state_t<>* stream
       , uint32_t* indices
       , uint32_t num) const
       {
@@ -54,18 +54,18 @@ namespace accel {
 	const auto rays  = simd::load((int32_t*) indices);
 	
 	const auto o = simd::vector3_t(
-	    stream.rays.p.x
-	  , stream.rays.p.y
-	  , stream.rays.p.z
+	    stream->rays.p.x
+	  , stream->rays.p.y
+	  , stream->rays.p.z
 	  , rays);
 	
 	const auto wi = simd::vector3_t(
-	    stream.rays.wi.x
-	  , stream.rays.wi.y
-	  , stream.rays.wi.z
+	    stream->rays.wi.x
+	  , stream->rays.wi.y
+	  , stream->rays.wi.z
 	  , rays);
 	
-	auto d = simd::float_t<SIMD_WIDTH>::gather(stream.rays.d, rays);
+	auto d = simd::float_t<SIMD_WIDTH>::gather(stream->rays.d, rays);
 	auto j = simd::load((int32_t) 0);
 	
 	for (auto i=0; i<N; ++i) {
@@ -114,14 +114,14 @@ namespace accel {
 	    const auto x = *(indices + n);
 	    const auto t = ts[n];
 	    // update shortest hit distance of ray
-	    stream.rays.d[x] = ds[t];
+	    stream->rays.d[x] = ds[t];
 	    // update shading parameters
-	    stream.shading.mesh[x] = meshid[t];
-	    stream.shading.set[x]  = setid[t];
-	    stream.shading.face[x] = faceid[t];
-	    stream.shading.u[x]    = u[t];
-	    stream.shading.v[x]    = v[t];
-	    stream.hit(x);
+	    stream->shading.mesh[x] = meshid[t];
+	    stream->shading.set[x]  = setid[t];
+	    stream->shading.face[x] = faceid[t];
+	    stream->shading.u[x]    = u[t];
+	    stream->shading.v[x]    = v[t];
+	    stream->hit(x);
 	  }
 	}
       }

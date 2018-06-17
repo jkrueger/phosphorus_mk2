@@ -1,5 +1,6 @@
 #pragma once
 
+#include "state.hpp"
 #include "triangle.hpp"
 
 #include <ImathVec.h>
@@ -21,7 +22,7 @@ struct mesh_t {
   /* a face set applies a material to a sub mesh */
   struct face_set_t {
     std::vector<uint32_t> faces;
-    // TODO: handle to material for the set
+    uint32_t material;
   };
 
   /* helper stuff to construct a mesh. mostly just here to hide
@@ -49,6 +50,7 @@ struct mesh_t {
   Imath::V3f* normals;
   Imath::V2f* uvs;
   uint32_t*   faces;
+  face_set_t* sets;
 
   uint32_t id;
   uint32_t flags;
@@ -62,4 +64,19 @@ struct mesh_t {
 
   /* get a list of descriptors of the triangles in this mesh */
   void triangles(std::vector<triangle_t>& triangle) const;
+
+  /* fill in the shading parameters for in the state from this mesh */
+  void shading_parameters(pipeline_state_t<>* state, uint32_t i) const;
+
+  inline bool has_per_vertex_normals() const {
+    return (flags & NormalsPerVertex) != 0;
+  }
+
+  inline bool has_per_vertex_uvs() const {
+    return (flags & UvPerVertex) != 0;
+  }
+
+  inline uint32_t material(uint32_t set) const {
+    return sets[set].material;
+  }
 };

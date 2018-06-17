@@ -1,4 +1,5 @@
 #include "codecs/scene.hpp"
+#include "material.hpp"
 #include "options.hpp"
 #include "scene.hpp"
 #include "state.hpp"
@@ -90,6 +91,8 @@ int main(int argc, char** argv) {
     usage();
     return -1;
   }
+
+  material_t::boot(options);
 
   std::cout << "Importing scene: " << options.scene << std::endl;
   scene_t scene;

@@ -39,6 +39,7 @@ struct pipeline_state_t {
   shading_t shading;
 
   uint8_t flags[size];
+  bsdf_t* bsdf[size];
 
   inline pipeline_state_t() {
     memset(flags, 0, sizeof(flags));
@@ -50,7 +51,11 @@ struct pipeline_state_t {
 
   inline void hit(uint32_t i) {
     flags[i] |= (HIT << 16);
-  } 
+  }
+
+  inline bool is_hit(uint32_t i) const {
+    return (flags[i] & HIT) != 0;
+  }
 };
 
 /* The state kept while evaluating a stream of occlusion
@@ -73,14 +78,22 @@ struct active_t {
   uint32_t num;
   uint32_t index[N];
 
-  inline active_t() {
-    reset(0);
-  }
+  inline active_t()
+    : num(0)
+  {}
 
   inline void reset(uint32_t base) {
     num = N;
     for (auto i=0; i<N; ++i) {
-      index[i] = i;
+      index[i] = base + i;
     }
+  }
+
+  inline void add(uint32_t i) {
+    index[i] = i;
+  }
+
+  inline bool has_live_paths() const {
+    return num > 0;
   }
 };

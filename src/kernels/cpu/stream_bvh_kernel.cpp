@@ -8,7 +8,7 @@
 /* Implements MBVH-RS algorithm for tracing a set of rays through 
  * the scene */
 template<typename Stream>
-void intersect(Stream& stream, const active_t<>& active, const accel::mbvh_t* bvh) {
+void intersect(Stream* stream, const active_t<>& active, const accel::mbvh_t* bvh) {
   static thread_local stream::lanes_t<accel::mbvh_t::width> lanes;
   static thread_local stream::task_t tasks[256];
 
@@ -51,7 +51,7 @@ void intersect(Stream& stream, const active_t<>& active, const accel::mbvh_t* bv
 	typename simd::float_t<accel::mbvh_t::width>::type dist;
 
 	const auto  ray  = *todo;
-	const auto& rays = stream.rays;
+	const auto& rays = stream->rays;
 
 	auto hits =
 	  simd::intersect<accel::mbvh_t::width>(
@@ -125,6 +125,6 @@ stream_mbvh_kernel_t::stream_mbvh_kernel_t(const accel::mbvh_t* bvh)
   : bvh(bvh)
 {}
 
-void stream_mbvh_kernel_t::trace(pipeline_state_t<>& state, active_t<>& active) const {
+void stream_mbvh_kernel_t::trace(pipeline_state_t<>* state, active_t<>& active) const {
   intersect(state, active, bvh);
 }
