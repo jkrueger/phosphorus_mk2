@@ -40,9 +40,24 @@ namespace mbvh {
       bounds[i + 40] = b.max.z;
     }
 
+    inline Imath::Box3f get_bounds() const {
+      Imath::Box3f bounds;
+      for (auto i=0; i<N; ++i) {
+	bounds.extendBy(get_bounds(i));
+      }
+      return bounds;
+    }
+
+    inline Imath::Box3f get_bounds(uint32_t i) const {
+      return Imath::Box3f(
+        Imath::V3f(bounds[i], bounds[i+8], bounds[i+16]),
+	Imath::V3f(bounds[i+24], bounds[i+32], bounds[i+40]));
+    }
+
     inline void set_leaf(uint32_t i, uint32_t index, uint32_t count) {
-      flags[i] = 0x1;
-      num[i]   = count;
+      flags[i]  = 0x1;
+      offset[i] = index;
+      num[i]    = count;
     }
   };
 }

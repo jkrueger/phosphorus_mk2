@@ -1,5 +1,6 @@
 #pragma once
 
+#include "film.hpp"
 #include "sampling.hpp"
 #include "jobs/tiles.hpp"
 #include "math/simd.hpp"
@@ -10,9 +11,11 @@
 struct frame_state_t {
   sampler_t     sampler;
   job::tiles_t* tiles;
+  film_t<>* film;
 
-  inline frame_state_t(job::tiles_t* tiles)
+  inline frame_state_t(job::tiles_t* tiles, film_t<>* film)
     : tiles(tiles)
+    , film(film)
   {}
 
   inline ~frame_state_t() {
@@ -42,19 +45,19 @@ struct pipeline_state_t {
   bsdf_t* bsdf[size];
 
   inline pipeline_state_t() {
-    memset(flags, 0, sizeof(flags));
+    memset(flags, 0, size);
   }
 
   inline void miss(uint32_t i) {
-    flags[i] &= (~(HIT << 16));
+    flags[i] &= ~HIT;
   }
 
   inline void hit(uint32_t i) {
-    flags[i] |= (HIT << 16);
+    flags[i] |= HIT;
   }
 
   inline bool is_hit(uint32_t i) const {
-    return (flags[i] & HIT) != 0;
+    return (flags[i] & HIT) == HIT;
   }
 };
 
@@ -68,7 +71,6 @@ struct occlusion_query_state_t {
   typedef soa::ray_t<size> ray_t;
 
   ray_t rays;
-
 };
 
 /* active masks for the pipeline and occlusion query states, 

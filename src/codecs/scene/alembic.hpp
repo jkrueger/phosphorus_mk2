@@ -85,12 +85,16 @@ namespace codec {
 	normalsParam.getExpanded(sample, selector);
 	
 	const auto values = sample.getVals();
+
+	// std::cout << values->size() << std::endl;
 	
 	for (auto i=0; i<values->size(); ++i) {
 	  Abc::V3f n;
 	  xform.multDirMatrix((*values)[i], n);
 	  builder->add_normal(Abc::V3f(-n.x, n.y, -n.z).normalize());
 	}
+
+	// std::cout << values->size() << std::endl;
 
 	return values->size();
       }
@@ -173,12 +177,12 @@ namespace codec {
 	const auto points = schema.getPositionsProperty().getValue();
 	const auto size   = points->size();
 
-	uint32_t num_normals;
-	uint32_t num_indices;
-	uint32_t num_uvs;
+	uint32_t num_normals = 0;
+	uint32_t num_indices = 0;
+	uint32_t num_uvs = 0;
 
 	for (auto i=0; i<size; ++i) {
-	  builder->add_vertex((*points)[i] * xform);
+	  builder->add_vertex((*points)[i] /* * xform */);
 	}
 
 	if (const auto indicesParam = schema.getFaceIndicesProperty()) {
@@ -200,12 +204,12 @@ namespace codec {
 	if (names.size() > 0) {
 	  for (const auto& n : names) {
 	    const auto& set = schema.getFaceSet(n);
-	    
+
 	    std::vector<uint32_t> faces;
 	    import_faces(faces, set.getSchema().getFacesProperty());
-	    
+
 	    std::cout << "Importing face set: " << n << ": " << faces.size() << std::endl;
-	    /*
+	    /* 
 	    const auto material = scene.material(n);
 	    if (!material) {
 	      std::cout << "Missing material: " << n << std::endl;
@@ -269,7 +273,7 @@ namespace codec {
         Geo::IObject object
       , scene_t& scene
       , const Abc::M44d& xform)
-      {	
+      {
 	if (Geo::IXform::matches(object.getHeader())) {
 	  Abc::M44d childXform(xform);
 	  import_xform(Geo::IXform(object, Geo::kWrapExisting), childXform);

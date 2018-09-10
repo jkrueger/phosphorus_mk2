@@ -11,7 +11,9 @@ add_executable(phosphorus
   src/scene.cpp
   src/accel/bvh.cpp
   src/codecs/scene.cpp
+  src/film/file.cpp
   src/kernels/cpu/stream_bvh_kernel.cpp
+  src/kernels/cpu/linear_bvh_kernel.cpp
   src/xpu.cpp
   src/xpu/cpu.cpp)
 

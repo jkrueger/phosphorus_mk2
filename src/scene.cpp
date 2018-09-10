@@ -23,6 +23,8 @@ scene_t::~scene_t() {
 }
 
 void scene_t::preprocess() {
+  std::cout << details->meshes.size() << std::endl;
+
   for (auto& mesh: details->meshes) {
     mesh->preprocess(/*, lights */);
   }

@@ -72,7 +72,7 @@ struct material_t::details_t {
   }
 
   void bsdf_from_closure(bsdf_t* bsdf, const ClosureColor* c, const color_t w = color_t()) const {
-    std::cout << "TEST" << std::endl;
+    // std::cout << "TEST" << std::endl;
     switch(c->id) {
     case ClosureColor::MUL:
       {
@@ -187,7 +187,9 @@ void material_t::evaluate(
 , pipeline_state_t<>* state
 , const active_t<>& active)
 {
-  printf("Evaluating shader: %d\n", active.num);
+  if (active.num > 0) {
+    printf("Evaluating shader: %d\n", active.num);
+  }
 
   for (auto i=0; i<active.num; ++i) {
     const auto index = active.index[i];

@@ -13,7 +13,7 @@ namespace simd {
     typedef __m256 type;
 
     static inline __m256 gather(const float* const p, const __m256i& i) {
-      return _mm256_i32gather_ps(p, i, 1);
+      return _mm256_i32gather_ps(p, i, 4);
     }
   };
 
@@ -81,15 +81,15 @@ namespace simd {
     return _mm256_cmp_ps(l, r, _CMP_GE_OS);
   }
 
-  inline __m256 _or(const __m256 l, const __m256& r) {
+  inline __m256 _or(const __m256& l, const __m256& r) {
     return _mm256_or_ps(l, r);
   }
 
-  inline __m256 _and(const __m256 l, const __m256& r) {
+  inline __m256 _and(const __m256& l, const __m256& r) {
     return _mm256_and_ps(l, r);
   }
 
-  inline __m256 andnot(const __m256 l, const __m256& r) {
+  inline __m256 andnot(const __m256& l, const __m256& r) {
     return _mm256_andnot_ps(l, r);
   }
 

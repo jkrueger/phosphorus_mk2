@@ -2,6 +2,8 @@
 
 #include "float8.hpp"
 
+#include <ImathVec.h>
+
 #include <xmmintrin.h>
 
 template<int N>
@@ -16,14 +18,18 @@ struct vector3_t
 
 template<>
 struct vector3_t<8> {
-  union {
-    __m256 v[3];
-    struct {
+  //union {
+  //__m256 v[3];
+  //struct {
       __m256 x, y, z;
-    };
-  };
+  //};
+  //};
 
   inline vector3_t()
+  {}
+
+  inline vector3_t(const vector3_t& cpy)
+    : x(cpy.x), y(cpy.y), z(cpy.z)
   {}
 
   inline vector3_t(
@@ -43,6 +49,10 @@ struct vector3_t<8> {
     z = _mm256_set1_ps(_z);
   }
 
+  inline vector3_t(const Imath::V3f& v)
+    : vector3_t(v.x, v.y, v.z)
+  {}
+
   inline vector3_t(
     const float* _x
   , const float* _y
@@ -55,14 +65,14 @@ struct vector3_t<8> {
 
   /* loads a vector from an SOA data structure via gather instructions */
   inline vector3_t(
-    const float*   _x
-  , const float*   _y
-  , const float*   _z
+    const float* _x
+  , const float* _y
+  , const float* _z
   , const __m256i& idx)
   {
-    x = _mm256_i32gather_ps(_x, idx, 1);
-    y = _mm256_i32gather_ps(_y, idx, 1);
-    z = _mm256_i32gather_ps(_z, idx, 1);
+    x = _mm256_i32gather_ps(_x, idx, 4);
+    y = _mm256_i32gather_ps(_y, idx, 4);
+    z = _mm256_i32gather_ps(_z, idx, 4);
   }
 
   inline vector3_t rcp() const {
@@ -80,6 +90,15 @@ struct vector3_t<8> {
       simd::msub(x, r.y, simd::mul(y, r.x))
     };
     return out;
+  }
+
+  inline void normalize() {
+    const auto l   = dot(*this);
+    const auto ool = _mm256_rcp_ps(_mm256_sqrt_ps(l));
+
+    x = _mm256_mul_ps(x, ool);
+    y = _mm256_mul_ps(y, ool);
+    z = _mm256_mul_ps(z, ool);
   }
 
   inline vector3_t operator-(const vector3_t& r) const {

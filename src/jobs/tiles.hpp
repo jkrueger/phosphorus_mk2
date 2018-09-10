@@ -4,7 +4,7 @@
 
 namespace job {
 
-  /* A ob that describes a set of precomputed tiles to be renderer */
+  /* A job that describes a set of precomputed tiles to be rendered */
   struct tiles_t {
     struct tile_t {
       uint32_t x, y;
@@ -43,7 +43,7 @@ namespace job {
 
       for (uint32_t y=0; y<vtiles; ++y) {
 	for (uint32_t x=0; x<htiles; ++x) {
-	  queue->tiles[y * htiles + x] = { x, y, tile_size, tile_size };
+	  queue->tiles[y * htiles + x] = { x*tile_size, y*tile_size, tile_size, tile_size };
 	}
       }
 

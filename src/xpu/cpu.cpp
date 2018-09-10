@@ -8,9 +8,14 @@
 #include "accel/bvh/binned_sah_builder.hpp"
 
 #include "kernels/cpu/camera.hpp"
-#include "kernels/cpu/stream_bvh_kernel.hpp"
+// #include "kernels/cpu/stream_bvh_kernel.hpp"
+#include "kernels/cpu/linear_bvh_kernel.hpp"
 #include "kernels/cpu/deferred_shading_kernel.hpp"
+#include "kernels/cpu/spt.hpp"
 
+#include "utils/allocator.hpp"
+
+#include <random> 
 #include <thread>
 #include <vector>
 
@@ -19,9 +24,11 @@ struct cpu_t::details_t {
 
   accel::mbvh_t accel;
 
-  camera_kernel_t           camera_rays;
-  stream_mbvh_kernel_t      trace;
-  deferred_shading_kernel_t shade;
+  camera_kernel_t            camera_rays;
+  linear_mbvh_kernel_t       trace;
+  deferred_shading_kernel_t  shade;
+  spt::sampler_t             sample_lights;
+  spt::integrator_t          integrate;
 
   details_t()
     : trace(&accel)
@@ -44,6 +51,9 @@ void cpu_t::preprocess(const scene_t& scene) {
     std::vector<triangle_t> triangles;
 
     scene.triangles(triangles);
+
+    std::cout << "TRIS: " << triangles.size() << std::endl;
+
     bvh::from(builder, triangles);
   }
   // TODO: precompute CDFs for scene lights, etc.
@@ -55,12 +65,14 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
       [&](const scene_t& scene, frame_state_t& frame) {
 	// create per thread state in the shading system
 	material_t::attach();
-	
-	// TODO: if no shading work is to be done...
-	pipeline_state_t<>* state = new pipeline_state_t<>();
+	// create append only memory allocator
+	allocator_t allocator(1024*1024*100);
 	
 	job::tiles_t::tile_t tile;
 	while (frame.tiles->next(tile)) {
+	  auto state  = new(allocator) pipeline_state_t<>();
+	  auto splats = new(allocator) color_t[tile.w * tile.h];
+
 	  // acquire a set of samples from the unit square, to generate
 	  // rays for this tile
 	  const auto& samples = frame.sampler.next_pixel_samples();
@@ -71,16 +83,32 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 
 	  details->camera_rays(camera.to_world, tile, samples, state);
 	  details->trace(state, active);
-
 	  details->shade(scene, state, active);
-	  // details->integrate(state, deferred);
-	  //
-	  // write to film
 
+	  auto shadow_samples = new(allocator) occlusion_query_state_t<>();
+
+	  details->sample_lights(scene, state, active, shadow_samples);
+	  // details->trace(shadow_samples, active);
+	  details->integrate(state, active, shadow_samples);
 	  // compute next path elements
+	  // apply filter
+
+	  // FIXME: temporary code to copy radiance values into output buffer
+	  // this should run through a filter kernel instead
+	  for (auto i=0; i<tile.w*tile.h; ++i) {
+	    const auto r = state->shading.r.at(i);
+	    const auto y = 0.5f + state->rays.wi.at(i).y * 0.5f;
+	    splats[i] = color_t(r);
+	  }
+
+	  frame.film->add_tile(
+	    Imath::V2i(tile.x, tile.y)
+	  , Imath::V2i(tile.w, tile.h)
+	  , splats);
+
+	  allocator.reset();
 	}
-	delete state;
-	
+
       }, std::cref(scene), std::ref(frame)));
   }
 }
@@ -93,7 +121,7 @@ void cpu_t::join() {
 
 cpu_t* cpu_t::make(const parsed_options_t& options) {
   const auto concurrency = 1;
-    // options.single_threaded ? 1 : std::thread::hardware_concurrency();
+  options.single_threaded ? 1 : std::thread::hardware_concurrency();
 
   return new cpu_t(concurrency);
 }

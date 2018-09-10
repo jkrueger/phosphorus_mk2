@@ -85,7 +85,7 @@ void mesh_t::preprocess() const {
 void mesh_t::triangles(std::vector<triangle_t>& triangles) const {
   for (auto i=0; i<details->sets.size(); ++i) {
     for (auto j=0; j<details->sets[i].faces.size(); j++) {
-      triangles.emplace_back(this, i, j);
+      triangles.emplace_back(this, i, details->sets[i].faces[j]*3);
     }
   }
 }
@@ -144,7 +144,9 @@ void mesh_t::shading_parameters(pipeline_state_t<>* state, uint32_t i) const {
 }
 
 triangle_t::triangle_t(const mesh_t* m, uint32_t set, uint32_t face)
-  : mesh(m), set(set), face(face)
+  : mesh(m)
+  , set(set)
+  , face(face)
 {}
 
 uint32_t triangle_t::meshid() const {
@@ -162,13 +164,13 @@ Imath::Box3f triangle_t::bounds() const {
 }
 
 const Imath::V3f& triangle_t::a() const {
-  return mesh->details->vertices[mesh->faces[face]];
+  return mesh->vertices[mesh->faces[face]];
 }
 
 const Imath::V3f& triangle_t::b() const {
-  return mesh->details->vertices[mesh->faces[face+1]];
+  return mesh->vertices[mesh->faces[face+1]];
 }
 
 const Imath::V3f& triangle_t::c() const {
-  return mesh->details->vertices[mesh->faces[face+2]];
+  return mesh->vertices[mesh->faces[face+2]];
 }

@@ -24,6 +24,12 @@ namespace soa {
     Imath::V3f at(uint32_t i) const {
       return Imath::V3f(x[i], y[i], z[i]);
     }
+
+    void from(uint32_t i, const Imath::V3f& v) {
+      x[i] = v.x;
+      y[i] = v.y;
+      z[i] = v.z;
+    }
   };
 
   /* a stream of rays */
