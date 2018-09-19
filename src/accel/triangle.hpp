@@ -7,6 +7,8 @@
 #include "math/soa.hpp"
 #include "utils/nocopy.hpp"
 
+#include <cmath> 
+
 namespace accel {
   /* Members of this namespace store optimized triangle data, and implement 
    * intersection algorithms on them */
@@ -39,6 +41,62 @@ namespace accel {
 	}
       }
 
+      /** 
+       * Intersect each ray with each triangle stored in this accelerator, one by one
+       * This is mostly here as a baseline algorithm to verify simd implementations 
+       */
+      inline void baseline(
+        pipeline_state_t<>* stream
+      , uint32_t* indices
+      , uint32_t num_rays) const {
+        for (auto i=0; i<num_rays; ++i) {
+          for (auto j=0; j<num; ++j) {
+            const auto index = indices[i];
+
+            auto v0v1 = _e0.at(j);
+            auto v0v2 = _e1.at(j);
+            auto p    = stream->rays.wi.at(index).cross(v0v2);
+
+            auto det = v0v1.dot(p);
+
+            if (std::abs(det) < 0.00000001) {
+              continue;
+            }
+
+            auto ood = 1.0 / det;
+
+            auto t = stream->rays.p.at(index) - _v0.at(j);
+
+            auto u = t.dot(p) * ood;
+            if (u < 0.0 || u > 1.0) {
+              continue;
+            }
+
+            auto q = t.cross(v0v1);
+
+            auto v = stream->rays.wi.at(index).dot(q) * ood;
+            if (v < 0.0 || (u + v) > 1.0) {
+              continue;
+            }
+            
+            auto d = v0v2.dot(q) * ood;
+            if (d < 0.0 || d > stream->rays.d[index]) {
+              continue;
+            }
+
+            // update shortest hit distance of ray
+            stream->rays.d[index] = d;
+            // update shading parameters
+            stream->shading.mesh[index] = meshid[j];
+            stream->shading.set[index] = setid[j];
+            stream->shading.face[index] = faceid[j];
+            // stream->shading.u[index] = u[i];
+            // stream->shading.v[index] = v[i];
+            stream->hit(index);
+          }
+        }
+      }
+
       inline void intersect2(
 	pipeline_state_t<>* stream
       , uint32_t* indices
@@ -50,19 +108,19 @@ namespace accel {
 	  peps = simd::load(0.00000001f),
 	  meps = simd::load(-0.00000001f);
 
-	const auto e0 = vector3_t<N>(_e0.x, _e0.y, _e0.z);
-	const auto e1 = vector3_t<N>(_e1.x, _e1.y, _e1.z);
-	const auto v0 = vector3_t<N>(_v0.x, _v0.y, _v0.z);
+	vector3_t<N> e0(_e0.x, _e0.y, _e0.z);
+        vector3_t<N> e1(_e1.x, _e1.y, _e1.z);
+	vector3_t<N> v0(_v0.x, _v0.y, _v0.z);
 
 	for (auto i=0; i<num_rays; ++i) {
 	  const auto index = indices[i];
 
-	  const auto o = vector3_t<N>(
+	  vector3_t<N> o(
 	      stream->rays.p.x[index]
 	    , stream->rays.p.y[index]
 	    , stream->rays.p.z[index]);
 
-	  const auto wi = vector3_t<N>(
+	  vector3_t<N> wi(
 	      stream->rays.wi.x[index]
 	    , stream->rays.wi.y[index]
 	    , stream->rays.wi.z[index]);
@@ -81,18 +139,14 @@ namespace accel {
 
 	  const auto xmask = simd::_or(simd::gt(det, peps), simd::lt(det, meps));
 	  const auto umask = simd::gte(us, zero);
-	  const auto vmask =
-	    simd::_and(
-	      simd::gte(vs, zero)
-	    , simd::lte(simd::add(us, vs), one));
+	  const auto vmask = simd::_and(simd::gte(vs, zero), simd::lte(simd::add(us, vs), one));
 
-	  const auto dmask =
-	    simd::_and(simd::gte(ds, zero), simd::lt(ds, d));
+	  const auto dmask = simd::_and(simd::gte(ds, zero), simd::lt(ds, d));
 
 	  auto mask =
 	    simd::movemask(
 	      simd::_and(
-	        simd::_and(
+                simd::_and(
 		  simd::_and(vmask, umask),
 		  dmask),
 		xmask));
@@ -106,7 +160,7 @@ namespace accel {
 	    int idx = -1;
 	    while(mask != 0) {
 	      auto x = __bscf(mask);
-	      if (dists[x] > 0.0f && dists[x] < closest && (7-x) < num) {
+	      if (dists[x] < closest && x < num) {
 		closest = dists[x];
 		idx = x;
 	      }
@@ -122,9 +176,9 @@ namespace accel {
 	      // update shortest hit distance of ray
 	      stream->rays.d[index] = closest;
 	      // update shading parameters
-	      stream->shading.mesh[index] = meshid[7-idx];
-	      stream->shading.set[index] = setid[7-idx];
-	      stream->shading.face[index] = faceid[7-idx];
+	      stream->shading.mesh[index] = meshid[idx];
+	      stream->shading.set[index] = setid[idx];
+	      stream->shading.face[index] = faceid[idx];
 	      stream->shading.u[index] = u[idx];
 	      stream->shading.v[index] = v[idx];
 	      stream->hit(index);

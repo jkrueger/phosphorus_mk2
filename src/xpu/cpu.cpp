@@ -8,8 +8,8 @@
 #include "accel/bvh/binned_sah_builder.hpp"
 
 #include "kernels/cpu/camera.hpp"
-// #include "kernels/cpu/stream_bvh_kernel.hpp"
-#include "kernels/cpu/linear_bvh_kernel.hpp"
+#include "kernels/cpu/stream_bvh_kernel.hpp"
+// #include "kernels/cpu/linear_bvh_kernel.hpp"
 #include "kernels/cpu/deferred_shading_kernel.hpp"
 #include "kernels/cpu/spt.hpp"
 
@@ -25,7 +25,7 @@ struct cpu_t::details_t {
   accel::mbvh_t accel;
 
   camera_kernel_t            camera_rays;
-  linear_mbvh_kernel_t       trace;
+  stream_mbvh_kernel_t       trace;
   deferred_shading_kernel_t  shade;
   spt::sampler_t             sample_lights;
   spt::integrator_t          integrate;
@@ -51,8 +51,6 @@ void cpu_t::preprocess(const scene_t& scene) {
     std::vector<triangle_t> triangles;
 
     scene.triangles(triangles);
-
-    std::cout << "TRIS: " << triangles.size() << std::endl;
 
     bvh::from(builder, triangles);
   }
@@ -97,7 +95,6 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	  // this should run through a filter kernel instead
 	  for (auto i=0; i<tile.w*tile.h; ++i) {
 	    const auto r = state->shading.r.at(i);
-	    const auto y = 0.5f + state->rays.wi.at(i).y * 0.5f;
 	    splats[i] = color_t(r);
 	  }
 

@@ -79,12 +79,12 @@ struct vector3_t<8> {
     return {_mm256_rcp_ps(x), _mm256_rcp_ps(y), _mm256_rcp_ps(z)};
   }
 
-  inline __m256 dot(const vector3_t<8>& r) const {
+  inline __m256 dot(const vector3_t& r) const {
     return simd::madd(x, r.x, simd::madd(y, r.y, simd::mul(z, r.z)));
   }
 
   inline vector3_t cross(const vector3_t& r) const {
-    vector3_t<8> out = {
+    vector3_t out = {
       simd::msub(y, r.z, simd::mul(z, r.y)),
       simd::msub(z, r.x, simd::mul(x, r.z)),
       simd::msub(x, r.y, simd::mul(y, r.x))
@@ -102,7 +102,7 @@ struct vector3_t<8> {
   }
 
   inline vector3_t operator-(const vector3_t& r) const {
-    return vector3_t(simd::sub(x, r.x), simd::sub(y, r.y), simd::sub(z, r.z));
+    return {simd::sub(x, r.x), simd::sub(y, r.y), simd::sub(z, r.z)};
   }
 };
 
