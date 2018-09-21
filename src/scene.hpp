@@ -5,6 +5,7 @@
 
 #include <vector>
 
+struct light_t;
 struct material_t;
 struct mesh_t;
 struct triangle_t;
@@ -23,11 +24,17 @@ struct scene_t {
 
   void triangles(std::vector<triangle_t>& v) const;
 
+  void add(light_t* light);
+
   void add(mesh_t* mesh);
 
   void add(material_t* mesh);
+
+  uint32_t num_lights() const;
   
   uint32_t num_materials() const;
+
+  light_t* light(uint32_t index) const;
 
   mesh_t* mesh(uint32_t index) const;
 
