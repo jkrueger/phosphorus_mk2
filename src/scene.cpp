@@ -36,6 +36,11 @@ void scene_t::triangles(std::vector<triangle_t>& out) const {
   }
 }
 
+void scene_t::add(light_t* light) {
+  mesh->id = details->meshes.size();
+  details->meshes.push_back(mesh);
+}
+
 void scene_t::add(mesh_t* mesh) {
   mesh->id = details->meshes.size();
   details->meshes.push_back(mesh);
