@@ -11,7 +11,7 @@
 struct frame_state_t {
   sampler_t     sampler;
   job::tiles_t* tiles;
-  film_t<>* film;
+  film_t<>*     film;
 
   inline frame_state_t(job::tiles_t* tiles, film_t<>* film)
     : tiles(tiles)

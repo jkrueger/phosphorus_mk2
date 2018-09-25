@@ -10,6 +10,8 @@ struct light_t {
 
   void preprocess(scene_t* scene);
 
+  void sample();
+
   /* constructs a light source from a face set of a mesh */
   static light_t* make(mesh_t* m, uint32_t set);
 };

@@ -8,7 +8,11 @@ namespace spt {
       const scene_t& scene
     , pipeline_state_t<>* state
     , active_t<>& active
-    , occlusion_query_state_t<>* samples) {
+    , occlusion_query_state_t<>* samples)
+    {
+      for (auto i=0; i<active.num) {
+        
+      }
     }
   };
 
