@@ -104,13 +104,8 @@ int main(int argc, char** argv) {
   std::cout << "Discovering devices" << std::endl;
   const auto devices = xpu_t::discover(options);
 
-  std::cout << "Preprocessing" << std::endl;
-  preprocess(devices, scene);
-
-  std::cout << "Rendering..." << std::endl;
-
   film::file_t* sink = new film::file_t(scene.camera.film, options.output);
-  
+
   frame_state_t state(
     job::tiles_t::make(
       scene.camera.film.width
@@ -118,11 +113,17 @@ int main(int argc, char** argv) {
     , 32)
   , sink);
 
-  start_devices(devices, scene, state);
+  std::cout << "Preprocessing" << std::endl;
+  preprocess(devices, scene, state);
+
+  std::cout << "Rendering..." << std::endl;
+
+  start_devices(devices, scene);
   join(devices);
 
   sink->finalize();
 
   std::cout << "Done" << std::endl;
+  
   return 0;
 }
