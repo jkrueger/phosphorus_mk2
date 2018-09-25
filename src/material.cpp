@@ -27,17 +27,22 @@ struct material_t::details_t {
   static thread_local PerThreadInfo*  pti;
   static thread_local ShadingContext* ctx;
 
-  ShaderGroupRef group;
-
   union parameter_t {
     float f;
   };
 
+  struct empty_params_t
+  {};
+
+  ShaderGroupRef group;
+
   parameter_t  storage[256];
   parameter_t* parameter;
 
+  bool is_emitter;
+
   details_t()
-    : parameter(storage)
+    : parameter(storage), is_emitter(false)
   {}
 
   static void boot() {
@@ -47,11 +52,17 @@ struct material_t::details_t {
     system  = new ShadingSystem(service, nullptr, nullptr);
 
     ClosureParam params[][32] = {
-      { CLOSURE_VECTOR_PARAM(bsdf::lobes::diffuse_t, n),
-	CLOSURE_FINISH_PARAM(bsdf::lobes::diffuse_t) }
+      {
+       CLOSURE_FINISH_PARAMS(empty_params_t)
+      },
+      {
+       CLOSURE_VECTOR_PARAM(bsdf::lobes::diffuse_t, n),
+       CLOSURE_FINISH_PARAM(bsdf::lobes::diffuse_t)
+      }
     };
 
-    system->register_closure("diffuse", bsdf_t::Diffuse, params[0], NULL, NULL);
+    system->register_closure("emission", bsdf_t::Emissive, params[0], NULL, NULL);
+    system->register_closure("diffuse", bsdf_t::Diffuse, params[1], NULL, NULL);
   }
 
   static void attach() {
@@ -65,33 +76,48 @@ struct material_t::details_t {
 
   void finalize() {
     system->ShaderGroupEnd();
+
+    int num_closures = 0;
+    system->getattribute(group, "num_closures_needed", num_closures);
+
+    ustring* closures;
+    system->getattribute(group, "num_closures", TypeDesc::PTR, &closures);
+    
+    for (auto i=0; i<num_closures; ++i) {
+      if (closures[i] == "emission") {
+        is_light = true;
+      }
+    }
   }
 
   void execute(ShaderGlobals& sg) {
     system->execute(ctx, *group, sg);
   }
 
-  void bsdf_from_closure(bsdf_t* bsdf, const ClosureColor* c, const color_t w = color_t()) const {
-    // std::cout << "TEST" << std::endl;
+  void eval_closure(state_t<>* state, uint32_t index, const ClosureColor* c, const color_t w = color_t()) const {
     switch(c->id) {
     case ClosureColor::MUL:
       {
 	const auto cw = w * c->as_mul()->weight;
-	bsdf_from_closure(bsdf, c->as_mul()->closure, cw);
+	eval_closure(bsdf, c->as_mul()->closure, cw);
 	break;
       }
     case ClosureColor::ADD:
-      bsdf_from_closure(bsdf, c->as_add()->closureA, w);
-      bsdf_from_closure(bsdf, c->as_add()->closureB, w);
+      eval_closure(bsdf, c->as_add()->closureA, w);
+      eval_closure(bsdf, c->as_add()->closureB, w);
       break;
     default:
       {
 	const auto cw = w * c->as_mul()->weight;
 	const auto component = c->as_comp();
 	switch(component->id) {
+        case bsdf_t::Emissive:
+          state->shading.e += cw;
 	case bsdf_t::Diffuse:
-	  std::cout << "diffuse" << std::endl;
-	  bsdf->add_lobe(bsdf_t::Diffuse, cw, component->as<bsdf::lobes::diffuse_t>());
+	  state->shading.bsdf[index]->add_lobe(
+            bsdf_t::Diffuse
+          , cw
+          , component->as<bsdf::lobes::diffuse_t>());
 	  break;
 	}
       }
@@ -187,10 +213,6 @@ void material_t::evaluate(
 , pipeline_state_t<>* state
 , const active_t<>& active)
 {
-  if (active.num > 0) {
-    printf("Evaluating shader: %d\n", active.num);
-  }
-
   for (auto i=0; i<active.num; ++i) {
     const auto index = active.index[i];
     const auto mesh  = scene.mesh(index);
@@ -204,13 +226,18 @@ void material_t::evaluate(
     sg.N = sg.Ng = state->shading.n.at(index);
     sg.u = state->shading.u[index];
     sg.v = state->shading.v[index];
-    sg.backfacing = sg.N.dot(sg.I) > 0;
+    sg.backfacing = sg.N.dot(sg.I) < 0;
 
     details->execute(sg);
 
     state->shading.bsdf[index] = new bsdf_t();
-    details->bsdf_from_closure(state->shading.bsdf[index], sg.Ci);
+    
+    details->eval_closure(state, index, sg.Ci);
   }
+}
+
+bool material_t::is_emitter() const {
+  return details->is_emitter;
 }
 
 void material_t::boot(const parsed_options_t& options) {

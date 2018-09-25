@@ -7,6 +7,8 @@
 
 #include <vector>
 
+struct scene_t;
+
 /* a mesh models a 3d obect in the scene, with a set of materials 
  * applied to it */
 struct mesh_t {
@@ -60,7 +62,7 @@ struct mesh_t {
 
   builder_t* builder();
 
-  void preprocess() const;
+  void preprocess(scene_t* scene) const;
 
   /* get a list of descriptors of the triangles in this mesh */
   void triangles(std::vector<triangle_t>& triangle) const;

@@ -1,4 +1,6 @@
 #include "mesh.hpp"
+#include "light.hpp"
+#include "scene.hpp"
 #include "triangle.hpp"
 
 #include <vector>
@@ -78,8 +80,14 @@ mesh_t::builder_t* mesh_t::builder() {
   return new builder_impl_t(this);
 }
 
-void mesh_t::preprocess() const {
+void mesh_t::preprocess(scene_t* scene) const {
   // get emitting light face sets, based on materials
+  for (auto& i=0; i<details->sets.size(); ++i) {
+    const auto material = scene->material(details->sets[i].material);
+    if (material->is_emitter()) {
+      scene->add(light_t::make(this, i));
+    }
+  }
 }
 
 void mesh_t::triangles(std::vector<triangle_t>& triangles) const {

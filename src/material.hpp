@@ -48,6 +48,8 @@ struct material_t {
   , pipeline_state_t<>* state
   , const active_t<>& active);
 
+  bool is_emitter() const;
+
   static void attach();
 
   static void boot(const parsed_options_t& options);
