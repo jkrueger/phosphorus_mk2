@@ -51,6 +51,7 @@ namespace soa {
     float        v[N];
     float        s[N];
     float        t[N];
+    vector3_t<N> e;
     vector3_t<N> r;
     bsdf_t*      bsdf[N];
   };

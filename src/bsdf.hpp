@@ -13,6 +13,7 @@ struct bsdf_t {
    * on the gpu as well, where we don't have virtual fcuntion calls
    * the type flags are used for dispatch  */
   enum type_t {
+    Emissive = 0, // NOTE: this doesn't really correspond to a real bsdf
     Diffuse
   };
 

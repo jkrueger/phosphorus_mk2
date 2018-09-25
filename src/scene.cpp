@@ -1,11 +1,12 @@
 #include "scene.hpp"
+#include "light.hpp"
 #include "material.hpp"
 #include "mesh.hpp"
 
 struct scene_t::details_t {
   std::vector<mesh_t*>     meshes;
   std::vector<material_t*> materials;
-  // emitters
+  std::vector<light_t*>    lights;
 };
 
 scene_t::scene_t()
@@ -19,14 +20,19 @@ scene_t::~scene_t() {
   for (auto& material : details->materials) {
     delete material;
   }
+  for (auto& light: details->lights) {
+    delete light;
+  }
   delete details;
 }
 
 void scene_t::preprocess() {
-  std::cout << details->meshes.size() << std::endl;
-
   for (auto& mesh: details->meshes) {
-    mesh->preprocess(/*, lights */);
+    mesh->preprocess(this);
+  }
+
+  for (auto& light: details->lights) {
+    light->preprocess(this);
   }
 }
 

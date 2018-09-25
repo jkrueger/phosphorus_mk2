@@ -39,6 +39,7 @@
 # directories
 build
 debug
+release
 scenes
 design
 
