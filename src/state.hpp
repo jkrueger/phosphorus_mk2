@@ -71,6 +71,13 @@ struct occlusion_query_state_t {
   typedef soa::ray_t<size> ray_t;
 
   ray_t rays;
+
+  struct params_t {
+    float     d[size];
+    vector3_t e;
+  } params;
+
+  uint8_t flags[size];
 };
 
 /* active masks for the pipeline and occlusion query states, 

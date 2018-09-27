@@ -19,6 +19,9 @@ struct sampler_t {
     vector2_t<step> v[size/step];
   };
 
+  struct light_sample_t {
+  };
+
   typedef pixel_sample_t<> pixel_samples_t;
 
   pixel_samples_t pixel_samples;
