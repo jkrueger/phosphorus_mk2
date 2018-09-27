@@ -8,9 +8,11 @@ struct light_t {
 
   light_t(details_t* details);
 
+  /* precompute data to effectively sample the light source */
   void preprocess(scene_t* scene);
 
-  void sample();
+  /* sample a point on the light source */
+  void sample(const Imath::V2f& uv);
 
   /* constructs a light source from a face set of a mesh */
   static light_t* make(mesh_t* m, uint32_t set);

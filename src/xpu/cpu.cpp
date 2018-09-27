@@ -86,7 +86,7 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	  auto shadow_samples = new(allocator) occlusion_query_state_t<>();
 
 	  details->sample_lights(scene, state, active, shadow_samples);
-	  // details->trace(shadow_samples, active);
+	  details->trace(shadow_samples, active);
 	  details->integrate(state, active, shadow_samples);
 	  // compute next path elements
 	  // apply filter
