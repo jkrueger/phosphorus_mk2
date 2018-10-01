@@ -272,15 +272,8 @@ namespace accel {
 	    const auto x = indices[(7-n)];
 	    const auto t = ts[n];
 
-	    // update shortest hit distance of ray
-	    stream->rays.d[x] = ds[t];
-	    // update shading parameters
-	    stream->shading.mesh[x] = meshid[t];
-	    stream->shading.set[x]  = setid[t];
-	    stream->shading.face[x] = faceid[t];
-	    stream->shading.u[x]    = u[t];
-	    stream->shading.v[x]    = v[t];
-	    stream->hit(x);
+	    stream->shade(x, meshid[t], setid[t], faceid[t], u[t], v[t]);
+	    stream->hit(x, ds[t]);
 	  }
 	}
       }

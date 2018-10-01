@@ -42,17 +42,23 @@ namespace soa {
 
   /* a stream of shading parameters and results */
   template<int N>
-  struct shading_t {
+  struct shading_parameters_t {
+    // parameters coming out of the intersection kernel
     uint32_t     mesh[N];
     uint32_t     set[N];
     uint32_t     face[N];
-    vector3_t<N> n;
     float        u[N];
     float        v[N];
+    // computed from mesh
+    vector3_t<N> n;
     float        s[N];
     float        t[N];
+  };
+
+  template<int N>
+  struct shading_result_t {
+    bsdf_t*      bsdf[N];
     vector3_t<N> e;
     vector3_t<N> r;
-    bsdf_t*      bsdf[N];
   };
 }

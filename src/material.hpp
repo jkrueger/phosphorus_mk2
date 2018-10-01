@@ -48,6 +48,11 @@ struct material_t {
   , pipeline_state_t<>* state
   , const active_t<>& active);
 
+  void evaluate(
+    const scene_t& scene
+  , occlusion_query_state_t<>* state
+  , const active_t<>& active);
+
   bool is_emitter() const;
 
   static void attach();

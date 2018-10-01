@@ -182,3 +182,7 @@ const Imath::V3f& triangle_t::b() const {
 const Imath::V3f& triangle_t::c() const {
   return mesh->vertices[mesh->faces[face+2]];
 }
+
+const Imath::V3f triangle_t::sample(const Imath::V2f& v) const {
+  
+}

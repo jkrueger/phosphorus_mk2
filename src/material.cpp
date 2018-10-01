@@ -215,7 +215,7 @@ void material_t::evaluate(
 {
   for (auto i=0; i<active.num; ++i) {
     const auto index = active.index[i];
-    const auto mesh  = scene.mesh(index);
+    const auto mesh  = scene.mesh(state.shading.mesh[index]);
 
     mesh->shading_parameters(state, i);
 
@@ -224,8 +224,8 @@ void material_t::evaluate(
     sg.P = state->rays.p.at(index);
     sg.I = state->rays.wi.at(index);
     sg.N = sg.Ng = state->shading.n.at(index);
-    sg.u = state->shading.u[index];
-    sg.v = state->shading.v[index];
+    sg.u = state->shading.s[index];
+    sg.v = state->shading.t[index];
     sg.backfacing = sg.N.dot(sg.I) < 0;
 
     details->execute(sg);
