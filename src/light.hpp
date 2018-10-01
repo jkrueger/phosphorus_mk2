@@ -12,7 +12,7 @@ struct light_t {
   void preprocess(scene_t* scene);
 
   /* sample a point on the light source */
-  void sample(const Imath::V2f& uv);
+  void sample(const Imath::V2f& uv) const;
 
   /* constructs a light source from a face set of a mesh */
   static light_t* make(mesh_t* m, uint32_t set);

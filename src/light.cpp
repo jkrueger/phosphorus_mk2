@@ -3,14 +3,18 @@
 #include "mesh.hpp"
 #include "scene.hpp"
 
+#include <random> 
+
 struct light_t::details_t {
+  uint32_t set;
   uint32_t material;
   std::vector<triangle_t> triangles;
   float area;
   float* cdf;
 
-  details_t(uint32_t material)
-    : material(material)
+  details_t(uint32_t set, uint32_t material)
+    : set(set)
+    , material(material)
     , area(0.0f);
   {}
 
@@ -42,6 +46,26 @@ void light_t::preprocess(scene_t* scene) {
   for (auto i=0; i<num; ++i) {
     details->cdf[i] /= details->area;
   }
+}
+
+void light_t::sample(const Imath::V2f& uv) const {
+  const auto num = details->triangles.size();
+
+  auto i = 0;
+  while (i < num && uv.x < details->cdf[i]) {
+    ++i;
+  }
+
+  const auto one_minus_epsilon =
+    1.0f-std::numerical_limits<float>::epsilon();
+  const auto remapped =
+    std::min(uv.x * num - triangle, one_minus_epsilon);
+
+  const auto& triangle = details->triangles[i];
+  
+  out.p = triangle.sample({remapped, uv.y});
+  out.pdf = triangle.area() / details->area;
+  out.material = details->material;
 }
 
 light_t* light_t::make(mesh_t* mesh, uint32_t set) {

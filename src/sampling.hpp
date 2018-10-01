@@ -3,7 +3,10 @@
 #include "math/simd.hpp"
 #include "utils/compiler.hpp"
 
+struct scene_t;
+
 struct sampler_t {
+  struct details_t* details;
 
   template<int N=8>
   struct alignas(32) vector2_t {
@@ -20,15 +23,26 @@ struct sampler_t {
   };
 
   struct light_sample_t {
+    vector3_t p;
+    uint32_t material;
+    float pdf;
   };
 
   typedef pixel_sample_t<> pixel_samples_t;
 
   pixel_samples_t pixel_samples;
+  light_sample_t* light_samples;
 
   sampler_t();
+  ~sampler_t();
 
-  inline const pixel_samples_t& next_pixel_samples() {
+  void preprocess(const scene_t& scene);
+
+  inline const pixel_samples_t& next_pixel_samples() const {
     return pixel_samples;
+  }
+
+  inline const light_sample_t& next_light_sample() const {
+    return light_samples[0];
   }
 };

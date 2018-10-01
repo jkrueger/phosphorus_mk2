@@ -41,10 +41,10 @@ void intersect(Stream* stream, const active_t<>& active, const accel::mbvh_t* bv
       auto length = zero;
       auto end    = todo + cur.num_rays;
       while (todo != end) {
-	// if (Stream::stop_on_first_hit && ray.segment->is_hit()) {
-	//   ++todo;
-	//   continue;
-	// }
+	if (Stream::stop_on_first_hit && ray.segment->is_hit()) {
+	   ++todo;
+	   continue;
+	}
 
 	typename simd::float_t<accel::mbvh_t::width>::type dist;
 
