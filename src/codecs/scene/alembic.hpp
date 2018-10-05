@@ -86,15 +86,11 @@ namespace codec {
 	
 	const auto values = sample.getVals();
 
-	// std::cout << values->size() << std::endl;
-	
 	for (auto i=0; i<values->size(); ++i) {
 	  Abc::V3f n;
 	  xform.multDirMatrix((*values)[i], n);
-	  builder->add_normal(Abc::V3f(-n.x, n.y, -n.z).normalize());
+	  builder->add_normal(Abc::V3f(n.x, n.y, -n.z).normalize());
 	}
-
-	// std::cout << values->size() << std::endl;
 
 	return values->size();
       }
@@ -153,9 +149,10 @@ namespace codec {
 	  faces.push_back((uint32_t)(*values)[i]);
 	}
       }
-      
+
       void import_mesh(
-        const Geo::IPolyMesh& mesh
+	scene_t& scene
+      , const Geo::IPolyMesh& mesh
       , mesh_t* out
       , const Abc::M44d& xform)
       {
@@ -182,7 +179,8 @@ namespace codec {
 	uint32_t num_uvs = 0;
 
 	for (auto i=0; i<size; ++i) {
-	  builder->add_vertex((*points)[i] /* * xform */);
+	  const auto& p = (*points)[i] * xform;
+	  builder->add_vertex(Imath::V3f(p.x, p.y, -p.z));
 	}
 
 	if (const auto indicesParam = schema.getFaceIndicesProperty()) {
@@ -209,18 +207,19 @@ namespace codec {
 	    import_faces(faces, set.getSchema().getFacesProperty());
 
 	    std::cout << "Importing face set: " << n << ": " << faces.size() << std::endl;
-	    /* 
+	     
 	    const auto material = scene.material(n);
 	    if (!material) {
 	      std::cout << "Missing material: " << n << std::endl;
 	    }
-	    */
-	    builder->add_face_set(/*material, */faces);
+
+	    builder->add_face_set(material, faces);
 	  }
 	}
 
 	if (num_normals > 0 && num_normals != size) {
 	  if (num_normals == num_indices) {
+	    std::cout << "per face normals" << std::endl;
 	    builder->set_normals_per_vertex_per_face();
 	  }
 	  else {
@@ -284,7 +283,7 @@ namespace codec {
 	}
 	else if (Geo::IPolyMesh::matches(object.getHeader())) {
 	  mesh_t* mesh = new mesh_t();
-	  import_mesh(Geo::IPolyMesh(object, Geo::kWrapExisting), mesh, xform);
+	  import_mesh(scene, Geo::IPolyMesh(object, Geo::kWrapExisting), mesh, xform);
 	  scene.add(mesh);
 	}
 	else {

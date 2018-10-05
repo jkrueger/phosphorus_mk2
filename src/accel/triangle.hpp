@@ -84,21 +84,15 @@ namespace accel {
               continue;
             }
 
-            // update shortest hit distance of ray
-            stream->rays.d[index] = d;
-            // update shading parameters
-            stream->shading.mesh[index] = meshid[j];
-            stream->shading.set[index] = setid[j];
-            stream->shading.face[index] = faceid[j];
-            // stream->shading.u[index] = u[i];
-            // stream->shading.v[index] = v[i];
-            stream->hit(index);
+	    stream->shade(index, meshid[j], setid[j], faceid[j], u, v);
+	    stream->hit(index, d);
           }
         }
       }
 
+      template<typename T>
       inline void intersect2(
-	pipeline_state_t<>* stream
+	T* stream
       , uint32_t* indices
       , uint32_t num_rays) const
       {
@@ -154,7 +148,7 @@ namespace accel {
 	  if (mask != 0) {
 	    float dists[N];
 	    float closest = stream->rays.d[index];
-	  
+
 	    simd::store(ds, dists);
 
 	    int idx = -1;
@@ -174,14 +168,8 @@ namespace accel {
 	      simd::store(vs, v);
 
 	      // update shortest hit distance of ray
-	      stream->rays.d[index] = closest;
-	      // update shading parameters
-	      stream->shading.mesh[index] = meshid[idx];
-	      stream->shading.set[index] = setid[idx];
-	      stream->shading.face[index] = faceid[idx];
-	      stream->shading.u[index] = u[idx];
-	      stream->shading.v[index] = v[idx];
-	      stream->hit(index);
+	      stream->shade(index, meshid[idx], setid[idx], faceid[idx], u[idx], v[idx]);
+	      stream->hit(index, closest);
 	    }
 	  }
 	}

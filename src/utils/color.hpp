@@ -82,6 +82,22 @@ inline color_t operator*(const color_t& l, const color_t& r) {
   return color_t(l.r*r.r, l.g*r.g, l.b*r.b);
 }
 
+inline color_t operator*(const color_t& l, const Imath::V3f& r) {
+  return color_t(l.r*r.x, l.g*r.y, l.b*r.z);
+}
+ 
+inline Imath::V3f operator*(const Imath::V3f& l, const color_t& r) {
+  return Imath::V3f(l.x*r.r, l.y*r.g, l.z*r.b);
+}
+
+inline color_t operator+(const color_t& l, const Imath::V3f& r) {
+  return color_t(l.r+r.x, l.g+r.y, l.b+r.z);
+}
+
+inline color_t operator+(const Imath::V3f& l, const color_t& r) {
+  return color_t(l.x+r.r, l.y+r.g, l.z+r.b);
+}
+
 inline std::ostream& operator<<(std::ostream& o, const color_t& c) {
   return o << "color_t{" << c.r << ", " << c.g << ", " << c.b << "}";
 }

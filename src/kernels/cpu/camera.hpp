@@ -4,6 +4,7 @@
 #include "math/simd.hpp"
 #include "state.hpp"
 
+#include <cmath>
 #include <limits>
 
 namespace camera {
@@ -34,7 +35,7 @@ namespace camera {
 struct camera_kernel_t {
   template<typename Tile, typename Samples, int N>
   inline void operator()(
-    const Imath::M44f& to_world
+    const camera_t& camera
   , const Tile& tile
   , const Samples& samples
   , pipeline_state_t<N>* state)
@@ -47,19 +48,25 @@ struct camera_kernel_t {
       0,1,2,3,4,5,6,7
     };
 
-    const auto p = Imath::V3f(0,0,0) * to_world;
+    auto p = Imath::V3f(0,0,0) * camera.to_world;
+    p.x = 0;
+    p.y = 1;
+    p.z = -6;
 
-    const simd::vector3_t pos(0, 0, -8);
-    const simd::matrix44_t m(to_world);
+    const simd::vector3_t pos(p);
+    const simd::matrix44_t m(camera.to_world);
 
     const int32_t s = pipeline_state_t<N>::step;
 
-    auto  sample  = samples.v;
-    auto& ray     = state->rays;
-    auto  one     = simd::load(1.0f);
-    auto  step    = simd::load((float) s);
-    auto  half    = simd::load(0.5f);
-    auto  nhalf   = simd::load(-0.5f);
+    auto  sample = samples.v;
+    auto& ray    = state->rays;
+    auto  one    = simd::load(1.0f);
+    auto  step   = simd::load((float) s);
+    auto  half   = simd::load(0.5f);
+    auto  nhalf  = simd::load(-0.5f);
+
+    auto  fov  = 2.0f * std::atan2(camera.sensor_width * 0.5f, camera.focal_length);
+    auto  zoom = simd::load(std::tan(fov * 0.5f));
 
     auto px = simd::add(simd::load((float) tile.x), simd::load(seqv));
     auto py = simd::load((float) tile.y);
@@ -83,8 +90,8 @@ struct camera_kernel_t {
 	, sample->y
 	, onev);
 
-	wi.x = simd::add(ndcx, simd::mul(wi.x, stepx));
-	wi.y = simd::add(ndcy, simd::mul(wi.y, stepy));
+	wi.x = simd::mul(simd::add(ndcx, simd::mul(wi.x, stepx)), zoom);
+	wi.y = simd::mul(simd::add(ndcy, simd::mul(wi.y, stepy)), zoom);
 	
 	camera::compute_ray(pos, m, wi, ray, off);
 

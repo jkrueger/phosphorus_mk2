@@ -3,6 +3,7 @@
 #include "triangle.hpp"
 #include "entities/camera.hpp"
 
+#include <string>
 #include <vector>
 
 struct light_t;
@@ -28,7 +29,7 @@ struct scene_t {
 
   void add(mesh_t* mesh);
 
-  void add(material_t* mesh);
+  void add(const std::string& name, material_t* mesh);
 
   uint32_t num_lights() const;
   
@@ -39,4 +40,5 @@ struct scene_t {
   mesh_t* mesh(uint32_t index) const;
 
   material_t* material(uint32_t index) const;
+  material_t* material(const std::string& name) const;
 };

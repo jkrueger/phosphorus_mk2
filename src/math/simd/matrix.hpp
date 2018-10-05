@@ -36,17 +36,17 @@ struct matrix44_t<8> {
     vector3_t<8> out;
 
     auto x = _mm256_mul_ps(v.x, m[0][0]);
-    x = _mm256_fmadd_ps(v.y, m[0][1], x);
-    x = _mm256_fmadd_ps(v.z, m[0][2], x);
+    x = _mm256_fmadd_ps(v.y, m[1][0], x);
+    x = _mm256_fmadd_ps(v.z, m[2][0], x);
     out.x = x;
 
-    auto y = _mm256_mul_ps(v.x, m[1][0]);
+    auto y = _mm256_mul_ps(v.x, m[0][1]);
     y = _mm256_fmadd_ps(v.y, m[1][1], y);
-    y = _mm256_fmadd_ps(v.z, m[1][2], y);
+    y = _mm256_fmadd_ps(v.z, m[2][1], y);
     out.y = y;
 
-    auto z = _mm256_mul_ps(v.x, m[2][0]);
-    z = _mm256_fmadd_ps(v.y, m[2][1], z);
+    auto z = _mm256_mul_ps(v.x, m[0][2]);
+    z = _mm256_fmadd_ps(v.y, m[1][2], z);
     z = _mm256_fmadd_ps(v.z, m[2][2], z);
     out.z = z;
 

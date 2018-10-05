@@ -9,12 +9,13 @@
 
 /* Global state for the rendering of one frame */
 struct frame_state_t {
-  sampler_t     sampler;
+  sampler_t*    sampler;
   job::tiles_t* tiles;
   film_t<>*     film;
 
-  inline frame_state_t(job::tiles_t* tiles, film_t<>* film)
-    : tiles(tiles)
+  inline frame_state_t(sampler_t* sampler, job::tiles_t* tiles, film_t<>* film)
+    : sampler(sampler)
+    , tiles(tiles)
     , film(film)
   {}
 
@@ -27,7 +28,7 @@ namespace details {
   static const uint32_t DEAD   = 0;
   static const uint32_t ALIVE  = 0x1;
   static const uint32_t HIT    = 0x2;
-  static const uint32_t MASKED = 0x3;
+  static const uint32_t MASKED = 0x4;
 }
 
 /* The state kept in the pipeline while rendering one 
@@ -40,17 +41,28 @@ struct pipeline_state_t {
 
   static const bool stop_on_first_hit = false;
 
-  typedef soa::ray_t<size>     ray_t;
-  typedef soa::shading_t<size> shading_t;
+  typedef soa::ray_t<size> ray_t;
+  typedef soa::shading_parameters_t<size> shading_parameters_t;
+  typedef soa::shading_result_t<size> shading_result_t;
 
   ray_t                rays;
   shading_parameters_t shading;
   shading_result_t     result;
 
+  soa::vector3_t<size> beta;
+
   uint8_t flags[size];
+  uint8_t depth[size];
 
   inline pipeline_state_t() {
     memset(flags, 0, size);
+    memset(depth, 0, size);
+    memset(&result.r, 0, sizeof(result.r));
+    memset(&result.e, 0, sizeof(result.e));
+
+    for (auto i=0; i<size; ++i) {
+      beta.from(i, Imath::V3f(1.0f));
+    }
   }
 
   inline void miss(uint32_t i) {
@@ -89,15 +101,14 @@ struct occlusion_query_state_t {
   static const bool stop_on_first_hit = true;
 
   typedef soa::ray_t<size> ray_t;
+  typedef soa::shading_parameters_t<size> shading_parameters_t;
+  typedef soa::shading_result_t<size> shading_result_t;
 
   ray_t rays;
+  shading_parameters_t shading;
+  shading_result_t result;
 
-  struct params_t {
-    float    d[size];
-    float    pdf[size];
-    uint32_t material[size];
-  } params;
-
+  float   pdf[size];
   uint8_t flags[size];
 
   inline occlusion_query_state_t() {
@@ -114,7 +125,7 @@ struct occlusion_query_state_t {
 
   inline void hit(uint32_t i, float d) {
     flags[i] |= details::HIT;
-    raus.d[i] = d;
+    rays.d[i] = d;
   }
 
   inline bool is_hit(uint32_t i) const {
@@ -122,18 +133,24 @@ struct occlusion_query_state_t {
   }
 
   inline bool is_masked(uint32_t i) const {
-    return (flags[i] & details::HIT) == details::HIT;
+    return (flags[i] & details::MASKED) == details::MASKED;
   } 
 
-  inline bool is_occluded() const {
-    return is_hit() || is_masked();
+  inline bool is_occluded(uint32_t i) const {
+    return is_hit(i) || is_masked(i);
   }
 
   inline void shade(
     uint32_t i
-  , uint32_t meshid, uint32_t setid, uint32_t faceid
+  , uint32_t mesh, uint32_t set, uint32_t face
   , float u, float v)
-  {}
+  {
+    shading.mesh[i] = mesh;
+    shading.set[i]  = set;
+    shading.face[i] = face;
+    shading.u[i]    = u;
+    shading.v[i]    = v;
+  }
 };
 
 /* active masks for the pipeline and occlusion query states, 
@@ -155,7 +172,7 @@ struct active_t {
   }
 
   inline void add(uint32_t i) {
-    index[i] = i;
+    index[num++] = i;
   }
 
   inline bool has_live_paths() const {

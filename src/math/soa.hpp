@@ -1,5 +1,7 @@
 #pragma once
 
+#include "config.hpp"
+
 #include <ImathVec.h>
 
 struct bsdf_t;
@@ -30,10 +32,16 @@ namespace soa {
       y[i] = v.y;
       z[i] = v.z;
     }
+
+    void from(uint32_t i, const color_t& c) {
+      x[i] = c.r;
+      y[i] = c.g;
+      z[i] = c.b;
+    }
   };
 
   /* a stream of rays */
-  template<int N>
+  template<int N = config::STREAM_SIZE>
   struct ray_t {
     vector3_t<N> p;
     vector3_t<N> wi;
@@ -41,7 +49,7 @@ namespace soa {
   };
 
   /* a stream of shading parameters and results */
-  template<int N>
+  template<int N = config::STREAM_SIZE>
   struct shading_parameters_t {
     // parameters coming out of the intersection kernel
     uint32_t     mesh[N];
@@ -55,7 +63,7 @@ namespace soa {
     float        t[N];
   };
 
-  template<int N>
+  template<int N = config::STREAM_SIZE>
   struct shading_result_t {
     bsdf_t*      bsdf[N];
     vector3_t<N> e;

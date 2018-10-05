@@ -28,8 +28,6 @@ namespace accel {
     std::vector<mbvh_t::details_t::node_t>& nodes;
     std::vector<mbvh_t::details_t::triangle_t>& triangles;
 
-    std::set<uint32_t> set;
-
     builder_t(mbvh_t* bvh)
       : bvh(bvh)
       , nodes(bvh->details->nodes)
@@ -42,8 +40,6 @@ namespace accel {
       bvh->triangles = triangles.data();
 
       bvh->num_triangles = triangles.size();
-
-      std::cout << "SIZE: " << size << ", SET: " << set.size() << std::endl;
     }
 
     uint32_t make_node() {
@@ -65,19 +61,10 @@ namespace accel {
 
       const triangle_t* tris[mbvh_t::width];
 
-      if ((end - begin) == 0) {
-	printf("TESTX\n");
-      }
-
-      if ((end - begin) > 8) {
-	printf("TESTY\n");
-      }
-
       for (auto i=begin; i<end; i+=mbvh_t::width) {
 	auto num = std::min(8u, (uint32_t)(end-i));
 	for (auto j=0; j<num; ++j) {
 	  tris[j] = &things[primitives[i+j].index];
-	  set.insert(primitives[i+j].index);
 	}
 	triangles.emplace_back(tris, num);
 	size += num;

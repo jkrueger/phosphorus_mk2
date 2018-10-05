@@ -7,6 +7,7 @@
 
 #include <vector>
 
+struct material_t;
 struct scene_t;
 
 /* a mesh models a 3d obect in the scene, with a set of materials 
@@ -23,8 +24,12 @@ struct mesh_t {
 
   /* a face set applies a material to a sub mesh */
   struct face_set_t {
-    std::vector<uint32_t> faces;
     uint32_t material;
+    std::vector<uint32_t> faces;
+
+    inline uint32_t mat() const {
+      return material;
+    }
   };
 
   /* helper stuff to construct a mesh. mostly just here to hide
@@ -39,7 +44,7 @@ struct mesh_t {
     virtual void add_normal(const Imath::V3f& n) = 0;
     virtual void add_uv(const Imath::V2f& uv) = 0;
     virtual void add_face(uint32_t a, uint32_t b, uint32_t c) = 0;
-    virtual void add_face_set(const std::vector<uint32_t>& faces) = 0;
+    virtual void add_face_set(const material_t* m, const std::vector<uint32_t>& faces) = 0;
 
     virtual void set_normals_per_vertex() = 0;
     virtual void set_uvs_per_vertex() = 0;
@@ -62,13 +67,17 @@ struct mesh_t {
 
   builder_t* builder();
 
-  void preprocess(scene_t* scene) const;
+  void preprocess(scene_t* scene);
 
   /* get a list of descriptors of the triangles in this mesh */
   void triangles(std::vector<triangle_t>& triangle) const;
 
-  /* fill in the shading parameters for in the state from this mesh */
-  void shading_parameters(pipeline_state_t<>* state, uint32_t i) const;
+  void triangles(uint32_t set, std::vector<triangle_t>& triangle) const;
+
+  /* fill in the shading parameters in the state from this mesh */
+  void shading_parameters(
+    soa::shading_parameters_t<>& parameters
+  , uint32_t i) const;
 
   inline bool has_per_vertex_normals() const {
     return (flags & NormalsPerVertex) != 0;
@@ -79,6 +88,6 @@ struct mesh_t {
   }
 
   inline uint32_t material(uint32_t set) const {
-    return sets[set].material;
+    return sets[set].mat();
   }
 };
