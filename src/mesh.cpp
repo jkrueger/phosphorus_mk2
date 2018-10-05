@@ -183,6 +183,19 @@ const Imath::V3f& triangle_t::c() const {
   return mesh->vertices[mesh->faces[face+2]];
 }
 
-const Imath::V3f triangle_t::sample(const Imath::V2f& v) const {
-  
+float triangle_t::area() const {
+  const auto ab = b() - a();
+  const auto ac = c() - a();
+
+  const auto z = cross(ab, ac);
+
+  return 0.5f * z.length();
+}
+
+Imath::V3f triangle_t::sample(const Imath::V2f& uv) const {
+  const auto x = std::sqrt(uv.x);
+  const auto u = 1 - x;
+  const auto v = uv.y * x;
+
+  return u * a() + v * b() + (1-u-v) * c();
 }
