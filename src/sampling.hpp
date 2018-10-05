@@ -23,7 +23,9 @@ struct sampler_t {
   };
 
   struct light_sample_t {
-    vector3_t p;
+    Imath::V3f p;
+    Imath::V3f n;
+    Imath::V2f uv;
     uint32_t material;
     float pdf;
   };

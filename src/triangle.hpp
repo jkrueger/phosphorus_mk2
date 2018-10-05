@@ -16,6 +16,10 @@ struct triangle_t {
 
   uint32_t meshid() const;
 
+  float area();
+
+  Imath::V3f sample(const Imath::V2f& uv)
+
   Imath::Box3f bounds() const;
 
   const Imath::V3f& a() const;
