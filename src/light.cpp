@@ -61,9 +61,11 @@ void light_t::sample(const Imath::V2f& uv) const {
   const auto remapped =
     std::min(uv.x * num - triangle, one_minus_epsilon);
 
-  const auto& triangle = details->triangles[i];
-  
-  out.p = triangle.sample({remapped, uv.y});
+  const auto& triangle    = details->triangles[i];
+  const auto  barycentric = triangle.sample({remapped, uv.y});
+
+  out.p   = triangle.barycentric_to_point(barycentric);
+  out.uv  = barycentric;
   out.pdf = triangle.area() / details->area;
   out.material = details->material;
 }

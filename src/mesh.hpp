@@ -67,7 +67,7 @@ struct mesh_t {
   /* get a list of descriptors of the triangles in this mesh */
   void triangles(std::vector<triangle_t>& triangle) const;
 
-  /* fill in the shading parameters for in the state from this mesh */
+  /* fill in the shading parameters in the state from this mesh */
   void shading_parameters(pipeline_state_t<>* state, uint32_t i) const;
 
   inline bool has_per_vertex_normals() const {

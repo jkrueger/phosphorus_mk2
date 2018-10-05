@@ -217,7 +217,7 @@ void material_t::evaluate(
     const auto index = active.index[i];
     const auto mesh  = scene.mesh(state.shading.mesh[index]);
 
-    mesh->shading_parameters(state, i);
+    mesh->shading_parameters(state, index);
 
     ShaderGlobals sg;
     memset(&sg, 0, sizeof(ShaderGlobals));

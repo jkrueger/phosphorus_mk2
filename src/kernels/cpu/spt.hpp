@@ -1,7 +1,7 @@
 #pragma once
 
 #include "state.hpp"
-#include "math/vector.hpp"
+include "math/vector.hpp"
 
 namespace spt {
   struct sampler_t {
@@ -19,16 +19,21 @@ namespace spt {
         const auto wi = sample.p - state->shading.p.at(index);
 
         if (is_same_hemisphere(n, wi)) {
-	  samples->params.d[index] = wi.length();
+	  samples->rays.d[index] = wi.length();
 	  samples->rays.p.from(index, offset(sample.p, n));
 
 	  wi.normalize();
 	  samples->rays.wi.from(index, wi);
-	  samples->params.pdf[index] = sample.pdf;
-	  samples->params.material = sample.material;
+          samples->shading.mesh[index] = sample.mesh;
+          samples->shading.set[index] = sample.set;
+          samples->shading.face[index] = sample.face;
+          samples->shading.u[index] = samples->uv.x;
+          samples->shading.v[index] = samples->uv.y;
+
+	  samples->pdf[index] = sample.pdf;
         }
         else {
-          samples.mask(i);
+          samples.mask(index);
         }
       }
     }
@@ -44,7 +49,7 @@ namespace spt {
       for (auto i=0; i<active.num; ++i) {
 	const auto index = active.index[i];
 
-	if (state->is_hit(index) && !samples->is_occluded(index)) {
+	if (!state->is_hit(index) && !samples->is_occluded(index)) {
 	  const auto il = samples.rays.wi.at(index);
 	  const auto ol = -state->shading.rays.wi.at(index);
 
@@ -52,8 +57,10 @@ namespace spt {
 	  const auto s = dot(state.shading.n.at(index), ol) /
 	    samples->params.pdf[index];
 
-	  const auto m = scene.material(samples->params.material[index]);
-	  material->evaluate(scene, samples, );
+          const auto mesh = scene.mesh(samples->shading.mesh[i]);
+          const auto material = scene.material(mesh->material(samples->shading.set[i]));
+
+	  material->evaluate(scene, samples.shading, samples.result);
 
 	  state->result.r.from((r * samples->result.e.at(index)) * s);
 	}

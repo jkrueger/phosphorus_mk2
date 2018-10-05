@@ -91,13 +91,10 @@ struct occlusion_query_state_t {
   typedef soa::ray_t<size> ray_t;
 
   ray_t rays;
+  shading_parameters_t shading;
+  shading_result result;
 
-  struct params_t {
-    float    d[size];
-    float    pdf[size];
-    uint32_t material[size];
-  } params;
-
+  float   pdf[size];
   uint8_t flags[size];
 
   inline occlusion_query_state_t() {
