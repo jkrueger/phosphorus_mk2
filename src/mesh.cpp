@@ -1,8 +1,10 @@
 #include "mesh.hpp"
 #include "light.hpp"
+#include "material.hpp"
 #include "scene.hpp"
 #include "triangle.hpp"
 
+#include <cmath>
 #include <vector>
 
 struct mesh_t::details_t {
@@ -46,8 +48,8 @@ struct builder_impl_t : public mesh_t::builder_t {
     mesh->details->faces.push_back(c);
   }
 
-  void add_face_set(const std::vector<uint32_t>& faces) {
-    mesh->details->sets.push_back({faces});
+  void add_face_set(const material_t* material, const std::vector<uint32_t>& faces) {
+    mesh->details->sets.push_back({material->id, faces});
   }
 
   void set_normals_per_vertex() {
@@ -80,9 +82,9 @@ mesh_t::builder_t* mesh_t::builder() {
   return new builder_impl_t(this);
 }
 
-void mesh_t::preprocess(scene_t* scene) const {
+void mesh_t::preprocess(scene_t* scene) {
   // get emitting light face sets, based on materials
-  for (auto& i=0; i<details->sets.size(); ++i) {
+  for (auto i=0; i<details->sets.size(); ++i) {
     const auto material = scene->material(details->sets[i].material);
     if (material->is_emitter()) {
       scene->add(light_t::make(this, i));
@@ -90,19 +92,26 @@ void mesh_t::preprocess(scene_t* scene) const {
   }
 }
 
-void mesh_t::triangles(std::vector<triangle_t>& triangles) const {
+void mesh_t::triangles(std::vector<triangle_t>& out) const {
   for (auto i=0; i<details->sets.size(); ++i) {
-    for (auto j=0; j<details->sets[i].faces.size(); j++) {
-      triangles.emplace_back(this, i, details->sets[i].faces[j]*3);
-    }
+    triangles(i, out);
   }
 }
 
-void mesh_t::shading_parameters(pipeline_state_t<>* state, uint32_t i) const {
-  const auto& face = state->shading.face[i];
+void mesh_t::triangles(uint32_t set, std::vector<triangle_t>& out) const {
+  for (auto j=0; j<details->sets[set].faces.size(); j++) {
+    out.emplace_back(this, set, details->sets[set].faces[j]*3);
+  }
+}
 
-  const auto u = state->shading.u[i];
-  const auto v = state->shading.v[i];
+void mesh_t::shading_parameters(
+  soa::shading_parameters_t<>& parameters
+, uint32_t i) const
+{
+  const auto& face = parameters.face[i];
+
+  const auto u = parameters.u[i];
+  const auto v = parameters.v[i];
 
   const auto w = 1 - u - v;
   const auto a = faces[face];
@@ -123,13 +132,13 @@ void mesh_t::shading_parameters(pipeline_state_t<>* state, uint32_t i) const {
 
   const auto n = (w*n0+u*n1+v*n2).normalize();
 
-  state->shading.n.x[i] = n.x;
-  state->shading.n.y[i] = n.y;
-  state->shading.n.z[i] = n.z;
+  parameters.n.x[i] = n.x;
+  parameters.n.y[i] = n.y;
+  parameters.n.z[i] = n.z;
 
   if (details->uvs.size() == 0) {
-    state->shading.u[i] = 0;
-    state->shading.v[i] = 0;
+    parameters.u[i] = 0;
+    parameters.v[i] = 0;
   }
   else {
     auto uva = a, uvb = b, uvc = c;
@@ -146,8 +155,8 @@ void mesh_t::shading_parameters(pipeline_state_t<>* state, uint32_t i) const {
 
     const auto uv = w*uv0+u*uv1+v*uv2;
 
-    state->shading.s[i] = uv.x;
-    state->shading.t[i] = uv.y;
+    parameters.s[i] = uv.x;
+    parameters.t[i] = uv.y;
   }
 }
 
@@ -171,6 +180,15 @@ Imath::Box3f triangle_t::bounds() const {
   return bounds;
 }
 
+float triangle_t::area() const {
+  const auto ab = b() - a();
+  const auto ac = c() - a();
+
+  const auto z = ab.cross(ac);
+
+  return 0.5f * z.length();
+}
+
 const Imath::V3f& triangle_t::a() const {
   return mesh->vertices[mesh->faces[face]];
 }
@@ -183,19 +201,14 @@ const Imath::V3f& triangle_t::c() const {
   return mesh->vertices[mesh->faces[face+2]];
 }
 
-float triangle_t::area() const {
-  const auto ab = b() - a();
-  const auto ac = c() - a();
-
-  const auto z = cross(ab, ac);
-
-  return 0.5f * z.length();
+Imath::V3f triangle_t::barycentric_to_point(const Imath::V2f& uv) const {
+  return uv.x * a() + uv.y * b() + (1-uv.x-uv.y) * c();
 }
 
-Imath::V3f triangle_t::sample(const Imath::V2f& uv) const {
+Imath::V2f triangle_t::sample(const Imath::V2f& uv) const {
   const auto x = std::sqrt(uv.x);
   const auto u = 1 - x;
   const auto v = uv.y * x;
 
-  return u * a() + v * b() + (1-u-v) * c();
+  return {u, v};
 }

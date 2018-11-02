@@ -4,6 +4,7 @@
 
 #include <string>
 
+struct allocator_t;
 struct color_t;
 struct parsed_options_t;
 struct scene_t;
@@ -15,6 +16,9 @@ struct material_t {
 
   struct builder_t {
     typedef std::unique_ptr<builder_t> scoped_t;
+
+    virtual ~builder_t()
+    {}
 
     virtual void shader(
       const std::string& name
@@ -44,14 +48,15 @@ struct material_t {
   builder_t* builder();
 
   void evaluate(
-    const scene_t& scene
+    allocator_t& allocator
+  , const scene_t& scene
   , pipeline_state_t<>* state
   , const active_t<>& active);
 
   void evaluate(
     const scene_t& scene
   , occlusion_query_state_t<>* state
-  , const active_t<>& active);
+  , uint32_t index);
 
   bool is_emitter() const;
 

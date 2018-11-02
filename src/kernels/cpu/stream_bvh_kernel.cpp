@@ -41,15 +41,15 @@ void intersect(Stream* stream, const active_t<>& active, const accel::mbvh_t* bv
       auto length = zero;
       auto end    = todo + cur.num_rays;
       while (todo != end) {
-	if (Stream::stop_on_first_hit && ray.segment->is_hit()) {
-	   ++todo;
-	   continue;
-	}
-
 	typename simd::float_t<accel::mbvh_t::width>::type dist;
 
 	const auto  ray  = *todo;
 	const auto& rays = stream->rays;
+
+	if (Stream::stop_on_first_hit && stream->is_hit(ray)) {
+	   ++todo;
+	   continue;
+	}
 
 	auto hits =
 	  simd::intersect<accel::mbvh_t::width>(
@@ -118,7 +118,7 @@ void intersect(Stream* stream, const active_t<>& active, const accel::mbvh_t* bv
 
 	  if (prims < cur.prims) {
 	    std::cout << "HANDLE THIS!" << std::endl;
-	  } 
+	  }
 	} while(unlikely(prims < cur.prims));
 
 	begin+=accel::mbvh_t::width;
@@ -132,5 +132,9 @@ stream_mbvh_kernel_t::stream_mbvh_kernel_t(const accel::mbvh_t* bvh)
 {}
 
 void stream_mbvh_kernel_t::trace(pipeline_state_t<>* state, active_t<>& active) const {
+  intersect(state, active, bvh);
+}
+
+void stream_mbvh_kernel_t::trace(occlusion_query_state_t<>* state, active_t<>& active) const {
   intersect(state, active, bvh);
 }

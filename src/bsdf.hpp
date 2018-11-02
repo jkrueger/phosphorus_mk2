@@ -1,8 +1,7 @@
 #pragma once
 
+#include "bsdf/params.hpp"
 #include "utils/color.hpp"
-
-struct sample_t;
 
 /* models a surface reflection function which can be evaluated and 
  * sampled by an integrator */
@@ -17,9 +16,13 @@ struct bsdf_t {
     Diffuse
   };
 
+  union param_t{
+    bsdf::lobes::diffuse_t diffuse;
+  };
+
   type_t   type[MaxLobes];
   color_t  weight[MaxLobes];
-  void*    params[MaxLobes];
+  uint8_t  params[MaxLobes*sizeof(param_t)];
   uint32_t lobes;
 
   /* evaluate the bsdf for a given pair of directions */
@@ -27,7 +30,7 @@ struct bsdf_t {
 
   /* sample the bsdf given an incident direction */
   color_t sample(
-    const sample_t& sample
+    const Imath::V2f& sample
   , const Imath::V3f& wi
   , Imath::V3f& wo
   , float& pdf) const;
@@ -35,8 +38,8 @@ struct bsdf_t {
   template<typename T>
   inline void add_lobe(type_t t, const color_t& c, const T* p) {
     type[lobes]   = t;
-    params[lobes] = new T(*p);
     weight[lobes] = c;
+    memcpy(&params[lobes*sizeof(param_t)], p, sizeof(T));
     ++lobes;
   }
 };

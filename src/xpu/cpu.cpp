@@ -27,7 +27,7 @@ struct cpu_t::details_t {
   camera_kernel_t            camera_rays;
   stream_mbvh_kernel_t       trace;
   deferred_shading_kernel_t  shade;
-  spt::sampler_t             sample_lights;
+  spt::light_sampler_t       sample_lights;
   spt::integrator_t          integrate;
 
   details_t()
@@ -68,34 +68,57 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	
 	job::tiles_t::tile_t tile;
 	while (frame.tiles->next(tile)) {
-	  auto state  = new(allocator) pipeline_state_t<>();
 	  auto splats = new(allocator) color_t[tile.w * tile.h];
 
-	  // acquire a set of samples from the unit square, to generate
-	  // rays for this tile
-	  const auto& samples = frame.sampler.next_pixel_samples();
-	  const auto& camera  = scene.camera;
+	  for (auto i=0; i<frame.sampler->spp; ++i) {
+	    allocator_scope_t scope(allocator);
 
-	  active_t<> active;
-	  active.reset(0);
+	    auto state  = new(allocator) pipeline_state_t<>();
 
-	  details->camera_rays(camera.to_world, tile, samples, state);
-	  details->trace(state, active);
-	  details->shade(scene, state, active);
+	    // acquire a set of samples from the unit square, to generate
+	    // rays for this tile
+	    const auto& samples = frame.sampler->next_pixel_samples(i);
+	    const auto& camera  = scene.camera;
 
-	  auto shadow_samples = new(allocator) occlusion_query_state_t<>();
+	    active_t<> active;
+	    active.reset(0);
 
-	  details->sample_lights(scene, state, active, shadow_samples);
-	  details->trace(shadow_samples, active);
-	  details->integrate(state, active, shadow_samples);
-	  // compute next path elements
-	  // apply filter
+	    details->camera_rays(camera, tile, samples, state);
 
-	  // FIXME: temporary code to copy radiance values into output buffer
-	  // this should run through a filter kernel instead
-	  for (auto i=0; i<tile.w*tile.h; ++i) {
-	    const auto r = state->shading.r.at(i);
-	    splats[i] = color_t(r);
+	    do {
+	      // automatically free up allocator memory in each
+	      // loop iteration
+	      allocator_scope_t scope(allocator);
+
+	      details->trace(state, active);
+
+	      // FIME: find the proper place for this
+	      for (auto j=0; j<active.num; ++j) {
+		const auto index = active.index[j];
+		const auto p     = state->rays.p.at(index);
+		const auto wi    = state->rays.wi.at(index);
+		
+		state->rays.p.from(index, p + wi * state->rays.d[index]);
+	      }
+
+	      details->shade(allocator, scene, state, active);
+
+	      auto shadow_samples = new(allocator) occlusion_query_state_t<>();
+
+	      details->sample_lights(frame.sampler, state, active, shadow_samples);
+	      details->trace(shadow_samples, active);
+	      details->integrate(frame.sampler, scene, state, active, shadow_samples);
+	      
+	    } while (active.has_live_paths());
+
+	      // apply fiter
+
+	    // FIXME: temporary code to copy radiance values into output buffer
+	    // this should run through a filter kernel instead
+	    for (auto j=0; j<tile.w*tile.h; ++j) {
+	      const auto r = state->result.r.at(j);
+	      splats[j] += color_t(r) * (1.0f / frame.sampler->spp);
+	    }
 	  }
 
 	  frame.film->add_tile(
@@ -105,7 +128,6 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 
 	  allocator.reset();
 	}
-
       }, std::cref(scene), std::ref(frame)));
   }
 }
@@ -117,8 +139,8 @@ void cpu_t::join() {
 }
 
 cpu_t* cpu_t::make(const parsed_options_t& options) {
-  const auto concurrency = 1;
-  options.single_threaded ? 1 : std::thread::hardware_concurrency();
+  const auto concurrency =
+    options.single_threaded ? 1 : std::thread::hardware_concurrency();
 
   return new cpu_t(concurrency);
 }

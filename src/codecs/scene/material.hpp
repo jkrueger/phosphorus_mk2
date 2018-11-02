@@ -46,17 +46,12 @@ namespace YAML {
   template<>
   struct convert<material_t*> {
     static bool decode(const Node& node, material_t*& material) {
-      std::cout << "TEST" << std::endl;
       if (!node.IsMap()) {
 	return false;
       }
-      std::cout << "TEST2" << std::endl;
-
       material = new material_t();
-      
-      material_t::builder_t::scoped_t builder(material->builder());
 
-      std::cout << "Shaders" << std::endl;
+      material_t::builder_t::scoped_t builder(material->builder());
 
       const auto shaders = node["shaders"];
       for (auto i=shaders.begin(); i!=shaders.end(); ++i) {
@@ -65,8 +60,6 @@ namespace YAML {
 	, (*i)["layer"].as<std::string>()
 	, (*i)["type"].as<std::string>("surface"));
       }
-
-      std::cout << "Parameters" << std::endl;
 
       const auto parameters=node["parameters"];
       for (auto i=parameters.begin(); i!=parameters.end(); ++i) {

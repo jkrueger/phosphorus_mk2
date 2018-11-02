@@ -4,7 +4,9 @@ project (phosphorus)
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 
 add_executable(phosphorus
+  src/bsdf.cpp
   src/core.cpp
+  src/light.cpp
   src/material.cpp
   src/mesh.cpp
   src/sampling.cpp

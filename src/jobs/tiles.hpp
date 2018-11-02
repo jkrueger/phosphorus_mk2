@@ -28,7 +28,7 @@ namespace job {
 
     const bool next(tile_t& out) {
       const auto t = tile++;
-      if (t < size) { 
+      if (t < size) {
 	out = tiles[t];
 	return true;
       }

@@ -15,7 +15,8 @@
 static option options[] = {
   { "output",     0,           NULL, 'o' },
   { "no-gpu",     0,           NULL, 'c' },
-  { "one-thread", no_argument, NULL, '1' }
+  { "one-thread", no_argument, NULL, '1' },
+  { "spp",        0,           NULL, 's' }
 };
 
 void usage() {
@@ -27,7 +28,7 @@ void usage() {
 bool parse_args(int argc, char** argv, parsed_options_t& parsed) {
   char ch;
 
-  while ((ch = getopt_long(argc, argv, "o:", options, nullptr)) != -1) {
+  while ((ch = getopt_long(argc, argv, "os:", options, nullptr)) != -1) {
     switch (ch) {
     case 'o':
       parsed.output = optarg;
@@ -39,6 +40,9 @@ bool parse_args(int argc, char** argv, parsed_options_t& parsed) {
     case 'c':
       std::cout << "CPU only mode" << std::endl;
       parsed.host_only = true;
+      break;
+    case 's':
+      parsed.samples_per_pixel = std::atoi(optarg);
       break;
     case '?':
     default:
@@ -65,12 +69,14 @@ bool parse_args(int argc, char** argv, parsed_options_t& parsed) {
 }
 
 template<typename T>
-void preprocess(const T& devices, scene_t& scene) {
+void preprocess(const T& devices, scene_t& scene, frame_state_t& state) {
   scene.preprocess();
 
   for(auto& device: devices) { 
     device->preprocess(scene);
   }
+
+  state.sampler->preprocess(scene);
 }
 
 template<typename T>
@@ -105,9 +111,11 @@ int main(int argc, char** argv) {
   const auto devices = xpu_t::discover(options);
 
   film::file_t* sink = new film::file_t(scene.camera.film, options.output);
+  sampler_t* sampler = new sampler_t(options);
 
   frame_state_t state(
-    job::tiles_t::make(
+    sampler
+  , job::tiles_t::make(
       scene.camera.film.width
     , scene.camera.film.height
     , 32)
@@ -118,7 +126,7 @@ int main(int argc, char** argv) {
 
   std::cout << "Rendering..." << std::endl;
 
-  start_devices(devices, scene);
+  start_devices(devices, scene, state);
   join(devices);
 
   sink->finalize();

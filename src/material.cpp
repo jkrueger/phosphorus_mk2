@@ -3,6 +3,7 @@
 #include "scene.hpp"
 #include "bsdf.hpp"
 #include "bsdf/params.hpp"
+#include "utils/allocator.hpp"
 #include "utils/color.hpp"
 
 #pragma clang diagnostic push
@@ -53,7 +54,7 @@ struct material_t::details_t {
 
     ClosureParam params[][32] = {
       {
-       CLOSURE_FINISH_PARAMS(empty_params_t)
+       CLOSURE_FINISH_PARAM(empty_params_t)
       },
       {
        CLOSURE_VECTOR_PARAM(bsdf::lobes::diffuse_t, n),
@@ -78,14 +79,16 @@ struct material_t::details_t {
     system->ShaderGroupEnd();
 
     int num_closures = 0;
-    system->getattribute(group, "num_closures_needed", num_closures);
+    system->getattribute(group.get(), "num_closures_needed", num_closures);
 
     ustring* closures;
-    system->getattribute(group, "num_closures", TypeDesc::PTR, &closures);
+    system->getattribute(group.get(), "closures_needed", TypeDesc::PTR, &closures);
+
+    std::cout << num_closures << std::endl;
     
     for (auto i=0; i<num_closures; ++i) {
       if (closures[i] == "emission") {
-        is_light = true;
+        is_emitter = true;
       }
     }
   }
@@ -94,30 +97,38 @@ struct material_t::details_t {
     system->execute(ctx, *group, sg);
   }
 
-  void eval_closure(state_t<>* state, uint32_t index, const ClosureColor* c, const color_t w = color_t()) const {
+  void eval_closure(
+    soa::shading_result_t<>& result
+  , uint32_t index
+  , const ClosureColor* c
+  , const color_t w = color_t(1,1,1)) const
+  {
     switch(c->id) {
     case ClosureColor::MUL:
       {
 	const auto cw = w * c->as_mul()->weight;
-	eval_closure(bsdf, c->as_mul()->closure, cw);
+	eval_closure(result, index, c->as_mul()->closure, cw);
 	break;
       }
     case ClosureColor::ADD:
-      eval_closure(bsdf, c->as_add()->closureA, w);
-      eval_closure(bsdf, c->as_add()->closureB, w);
+      eval_closure(result, index, c->as_add()->closureA, w);
+      eval_closure(result, index, c->as_add()->closureB, w);
       break;
     default:
       {
-	const auto cw = w * c->as_mul()->weight;
 	const auto component = c->as_comp();
+	const auto cw = w * component->w;
 	switch(component->id) {
         case bsdf_t::Emissive:
-          state->shading.e += cw;
+          result.e.from(index, cw);
+	  break;
 	case bsdf_t::Diffuse:
-	  state->shading.bsdf[index]->add_lobe(
-            bsdf_t::Diffuse
-          , cw
-          , component->as<bsdf::lobes::diffuse_t>());
+	  if (auto bsdf = result.bsdf[index]) {
+	    bsdf->add_lobe(
+	      bsdf_t::Diffuse
+	    , cw
+	    , component->as<bsdf::lobes::diffuse_t>());
+	  }
 	  break;
 	}
       }
@@ -140,7 +151,7 @@ struct material_builder_t : public material_t::builder_t {
     material->details->init();
   }
 
-  ~material_builder_t() {
+  virtual ~material_builder_t() {
     material->details->finalize();
   }
 
@@ -209,15 +220,16 @@ material_t::builder_t* material_t::builder() {
 }
 
 void material_t::evaluate(
-  const scene_t& scene
+  allocator_t& allocator
+, const scene_t& scene
 , pipeline_state_t<>* state
 , const active_t<>& active)
 {
   for (auto i=0; i<active.num; ++i) {
     const auto index = active.index[i];
-    const auto mesh  = scene.mesh(state.shading.mesh[index]);
+    const auto mesh  = scene.mesh(state->shading.mesh[index]);
 
-    mesh->shading_parameters(state, index);
+    mesh->shading_parameters(state->shading, index);
 
     ShaderGlobals sg;
     memset(&sg, 0, sizeof(ShaderGlobals));
@@ -230,10 +242,28 @@ void material_t::evaluate(
 
     details->execute(sg);
 
-    state->shading.bsdf[index] = new bsdf_t();
+    state->result.bsdf[index] = new(allocator) bsdf_t();
     
-    details->eval_closure(state, index, sg.Ci);
+    details->eval_closure(state->result, index, sg.Ci);
   }
+}
+
+void material_t::evaluate(
+  const scene_t& scene
+, occlusion_query_state_t<>* state
+, uint32_t index)
+{
+  ShaderGlobals sg;
+  memset(&sg, 0, sizeof(ShaderGlobals));
+  sg.P = state->rays.p.at(index);
+  sg.I = -state->rays.wi.at(index);
+  sg.N = sg.Ng = state->shading.n.at(index);
+  sg.u = state->shading.s[index];
+  sg.v = state->shading.t[index];
+  sg.backfacing = sg.N.dot(sg.I) < 0;
+
+  details->execute(sg);
+  details->eval_closure(state->result, index, sg.Ci);
 }
 
 bool material_t::is_emitter() const {

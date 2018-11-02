@@ -15,7 +15,13 @@ struct stream_mbvh_kernel_t {
    * current work item in the pipeline */
   void trace(pipeline_state_t<>* state, active_t<>& active) const;
 
+  void trace(occlusion_query_state_t<>* state, active_t<>& active) const;
+
   inline void operator()(pipeline_state_t<>* state, active_t<>& active) const {
+    trace(state, active);
+  }
+
+  inline void operator()(occlusion_query_state_t<>* state, active_t<>& active) const {
     trace(state, active);
   }
 };
