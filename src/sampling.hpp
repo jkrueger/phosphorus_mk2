@@ -2,6 +2,7 @@
 
 #include "options.hpp"
 #include "math/simd.hpp"
+#include "utils/assert.hpp"
 #include "utils/compiler.hpp"
 
 struct scene_t;
@@ -39,19 +40,27 @@ struct sampler_t {
   light_sample_t*  light_samples;
 
   const uint32_t spp;
+  const uint32_t path_depth;
 
   sampler_t(parsed_options_t& options);
   ~sampler_t();
 
   void preprocess(const scene_t& scene);
 
+  float sample();
+  
   Imath::V2f sample2();
 
   inline const pixel_samples_t& next_pixel_samples(uint32_t i) const {
     return pixel_samples[i];
   }
 
-  inline const light_sample_t& next_light_sample(uint32_t i) const {
-    return light_samples[i];
+  inline const light_sample_t& next_light_sample(uint32_t s, uint32_t i) const {
+    assert(s < spp);
+    assert(i < path_depth);
+    if (i >= path_depth) {
+      std::cout << i << std::endl;
+    }
+    return light_samples[s*path_depth+i];
   }
 };

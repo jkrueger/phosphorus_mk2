@@ -89,7 +89,7 @@ namespace codec {
 	for (auto i=0; i<values->size(); ++i) {
 	  Abc::V3f n;
 	  xform.multDirMatrix((*values)[i], n);
-	  builder->add_normal(Abc::V3f(n.x, n.y, -n.z).normalize());
+	  builder->add_normal(Abc::V3f(n.x, n.y, n.z).normalize());
 	}
 
 	return values->size();
@@ -180,7 +180,7 @@ namespace codec {
 
 	for (auto i=0; i<size; ++i) {
 	  const auto& p = (*points)[i] * xform;
-	  builder->add_vertex(Imath::V3f(p.x, p.y, -p.z));
+	  builder->add_vertex(Imath::V3f(p.x, p.y, p.z));
 	}
 
 	if (const auto indicesParam = schema.getFaceIndicesProperty()) {

@@ -2,6 +2,8 @@
 #include "sampling.hpp"
 
 #include "bsdf/lambert.hpp"
+#include "bsdf/reflection.hpp"
+#include "bsdf/refraction.hpp"
 
 #include <cmath>
 
@@ -17,10 +19,18 @@ color_t eval(
   switch(type) {
   case bsdf_t::Diffuse:
     {
-      pdf    = lambert::pdf(param.diffuse, wi, wo);
+      pdf = lambert::pdf(param.diffuse, wi, wo);
       result = lambert::f(param.diffuse, wi, wo);
       break;
     }
+  case bsdf_t::Reflection:
+    pdf = 0.0f;
+    result = 0.0f;
+    break;
+  case bsdf_t::Refraction:
+    pdf = 0.0f;
+    result = 0.0f;
+    break;
   default:
     std::cout << "Can't evaluate BSDF type: " << type << std::endl;
     break;
@@ -29,6 +39,10 @@ color_t eval(
   return result;
 }
 
+bsdf_t::bsdf_t()
+  : flags(0), lobes(0)
+{}
+
 color_t bsdf_t::f(const Imath::V3f& wi, const Imath::V3f& wo) const {
   color_t out;
   float   ignored;
@@ -36,7 +50,7 @@ color_t bsdf_t::f(const Imath::V3f& wi, const Imath::V3f& wo) const {
   const auto p = (param_t*) params;
 
   for (auto i=0; i<lobes; ++i) {
-    out = eval(type[i], p[i], wi, wo, ignored);
+    out += weight[i] * eval(type[i], p[i], wi, wo, ignored);
   }
 
   return out;
@@ -53,23 +67,29 @@ color_t bsdf_t::sample(
 
   const auto p = (param_t*) params;
 
+  color_t result;
+
   switch(type[index]) {
   case Diffuse:
-    {
-      lambert::sample(p[index].diffuse, wi, wo, sample, pdf);
-      break;
-    }
+    result = lambert::sample(p[index].diffuse, wi, wo, sample, pdf);
+    break;
+  case Reflection:
+    result = reflection::sample(p[index].reflect, wi, wo, sample, pdf);
+    break;
+  case Refraction:
+    result = refraction::sample(p[index].refract, wi, wo, sample, pdf);
+    break;
   default:
     // std::cout << "Can't sample BSDF type: " << type[index] << std::endl;
     break;
   }
 
-  color_t result;
+  result *= weight[index];
 
   for (auto i=0; i<lobes; ++i) {
     if (i != index) {
       float lobe_pdf;
-      result += eval(type[i], p[i], wi, wo, lobe_pdf);
+      result += weight[i] * eval(type[i], p[i], wi, wo, lobe_pdf);
       pdf    += lobe_pdf;
     }
   }

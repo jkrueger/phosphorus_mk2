@@ -2,6 +2,7 @@
 #include "light.hpp"
 #include "material.hpp"
 #include "mesh.hpp"
+#include "utils/assert.hpp"
 
 #include <unordered_map>
 
@@ -66,6 +67,10 @@ uint32_t scene_t::num_lights() const {
   return details->lights.size();
 }
 
+uint32_t scene_t::num_meshes() const {
+  return details->meshes.size();
+}
+
 uint32_t scene_t::num_materials() const {
   return details->materials.size();
 }
@@ -79,6 +84,7 @@ mesh_t* scene_t::mesh(uint32_t index) const {
 }
 
 material_t* scene_t::material(uint32_t index) const {
+  assert(index < details->materials.size());
   return details->materials[index];
 }
 

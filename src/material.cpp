@@ -59,11 +59,23 @@ struct material_t::details_t {
       {
        CLOSURE_VECTOR_PARAM(bsdf::lobes::diffuse_t, n),
        CLOSURE_FINISH_PARAM(bsdf::lobes::diffuse_t)
+      },
+      {
+       CLOSURE_VECTOR_PARAM(bsdf::lobes::reflect_t, n),
+       CLOSURE_FLOAT_PARAM(bsdf::lobes::reflect_t, eta),
+       CLOSURE_FINISH_PARAM(bsdf::lobes::reflect_t)
+      },
+      {
+       CLOSURE_VECTOR_PARAM(bsdf::lobes::refract_t, n),
+       CLOSURE_FLOAT_PARAM(bsdf::lobes::refract_t, eta),
+       CLOSURE_FINISH_PARAM(bsdf::lobes::refract_t)
       }
     };
 
     system->register_closure("emission", bsdf_t::Emissive, params[0], NULL, NULL);
     system->register_closure("diffuse", bsdf_t::Diffuse, params[1], NULL, NULL);
+    system->register_closure("reflection", bsdf_t::Reflection, params[2], NULL, NULL);
+    system->register_closure("refraction", bsdf_t::Refraction, params[3], NULL, NULL);
   }
 
   static void attach() {
@@ -84,8 +96,6 @@ struct material_t::details_t {
     ustring* closures;
     system->getattribute(group.get(), "closures_needed", TypeDesc::PTR, &closures);
 
-    std::cout << num_closures << std::endl;
-    
     for (auto i=0; i<num_closures; ++i) {
       if (closures[i] == "emission") {
         is_emitter = true;
@@ -118,6 +128,7 @@ struct material_t::details_t {
       {
 	const auto component = c->as_comp();
 	const auto cw = w * component->w;
+
 	switch(component->id) {
         case bsdf_t::Emissive:
           result.e.from(index, cw);
@@ -128,6 +139,22 @@ struct material_t::details_t {
 	      bsdf_t::Diffuse
 	    , cw
 	    , component->as<bsdf::lobes::diffuse_t>());
+	  }
+	  break;
+	case bsdf_t::Reflection:
+	  if (auto bsdf = result.bsdf[index]) {
+	    bsdf->add_lobe(
+	      bsdf_t::Reflection
+	    , cw
+	    , component->as<bsdf::lobes::reflect_t>());
+	  }
+	  break;
+	case bsdf_t::Refraction:
+	  if (auto bsdf = result.bsdf[index]) {
+	    bsdf->add_lobe(
+	      bsdf_t::Refraction
+	    , cw
+	    , component->as<bsdf::lobes::refract_t>());
 	  }
 	  break;
 	}
@@ -148,10 +175,12 @@ struct material_builder_t : public material_t::builder_t {
   material_builder_t(material_t* material)
     : material(material)
   {
+    std::cout << "begin" << std::endl;
     material->details->init();
   }
 
   virtual ~material_builder_t() {
+    std::cout << "end" << std::endl;
     material->details->finalize();
   }
 
@@ -227,8 +256,9 @@ void material_t::evaluate(
 {
   for (auto i=0; i<active.num; ++i) {
     const auto index = active.index[i];
-    const auto mesh  = scene.mesh(state->shading.mesh[index]);
+    assert(state->is_hit(index));
 
+    const auto mesh = scene.mesh(state->shading.mesh[index]);
     mesh->shading_parameters(state->shading, index);
 
     ShaderGlobals sg;
@@ -238,7 +268,7 @@ void material_t::evaluate(
     sg.N = sg.Ng = state->shading.n.at(index);
     sg.u = state->shading.s[index];
     sg.v = state->shading.t[index];
-    sg.backfacing = sg.N.dot(sg.I) < 0;
+    sg.backfacing = sg.N.dot(sg.I) > 0;
 
     details->execute(sg);
 
@@ -263,6 +293,8 @@ void material_t::evaluate(
   sg.backfacing = sg.N.dot(sg.I) < 0;
 
   details->execute(sg);
+
+  state->result.bsdf[index] = nullptr;
   details->eval_closure(state->result, index, sg.Ci);
 }
 

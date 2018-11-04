@@ -105,7 +105,7 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 
 	      auto shadow_samples = new(allocator) occlusion_query_state_t<>();
 
-	      details->sample_lights(frame.sampler, state, active, shadow_samples);
+	      details->sample_lights(i, frame.sampler, state, active, shadow_samples);
 	      details->trace(shadow_samples, active);
 	      details->integrate(frame.sampler, scene, state, active, shadow_samples);
 	      

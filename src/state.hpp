@@ -25,10 +25,11 @@ struct frame_state_t {
 };
 
 namespace details {
-  static const uint32_t DEAD   = 0;
-  static const uint32_t ALIVE  = 0x1;
-  static const uint32_t HIT    = 0x2;
-  static const uint32_t MASKED = 0x4;
+  static const uint32_t ALIVE    = 0;
+  static const uint32_t DEAD     = 0x1;
+  static const uint32_t HIT      = 0x2;
+  static const uint32_t MASKED   = 0x4;
+  static const uint32_t SPECULAR = 0x8;
 }
 
 /* The state kept in the pipeline while rendering one 
@@ -65,6 +66,14 @@ struct pipeline_state_t {
     }
   }
 
+  inline void kill(uint32_t i) {
+    flags[i] |= details::DEAD;
+  }
+
+  inline bool is_dead(uint32_t i) const {
+    return (flags[i] & details::DEAD) == details::DEAD;
+  }
+
   inline void miss(uint32_t i) {
     flags[i] &= ~details::HIT;
   }
@@ -78,11 +87,26 @@ struct pipeline_state_t {
     return (flags[i] & details::HIT) == details::HIT;
   }
 
+  inline void specular_bounce(uint32_t i, bool b) {
+    if (b) {
+      flags[i] |= details::SPECULAR;
+    }
+    else {
+      flags[i] &= ~details::SPECULAR;
+    }
+  }
+
+  inline bool is_specular(uint32_t i) const {
+    return (flags[i] & details::SPECULAR) == details::SPECULAR;
+  }
+
   inline void shade(
     uint32_t i
   , uint32_t mesh, uint32_t set, uint32_t face
   , float u, float v)
   {
+    assert(i >= 0 && i < size);
+    
     shading.mesh[i] = mesh;
     shading.set[i]  = set;
     shading.face[i] = face;
