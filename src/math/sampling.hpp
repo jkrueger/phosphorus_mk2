@@ -33,4 +33,23 @@ namespace sample {
       pdf = out.y * UNIFORM_DISC_PDF;
     }
   }
+
+  /**
+   * Generate a two dimentsional stratified sampling pattern given
+   * a random number generator
+   */
+  template<typename Rng>
+  inline void stratified_2d(const Rng& rng, Imath::V2f* out, uint32_t num) {
+    const float_t step = 1.0f / (float_t)num;
+    float_t dy = 0.0;
+    for (auto i=0; i<num; ++i, dy += step) {
+      float_t dx = 0.0;
+      for (auto j=0; j<num; ++j, dx += step) {
+	out[j * num + i] = {
+	  dx + rng() * step,
+	  dy + rng() * step
+	};
+      }
+    }
+  }
 }

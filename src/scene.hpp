@@ -32,6 +32,8 @@ struct scene_t {
   void add(const std::string& name, material_t* mesh);
 
   uint32_t num_lights() const;
+
+  uint32_t num_meshes() const;
   
   uint32_t num_materials() const;
 

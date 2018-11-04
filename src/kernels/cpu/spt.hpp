@@ -2,7 +2,6 @@
 
 #include "state.hpp"
 #include "../../bsdf.hpp"
-#include "math/orthogonal_base.hpp"
 #include "math/vector.hpp"
 
 #include <cmath>
@@ -10,7 +9,8 @@
 namespace spt {
   struct light_sampler_t {
     inline void operator()(
-      sampler_t* sampler
+      uint32_t sid
+    , sampler_t* sampler
     , pipeline_state_t<>* state
     , active_t<>& active
     , occlusion_query_state_t<>* samples)
@@ -22,7 +22,7 @@ namespace spt {
 	}
 	
         // get one light source sample
-        const auto& sample = sampler->next_light_sample(state->depth[index]);
+        const auto& sample = sampler->next_light_sample(sid, state->depth[index]);
 
 	const auto n = state->shading.n.at(index);
 	const auto p = offset(state->rays.p.at(index), n);
@@ -52,7 +52,7 @@ namespace spt {
 
   struct integrator_t {
 
-    static const uint32_t DEFAULT_PATH_DEPTH = 3;
+    static const uint32_t DEFAULT_PATH_DEPTH = 9;
 
     uint32_t max_depth;
 
@@ -73,14 +73,18 @@ namespace spt {
       for (auto i=0; i<num; ++i) {
 	const auto index = active.index[i];
 
-	auto out = state->result.r.at(index) + state->result.e.at(index);
+	auto out = state->result.r.at(index);
 	
 	if (state->is_hit(index)) {
 	  const auto bsdf = state->result.bsdf[index];
 	
-	  const auto wi = samples->rays.wi.at(index);
-	  const auto wo = -state->rays.wi.at(index);
-	  const auto n  = state->shading.n.at(index);
+	  const auto wi   = samples->rays.wi.at(index);
+	  const auto wo   = -state->rays.wi.at(index);
+	  const auto n    = state->shading.n.at(index);
+
+	  if (state->depth[index] == 0 || state->is_specular(index)) {
+	    out += state->result.e.at(index);
+	  }
 
 	  // compute direct light contribution at the current
 	  // path vertex. this gets modulated by the current path weight
@@ -91,11 +95,7 @@ namespace spt {
 
 	  // update state with new path segments based on sampling
 	  // the bsdf at the current path vertex
-	  sample_bsdf(sampler, bsdf, n, wo, state, index);
-
-	  // check if we have to terminate the path
-	  if (!terminate_path(state->depth[index])) {
-	    ++state->depth[index];
+	  if(sample_bsdf(sampler, bsdf, n, wo, state, index)) {
 	    active.add(index);
 	  }
 	}
@@ -130,7 +130,7 @@ namespace spt {
       return state->beta.at(index) * (f * samples->result.e.at(index) * s);
     }
 
-    void sample_bsdf(
+    bool sample_bsdf(
       sampler_t* sampler
     , const bsdf_t* bsdf
     , const Imath::V3f& n
@@ -142,32 +142,43 @@ namespace spt {
       Imath::V3f sampled;
       Imath::V2f sample = sampler->sample2();
 
-      const orthogonal_base_t base(n);
-
       // sample the bsdf based on the previous path direction
       const auto f = bsdf->sample(sample, wi, sampled, pdf);
 
       // transform the sampled direction back to world
-      // state->rays.wo = state->wi;
-      const auto weight = n.dot(wi);
-      const auto beta   = state->beta.at(index);
+      const auto weight = n.dot(sampled);
 
-      state->rays.wi.from(index, base.to_world(sampled));
-      state->beta.from(index, beta * (f * (std::fabs(weight) / pdf)));
+      auto beta = color_t(state->beta.at(index) * (f * (std::fabs(weight) / pdf)));
+
+      state->rays.wi.from(index, sampled);
       state->rays.p.from(index, offset(state->rays.p.at(index), n, weight < 0.0f));
+
+      ++state->depth[index];
+
+      // check if we have to terminate the path
+      if (!terminate_path(sampler, state->depth[index], beta)) {
+	state->beta.from(index, beta);
+	state->specular_bounce(index, bsdf->is_specular());
+
+	return true;
+      }
+
+      state->kill(index);
+      return false;
     }
 
-    inline bool terminate_path(uint8_t depth) const {
-      return depth >= max_depth /*|| (depth >= 3 && terminate_ray(beta))*/;
+    inline bool terminate_path(sampler_t* sampler, uint8_t depth, color_t& beta) const {
+      bool alive = depth < max_depth;
+      if (alive) {
+	// if (depth >= 3) {
+	//   float q = std::max((float) 0.05f, 1.0f - beta.y());
+	//   alive = sampler->sample() >= q;
+	//   if (alive) {
+	//     beta *= (1.0f / (1.0f - q));
+	//   }
+        // }
+      }
+      return !alive;
     }
-
-    // inline bool terminate_path(color_t& beta) const {
-    //   float_t q = std::max((float_t) 0.05f, 1.0f - beta.y());
-    //   if (dis(gen) < q) {
-    // 	return true;
-    //   }
-    //   beta *= (1.0f / (1.0f - q));
-    //   return false;
-    // }
   };
 }

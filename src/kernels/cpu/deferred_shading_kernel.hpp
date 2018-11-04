@@ -2,6 +2,7 @@
 
 #include "mesh.hpp"
 #include "utils/allocator.hpp"
+#include "utils/assert.hpp"
 
 struct deferred_shading_kernel_t {
   struct deferred_t {
@@ -21,11 +22,16 @@ struct deferred_shading_kernel_t {
     , pipeline_state_t<>* state
     , const active_t<>& active) const
   {
+    assert(state);
+
     deferred_t deferred(allocator, scene.num_materials());
     sort_by_material(scene, state, active, deferred);
 
+    assert(deferred.size == scene.num_materials());
     for (auto i=0; i<deferred.size; ++i) {
-      scene.material(i)->evaluate(allocator, scene, state, deferred.material[i]);
+      const auto material = scene.material(i);
+      assert(material->id == i);
+      material->evaluate(allocator, scene, state, deferred.material[i]);
     }
 
     // TODO: copy deferred buckets back into the active set?
@@ -44,10 +50,13 @@ struct deferred_shading_kernel_t {
     for (auto i=0; i<active.num; ++i) {
       const auto index = active.index[i];
       if (state->is_hit(index)) {
-	const auto mesh     = scene.mesh(state->shading.mesh[index]);
-	const auto material = scene.material(mesh->material(state->shading.set[index]));
-
-	deferred.material[material->id].add(active.index[index]);
+	assert(state->shading.mesh[index] < scene.num_meshes());
+	const auto mesh = scene.mesh(state->shading.mesh[index]);
+	assert(mesh);
+	assert(mesh->material(state->shading.set[index]) < scene.num_materials());
+	const auto material = mesh->material(state->shading.set[index]);
+	
+	deferred.material[material].add(index);
       }
     }
   }
