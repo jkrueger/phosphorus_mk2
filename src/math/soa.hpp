@@ -28,12 +28,14 @@ namespace soa {
     }
 
     void from(uint32_t i, const Imath::V3f& v) {
+      assert(i >= 0 && i <= N);
       x[i] = v.x;
       y[i] = v.y;
       z[i] = v.z;
     }
 
     void from(uint32_t i, const color_t& c) {
+      assert(i >= 0 && i<= N);
       x[i] = c.r;
       y[i] = c.g;
       z[i] = c.b;
