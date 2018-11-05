@@ -24,7 +24,7 @@ namespace camera {
     // transform film sample
     const auto max = simd::load(std::numeric_limits<float>::max());
 
-    auto wi = sample;
+    auto wi = m * sample;
     wi.normalize();
 
     simd::store(wi, out.wi.x + off, out.wi.y + off, out.wi.z + off);
@@ -41,19 +41,14 @@ struct camera_kernel_t {
   , pipeline_state_t<N>* state)
   {
     static const float onev[] = {
-      1,1,1,1,1,1,1,1
+      -1,-1,-1,-1,-1,-1,-1,-1
     };
 
     static const float seqv[] = {
       0,1,2,3,4,5,6,7
     };
 
-    auto p = Imath::V3f(0,0,0) * camera.to_world;
-    p.x = 0;
-    p.y = 1;
-    p.z = -6;
-
-    const simd::vector3_t pos(p);
+    const simd::vector3_t pos(Imath::V3f(0,0,0) * camera.to_world);
     const simd::matrix44_t m(camera.to_world);
 
     const int32_t s = pipeline_state_t<N>::step;

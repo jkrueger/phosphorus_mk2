@@ -52,15 +52,15 @@ struct sampler_t {
   Imath::V2f sample2();
 
   inline const pixel_samples_t& next_pixel_samples(uint32_t i) const {
+    assert(i < spp);
+    
     return pixel_samples[i];
   }
 
   inline const light_sample_t& next_light_sample(uint32_t s, uint32_t i) const {
     assert(s < spp);
     assert(i < path_depth);
-    if (i >= path_depth) {
-      std::cout << i << std::endl;
-    }
+
     return light_samples[s*path_depth+i];
   }
 };

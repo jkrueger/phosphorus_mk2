@@ -94,21 +94,21 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 
 	      // FIME: find the proper place for this
 	      for (auto j=0; j<active.num; ++j) {
-		const auto index = active.index[j];
-		const auto p     = state->rays.p.at(index);
-		const auto wi    = state->rays.wi.at(index);
-		
-		state->rays.p.from(index, p + wi * state->rays.d[index]);
+	      	const auto index = active.index[j];
+	      	const auto p     = state->rays.p.at(index);
+	      	const auto wi    = state->rays.wi.at(index);
+
+	      	state->rays.p.from(index, p + wi * state->rays.d[index]);
 	      }
 
 	      details->shade(allocator, scene, state, active);
 
 	      auto shadow_samples = new(allocator) occlusion_query_state_t<>();
-
+ 
 	      details->sample_lights(i, frame.sampler, state, active, shadow_samples);
 	      details->trace(shadow_samples, active);
 	      details->integrate(frame.sampler, scene, state, active, shadow_samples);
-	      
+
 	    } while (active.has_live_paths());
 
 	      // apply fiter

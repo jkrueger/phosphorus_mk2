@@ -17,6 +17,9 @@ namespace spt {
     {
       for (auto i=0; i<active.num; ++i) {
         const auto index = active.index[i];
+	assert(index >= 0 && index < pipeline_state_t<>::size);
+	assert(sid < sampler->spp);
+
 	if (!state->is_hit(index)) {
 	  continue;
 	}
@@ -52,7 +55,7 @@ namespace spt {
 
   struct integrator_t {
 
-    static const uint32_t DEFAULT_PATH_DEPTH = 9;
+    static const uint32_t DEFAULT_PATH_DEPTH = 6;
 
     uint32_t max_depth;
 
@@ -72,6 +75,8 @@ namespace spt {
 
       for (auto i=0; i<num; ++i) {
 	const auto index = active.index[i];
+	assert(index >= 0 && index < pipeline_state_t<>::size);
+	assert(state->depth[index] < max_depth);
 
 	auto out = state->result.r.at(index);
 	
@@ -145,6 +150,10 @@ namespace spt {
       // sample the bsdf based on the previous path direction
       const auto f = bsdf->sample(sample, wi, sampled, pdf);
 
+      if (f.y() == 0.0f) {
+	return false;
+      }
+
       // transform the sampled direction back to world
       const auto weight = n.dot(sampled);
 
@@ -153,6 +162,7 @@ namespace spt {
       state->rays.wi.from(index, sampled);
       state->rays.p.from(index, offset(state->rays.p.at(index), n, weight < 0.0f));
 
+      assert(state->depth[index] < max_depth);
       ++state->depth[index];
 
       // check if we have to terminate the path
@@ -163,20 +173,20 @@ namespace spt {
 	return true;
       }
 
-      state->kill(index);
+      // state->kill(index);
       return false;
     }
 
     inline bool terminate_path(sampler_t* sampler, uint8_t depth, color_t& beta) const {
       bool alive = depth < max_depth;
       if (alive) {
-	// if (depth >= 3) {
-	//   float q = std::max((float) 0.05f, 1.0f - beta.y());
-	//   alive = sampler->sample() >= q;
-	//   if (alive) {
-	//     beta *= (1.0f / (1.0f - q));
-	//   }
-        // }
+	if (depth >= 3) {
+	  float q = std::max((float) 0.05f, 1.0f - beta.y());
+	  alive = sampler->sample() >= q;
+	  if (alive) {
+	    beta *= (1.0f / (1.0f - q));
+	  }
+        }
       }
       return !alive;
     }

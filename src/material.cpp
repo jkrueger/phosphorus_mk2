@@ -283,6 +283,8 @@ void material_t::evaluate(
 , occlusion_query_state_t<>* state
 , uint32_t index)
 {
+  assert(index >= 0 && index <= occlusion_query_state_t<>::size);
+  
   ShaderGlobals sg;
   memset(&sg, 0, sizeof(ShaderGlobals));
   sg.P = state->rays.p.at(index);

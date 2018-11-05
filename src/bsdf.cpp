@@ -63,7 +63,13 @@ color_t bsdf_t::sample(
 , float& pdf) const
 {
   auto index = std::min((uint32_t) std::floor(sample.x * lobes), (lobes-1));
-  float sum = 0;
+
+  const auto one_minus_epsilon =
+    1.0f-std::numeric_limits<float>::epsilon();
+  const auto u =
+    std::min(sample.x * lobes - index, one_minus_epsilon);
+
+  Imath::V2f remapped(u, sample.y);
 
   const auto p = (param_t*) params;
 
@@ -71,13 +77,13 @@ color_t bsdf_t::sample(
 
   switch(type[index]) {
   case Diffuse:
-    result = lambert::sample(p[index].diffuse, wi, wo, sample, pdf);
+    result = lambert::sample(p[index].diffuse, wi, wo, remapped, pdf);
     break;
   case Reflection:
-    result = reflection::sample(p[index].reflect, wi, wo, sample, pdf);
+    result = reflection::sample(p[index].reflect, wi, wo, remapped, pdf);
     break;
   case Refraction:
-    result = refraction::sample(p[index].refract, wi, wo, sample, pdf);
+    result = refraction::sample(p[index].refract, wi, wo, remapped, pdf);
     break;
   default:
     // std::cout << "Can't sample BSDF type: " << type[index] << std::endl;
