@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <getopt.h>
+#include <sys/time.h>
 
 /* available arguments to the renderer */
 static option options[] = {
@@ -126,8 +127,20 @@ int main(int argc, char** argv) {
 
   std::cout << "Rendering..." << std::endl;
 
+  timeval start;
+  gettimeofday(&start, 0);
+  
   start_devices(devices, scene, state);
   join(devices);
+
+  timeval end;
+  gettimeofday(&end, 0);
+
+  std::cout
+    << "Rendering time: "
+    << ((end.tv_sec - start.tv_sec) +
+        ((end.tv_usec - start.tv_usec) / 1000000.0))
+    << std::endl;
 
   sink->finalize();
 
