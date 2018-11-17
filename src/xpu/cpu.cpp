@@ -92,11 +92,11 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 
 	      details->trace(state, active);
 
-	      // FIME: find the proper place for this
+	      // FIME: find the proper place for his
 	      for (auto j=0; j<active.num; ++j) {
 	      	const auto index = active.index[j];
-	      	const auto p     = state->rays.p.at(index);
-	      	const auto wi    = state->rays.wi.at(index);
+	      	const auto p = state->rays.p.at(index);
+	      	const auto wi = state->rays.wi.at(index);
 
 	      	state->rays.p.from(index, p + wi * state->rays.d[index]);
 	      }

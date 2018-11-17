@@ -55,7 +55,7 @@ namespace spt {
 
   struct integrator_t {
 
-    static const uint32_t DEFAULT_PATH_DEPTH = 6;
+    static const uint32_t DEFAULT_PATH_DEPTH = 9;
 
     uint32_t max_depth;
 
@@ -83,9 +83,9 @@ namespace spt {
 	if (state->is_hit(index)) {
 	  const auto bsdf = state->result.bsdf[index];
 	
-	  const auto wi   = samples->rays.wi.at(index);
-	  const auto wo   = -state->rays.wi.at(index);
-	  const auto n    = state->shading.n.at(index);
+	  const auto wi = samples->rays.wi.at(index);
+	  const auto wo = -state->rays.wi.at(index);
+	  const auto n  = state->shading.n.at(index);
 
 	  if (state->depth[index] == 0 || state->is_specular(index)) {
 	    out += state->result.e.at(index);
@@ -94,9 +94,9 @@ namespace spt {
 	  // compute direct light contribution at the current
 	  // path vertex. this gets modulated by the current path weight
 	  // and added to the path radiance
-	  if(!samples->is_occluded(index)) {
+	  if (!samples->is_occluded(index)) {
 	    out += li(scene, bsdf, n, wi, wo, state, samples, index);
-	  }
+          }
 
 	  // update state with new path segments based on sampling
 	  // the bsdf at the current path vertex

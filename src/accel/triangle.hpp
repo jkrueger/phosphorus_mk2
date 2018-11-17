@@ -45,8 +45,9 @@ namespace accel {
        * Intersect each ray with each triangle stored in this accelerator, one by one
        * This is mostly here as a baseline algorithm to verify simd implementations 
        */
+      template<typename T>
       inline void baseline(
-        pipeline_state_t<>* stream
+        T* stream
       , uint32_t* indices
       , uint32_t num_rays) const {
         for (auto i=0; i<num_rays; ++i) {

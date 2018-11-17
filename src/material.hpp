@@ -38,6 +38,10 @@ struct material_t {
     virtual void parameter(
       const std::string& name
     , const color_t& c) = 0;
+
+    virtual void parameter(
+      const std::string& name
+    , const std::string& s) = 0;
   };
 
   uint32_t id;

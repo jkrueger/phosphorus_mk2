@@ -63,6 +63,9 @@ namespace YAML {
 	else if (type == "rgb") {
 	  builder->parameter(name, i->as<color_t>());
 	}
+        else if(type == "string") {
+          builder->parameter(name, (*i)["value"].as<std::string>());
+        }
 	else {
 	  throw std::runtime_error("Unknown parameter type: " + type);
 	}
@@ -74,6 +77,17 @@ namespace YAML {
 	  (*i)["name"].as<std::string>()
 	, (*i)["layer"].as<std::string>()
 	, (*i)["type"].as<std::string>("surface"));
+      }
+
+      const auto edges = node["connect"];
+      for (auto edge : edges) {
+        const auto from = edge["from"];
+        const auto to   = edge["to"];
+        builder->connect(
+          from["slot"].as<std::string>(),
+          to["slot"].as<std::string>(),
+          from["layer"].as<std::string>(),
+          to["layer"].as<std::string>());
       }
 
       return true;

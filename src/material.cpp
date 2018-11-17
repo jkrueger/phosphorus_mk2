@@ -28,17 +28,13 @@ struct material_t::details_t {
   static thread_local PerThreadInfo*  pti;
   static thread_local ShadingContext* ctx;
 
-  union parameter_t {
-    float f;
-  };
-
   struct empty_params_t
   {};
 
   ShaderGroupRef group;
 
-  parameter_t  storage[256];
-  parameter_t* parameter;
+  char  storage[256];
+  char* parameter;
 
   bool is_emitter;
 
@@ -175,12 +171,10 @@ struct material_builder_t : public material_t::builder_t {
   material_builder_t(material_t* material)
     : material(material)
   {
-    std::cout << "begin" << std::endl;
     material->details->init();
   }
 
   virtual ~material_builder_t() {
-    std::cout << "end" << std::endl;
     material->details->finalize();
   }
 
@@ -209,30 +203,50 @@ struct material_builder_t : public material_t::builder_t {
     const std::string& name
   , float f)
   {
-    material->details->parameter->f = f;
+    float* p = (float*) material->details->parameter;
+
+    (*p) = f;
     
     material_t::details_t::system->Parameter(
       name
     , TypeDesc::TypeFloat
-    , material->details->parameter);
+    , p);
 
-    material->details->parameter++;
+    material->details->parameter+=4;
   }
 
   void parameter(
     const std::string& name
   , const color_t& c)
   {
-    material->details->parameter[0].f = c.r;
-    material->details->parameter[1].f = c.g;
-    material->details->parameter[2].f = c.b;
+    float* p = (float*) material->details->parameter;
+    
+    p[0] = c.r;
+    p[1] = c.g;
+    p[2] = c.b;
 
     material_t::details_t::system->Parameter(
       name
     , TypeDesc::TypeColor
-    , material->details->parameter);
+    , p);
 
-    material->details->parameter+=3;
+    material->details->parameter+=12;
+  }
+
+  void parameter(
+    const std::string& name
+  , const std::string& s)
+  {
+    char** p = (char**) material->details->parameter;
+    
+    (*p) = strdup(s.c_str());
+
+    material_t::details_t::system->Parameter(
+      name
+    , TypeDesc::TypeString
+    , p);
+
+    material->details->parameter+=sizeof(char*);
   }
 };
 
