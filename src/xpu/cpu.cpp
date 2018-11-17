@@ -75,8 +75,6 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 
 	    auto state  = new(allocator) pipeline_state_t<>();
 
-	    // acquire a set of samples from the unit square, to generate
-	    // rays for this tile
 	    const auto& samples = frame.sampler->next_pixel_samples(i);
 	    const auto& camera  = scene.camera;
 
