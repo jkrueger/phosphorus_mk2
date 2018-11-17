@@ -115,10 +115,6 @@ void intersect(Stream* stream, const active_t<>& active, const accel::mbvh_t* bv
 	  bvh->triangles[index].intersect2(stream, begin, num);
 	  prims += accel::mbvh_t::width;
 	  ++index;
-
-	  if (prims < cur.prims) {
-	    std::cout << "HANDLE THIS!" << std::endl;
-	  }
 	} while(unlikely(prims < cur.prims));
 
 	begin+=accel::mbvh_t::width;
