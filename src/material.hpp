@@ -37,7 +37,7 @@ struct material_t {
 
     virtual void parameter(
       const std::string& name
-    , const color_t& c) = 0;
+    , const Imath::Color3f& c) = 0;
 
     virtual void parameter(
       const std::string& name

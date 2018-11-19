@@ -2,7 +2,7 @@
 
 #include "utils/color.hpp"
 
-#include <ImathVec.h>
+#include <OpenEXR/ImathVec.h>
 
 template<int N = 1024>
 struct film_t {
@@ -10,5 +10,5 @@ struct film_t {
   virtual void add_tile(
     const Imath::V2i& pos
   , const Imath::V2i& size
-  , const color_t* splats) = 0;
+  , const Imath::Color3f* splats) = 0;
 };

@@ -5,7 +5,7 @@
 #include "math/sampling.hpp"
 
 namespace reflection {
-  color_t sample(
+  Imath::Color3f sample(
     const bsdf::lobes::reflect_t& params
   , const Imath::V3f& wi
   , Imath::V3f& wo
@@ -17,6 +17,8 @@ namespace reflection {
     pdf = 1.0f;
     wo = -wi + (2.0f * cos_theta) * params.n;
 
-    return fresnel::dielectric(cos_theta, params.eta);
+    const auto out = fresnel::dielectric(cos_theta, params.eta);
+
+    return Imath::Color3f(out);
   }
 }

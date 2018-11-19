@@ -5,12 +5,12 @@
 #include "math/sampling.hpp"
 
 namespace lambert {
-  color_t f(
+  Imath::Color3f f(
     const bsdf::lobes::diffuse_t& params
   , const Imath::V3f& wi
   , const Imath::V3f& wo)
   {
-    return M_1_PI;
+    return Imath::Color3f(M_1_PI);
   }
 
   float pdf(
@@ -21,7 +21,7 @@ namespace lambert {
     return params.n.dot(wi) * M_1_PI;
   }
 
-  color_t sample(
+  Imath::Color3f sample(
     const bsdf::lobes::diffuse_t& params
   , const Imath::V3f& wi
   , Imath::V3f& wo

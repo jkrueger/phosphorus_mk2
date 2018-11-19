@@ -68,7 +68,8 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	
 	job::tiles_t::tile_t tile;
 	while (frame.tiles->next(tile)) {
-	  auto splats = new(allocator) color_t[tile.w * tile.h];
+	  auto splats = new(allocator) Imath::Color3f[tile.w * tile.h];
+          memset(splats, 0, sizeof(Imath::Color3f) * tile.w*tile.h);
 
 	  for (auto i=0; i<frame.sampler->spp; ++i) {
 	    allocator_scope_t scope(allocator);
@@ -115,7 +116,7 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	    // this should run through a filter kernel instead
 	    for (auto j=0; j<tile.w*tile.h; ++j) {
 	      const auto r = state->result.r.at(j);
-	      splats[j] += color_t(r) * (1.0f / frame.sampler->spp);
+	      splats[j] += r * (1.0f / frame.sampler->spp);
 	    }
 	  }
 

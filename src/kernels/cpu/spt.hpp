@@ -150,7 +150,7 @@ namespace spt {
       // sample the bsdf based on the previous path direction
       const auto f = bsdf->sample(sample, wi, sampled, pdf);
 
-      if (f.y() == 0.0f) {
+      if (color::y(f) == 0.0f) {
 	return false;
       }
 
@@ -158,7 +158,7 @@ namespace spt {
       ++state->depth[index];
 
       float w;
-      color_t beta(state->beta.at(index));
+      Imath::Color3f beta(state->beta.at(index));
 
       // check if we have to terminate the path
       if (terminate_path(sampler, state->depth[index], beta, w)) {
@@ -172,7 +172,9 @@ namespace spt {
 
       state->rays.wi.from(index, sampled);
       state->rays.p.from(index, offset(state->rays.p.at(index), n, weight < 0.0f));
+      state->rays.d[index] = std::numeric_limits<float>::max();
       state->beta.from(index, beta * w);
+      state->miss(index);
       state->specular_bounce(index, bsdf->is_specular());
 
       return true;
@@ -181,15 +183,15 @@ namespace spt {
     inline bool terminate_path(
       sampler_t* sampler
     , uint8_t depth
-    , const color_t& beta
+    , const Imath::Color3f& beta
     , float& w) const
     {
       w = 1.0f;
-      
+
       bool alive = depth < max_depth;
       if (alive) {
 	if (depth >= 3) {
-	  float q = std::max((float) 0.05f, 1.0f - beta.y());
+	  float q = std::max((float) 0.05f, 1.0f - color::y(beta));
 	  alive = sampler->sample() >= q;
 	  if (alive) {
 	    w = (1.0f / (1.0f - q));

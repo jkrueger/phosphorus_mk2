@@ -25,5 +25,5 @@ SET( LIBRARIES "-lIlmImf -lHalf -lIex -lOpenImageIO -lOpenImageIO_Util -lyaml-cp
 SET( CMAKE_CXX_FLAGS_RELEASE  "${CMAKE_CXX_FLAGS} ${INCLUDE_PATHS} -std=c++14 -O3 -march=native -fno-rtti" )
 SET( CMAKE_EXE_LINKER_FLAGS "${CMAKE_CXX_LDFLAGS} ${LIBRARY_PATHS} ${LIBRARIES} -flto" )
 
-set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${INCLUDE_PATHS} -std=c++14 -march=native -fno-rtti" )
+set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${INCLUDE_PATHS} -std=c++14 -march=native -fno-rtti -D_DEBUG" )
 
