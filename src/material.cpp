@@ -4,6 +4,7 @@
 #include "bsdf.hpp"
 #include "bsdf/params.hpp"
 #include "utils/allocator.hpp"
+#include "utils/buffer.hpp"
 #include "utils/color.hpp"
 
 #pragma clang diagnostic push
@@ -22,6 +23,8 @@ struct service_t : public RendererServices {
 };
 
 struct material_t::details_t {
+  static const uint32_t PARAMETER_BUFFER_SIZE = 256;
+  
   static service_t*     service;
   static ShadingSystem* system;
 
@@ -33,13 +36,12 @@ struct material_t::details_t {
 
   ShaderGroupRef group;
 
-  char  storage[256];
-  char* parameter;
+  buffer_t<PARAMETER_BUFFER_SIZE> parameters;
 
   bool is_emitter;
 
   details_t()
-    : parameter(storage), is_emitter(false)
+    : is_emitter(false)
   {}
 
   static void boot() {
@@ -203,50 +205,37 @@ struct material_builder_t : public material_t::builder_t {
     const std::string& name
   , float f)
   {
-    float* p = (float*) material->details->parameter;
-
-    (*p) = f;
+    const auto p = material->details->parameters.write_float(f);
     
     material_t::details_t::system->Parameter(
       name
     , TypeDesc::TypeFloat
     , p);
-
-    material->details->parameter+=4;
   }
 
   void parameter(
     const std::string& name
   , const color_t& c)
   {
-    float* p = (float*) material->details->parameter;
-    
-    p[0] = c.r;
-    p[1] = c.g;
-    p[2] = c.b;
+    const auto p = material->details->parameters.write_3f(c.r, c.g, c.b);
 
     material_t::details_t::system->Parameter(
       name
     , TypeDesc::TypeColor
     , p);
-
-    material->details->parameter+=12;
   }
 
   void parameter(
     const std::string& name
   , const std::string& s)
   {
-    char** p = (char**) material->details->parameter;
-    
-    (*p) = strdup(s.c_str());
+    ustring us(s);
+    const auto p = material->details->parameters.write_ptr(us.c_str());
 
     material_t::details_t::system->Parameter(
       name
     , TypeDesc::TypeString
     , p);
-
-    material->details->parameter+=sizeof(char*);
   }
 };
 

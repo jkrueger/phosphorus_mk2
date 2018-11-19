@@ -17,8 +17,6 @@ namespace spt {
     {
       for (auto i=0; i<active.num; ++i) {
         const auto index = active.index[i];
-	assert(index >= 0 && index < pipeline_state_t<>::size);
-	assert(sid < sampler->spp);
 
 	if (!state->is_hit(index)) {
 	  continue;
@@ -123,7 +121,7 @@ namespace spt {
     , uint32_t index) const
     {
       const auto f = bsdf->f(wi, wo);
-      const auto s = std::fabs(n.dot(wi)) / samples->pdf[index];
+      const auto s = f * (std::fabs(n.dot(wi)) / samples->pdf[index]);
 
       const auto mesh = scene.mesh(samples->shading.mesh[index]);
       const auto matid = mesh->material(samples->shading.set[index]);
@@ -132,7 +130,9 @@ namespace spt {
       mesh->shading_parameters(samples->shading, index);
       material->evaluate(scene, samples, index);
 
-      return state->beta.at(index) * (f * samples->result.e.at(index) * s);
+      const auto e = samples->result.e.at(index);
+
+      return state->beta.at(index) * e * s;
     }
 
     bool sample_bsdf(
@@ -154,37 +154,45 @@ namespace spt {
 	return false;
       }
 
-      // transform the sampled direction back to world
-      const auto weight = n.dot(sampled);
-
-      auto beta = color_t(state->beta.at(index) * (f * (std::fabs(weight) / pdf)));
-
-      state->rays.wi.from(index, sampled);
-      state->rays.p.from(index, offset(state->rays.p.at(index), n, weight < 0.0f));
-
       assert(state->depth[index] < max_depth);
       ++state->depth[index];
 
-      // check if we have to terminate the path
-      if (!terminate_path(sampler, state->depth[index], beta)) {
-	state->beta.from(index, beta);
-	state->specular_bounce(index, bsdf->is_specular());
+      float w;
+      color_t beta(state->beta.at(index));
 
-	return true;
+      // check if we have to terminate the path
+      if (terminate_path(sampler, state->depth[index], beta, w)) {
+        return false;
       }
 
-      // state->kill(index);
-      return false;
+      // transform the sampled direction back to world
+      const auto weight = n.dot(sampled);
+
+      beta = beta * (f * (std::fabs(weight) / pdf));
+
+      state->rays.wi.from(index, sampled);
+      state->rays.p.from(index, offset(state->rays.p.at(index), n, weight < 0.0f));
+      state->beta.from(index, beta * w);
+      state->specular_bounce(index, bsdf->is_specular());
+
+      return true;
     }
 
-    inline bool terminate_path(sampler_t* sampler, uint8_t depth, color_t& beta) const {
+    inline bool terminate_path(
+      sampler_t* sampler
+    , uint8_t depth
+    , const color_t& beta
+    , float& w) const
+    {
+      w = 1.0f;
+      
       bool alive = depth < max_depth;
       if (alive) {
 	if (depth >= 3) {
 	  float q = std::max((float) 0.05f, 1.0f - beta.y());
 	  alive = sampler->sample() >= q;
 	  if (alive) {
-	    beta *= (1.0f / (1.0f - q));
+	    w = (1.0f / (1.0f - q));
 	  }
         }
       }
