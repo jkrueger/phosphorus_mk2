@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../material.hpp"
-#include "utils/color.hpp"
+#include "OpenEXR/ImathColor.h"
 
 #include <yaml-cpp/yaml.h>
 
@@ -9,12 +9,12 @@
 
 namespace YAML {
   template<>
-  struct convert<color_t> {
-    static Node encode(const color_t& rhs) {
+  struct convert<Imath::Color3f> {
+    static Node encode(const Imath::Color3f& rhs) {
       Node rgb;
-      rgb.push_back(rhs.r);
-      rgb.push_back(rhs.g);
-      rgb.push_back(rhs.b);
+      rgb.push_back(rhs.x);
+      rgb.push_back(rhs.y);
+      rgb.push_back(rhs.z);
 
       Node out;
       out["type"]  = "rgb";
@@ -23,7 +23,7 @@ namespace YAML {
       return out;
     }
 
-    static bool decode(const Node& node, color_t& rhs) {
+    static bool decode(const Node& node, Imath::Color3f& rhs) {
       const auto t = node["type"].as<std::string>();
       const auto v = node["value"];
 
@@ -32,10 +32,10 @@ namespace YAML {
       }
       
       if (t == "rgb") {
-	rhs.r = v[0].as<float>();
-	rhs.g = v[1].as<float>();
-	rhs.b = v[2].as<float>();
-      
+	rhs.x = v[0].as<float>();
+	rhs.y = v[1].as<float>();
+	rhs.z = v[2].as<float>();
+
 	return true;
       }
 
@@ -61,7 +61,7 @@ namespace YAML {
 	  builder->parameter(name, (*i)["value"].as<float>());
 	}
 	else if (type == "rgb") {
-	  builder->parameter(name, i->as<color_t>());
+	  builder->parameter(name, i->as<Imath::Color3f>());
 	}
         else if(type == "string") {
           builder->parameter(name, (*i)["value"].as<std::string>());

@@ -19,16 +19,16 @@ namespace film {
   void file_t::add_tile(
     const Imath::V2i& pos
   , const Imath::V2i& size
-  , const color_t* splats)
+  , const Imath::Color3f* splats)
   {
     int i=0;
 
     for (auto y=pos.y; y<pos.y+size.y; ++y) {
       for (auto x=pos.x; x<pos.x+size.x; ++x, ++i) {
 	const auto index = (y * width + x) * 3;
-	pixels[index  ] = splats[i].r;
-	pixels[index+1] = splats[i].g;
-	pixels[index+2] = splats[i].b;
+	pixels[index  ] = splats[i].x;
+	pixels[index+1] = splats[i].y;
+	pixels[index+2] = splats[i].z;
       }
     }
   }

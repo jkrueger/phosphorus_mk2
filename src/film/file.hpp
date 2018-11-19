@@ -15,7 +15,7 @@ namespace film {
     void add_tile(
       const Imath::V2i& pos
     , const Imath::V2i& size
-    , const color_t* splats);
+    , const Imath::Color3f* splats);
 
     void finalize();
   };

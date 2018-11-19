@@ -109,7 +109,7 @@ struct material_t::details_t {
     soa::shading_result_t<>& result
   , uint32_t index
   , const ClosureColor* c
-  , const color_t w = color_t(1,1,1)) const
+    , const Imath::Color3f w = Imath::Color3f(1,1,1)) const
   {
     switch(c->id) {
     case ClosureColor::MUL:
@@ -125,7 +125,7 @@ struct material_t::details_t {
     default:
       {
 	const auto component = c->as_comp();
-	const auto cw = w * component->w;
+	const auto cw = w * Imath::Color3f(component->w);
 
 	switch(component->id) {
         case bsdf_t::Emissive:
@@ -215,9 +215,9 @@ struct material_builder_t : public material_t::builder_t {
 
   void parameter(
     const std::string& name
-  , const color_t& c)
+  , const Imath::Color3f& c)
   {
-    const auto p = material->details->parameters.write_3f(c.r, c.g, c.b);
+    const auto p = material->details->parameters.write_3f(c.x, c.y, c.z);
 
     material_t::details_t::system->Parameter(
       name

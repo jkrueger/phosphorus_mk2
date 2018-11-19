@@ -7,7 +7,7 @@
 #include <cmath>
 
 namespace refraction {
-  color_t sample(
+  Imath::Color3f sample(
     const bsdf::lobes::refract_t& params
   , const Imath::V3f& wi
   , Imath::V3f& wo
@@ -39,9 +39,11 @@ namespace refraction {
 
       wo = -wi * eta + n * nk;
 
-      return 1.0f - fresnel::dielectric(cos_theta, params.eta);
+      const auto out = 1.0f - fresnel::dielectric(cos_theta, params.eta);
+
+      return Imath::Color3f(out);
     }
 
-    return 0;
+    return Imath::Color3f();
   }
 }

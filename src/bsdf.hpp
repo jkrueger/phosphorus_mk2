@@ -27,24 +27,24 @@ struct bsdf_t {
   uint32_t flags;
   
   type_t   type[MaxLobes];
-  color_t  weight[MaxLobes];
+  Imath::Color3f weight[MaxLobes];
   uint8_t  params[MaxLobes*sizeof(param_t)];
   uint32_t lobes;
 
   bsdf_t();
 
   /* evaluate the bsdf for a given pair of directions */
-  color_t f(const Imath::V3f& wi, const Imath::V3f& wo) const;
+  Imath::Color3f f(const Imath::V3f& wi, const Imath::V3f& wo) const;
 
   /* sample the bsdf given an incident direction */
-  color_t sample(
+  Imath::Color3f sample(
     const Imath::V2f& sample
   , const Imath::V3f& wi
   , Imath::V3f& wo
   , float& pdf) const;
 
   template<typename T>
-  inline void add_lobe(type_t t, const color_t& c, const T* p) {
+  inline void add_lobe(type_t t, const Imath::Color3f& c, const T* p) {
 
     flags |= (uint32_t) t;
     
