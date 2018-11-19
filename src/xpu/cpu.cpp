@@ -73,7 +73,7 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	  for (auto i=0; i<frame.sampler->spp; ++i) {
 	    allocator_scope_t scope(allocator);
 
-	    auto state  = new(allocator) pipeline_state_t<>();
+	    auto state = new(allocator) pipeline_state_t<>();
 
 	    const auto& samples = frame.sampler->next_pixel_samples(i);
 	    const auto& camera  = scene.camera;
