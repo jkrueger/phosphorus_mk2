@@ -17,6 +17,8 @@ namespace spt {
     soa::vector3_t<N> beta; // the contribution of the current path vertex
     soa::vector3_t<N> r;    // accumulated radianceover all computed paths
 
+    active_t<> dead;
+
     inline state_t() {
       memset(depth, 0, sizeof(depth));
       memset(path, 0, sizeof(path));
@@ -25,6 +27,16 @@ namespace spt {
       for (auto i=0; i<N; ++i) {
         beta.from(i, Imath::V3f(1.0f));
       }
+    }
+
+    inline void mark_for_revive(uint32_t i) {
+      dead.add(i);
+    }
+
+    inline void revive(uint32_t i) {
+      depth[i] = 0;
+      path[i]++;
+      beta.from(i, Imath::V3f(1.0f));
     }
   };
 
@@ -38,16 +50,26 @@ namespace spt {
     inline void operator()(
       const scene_t& scene
     , sampler_t* sampler
-    , const active_t<>& active
-    , const interaction_t<>* hits
+    , active_t<>& active
+    , const interaction_t<>* primary
+    , interaction_t<>* hits
     , state_t<>* state
     , ray_t<>* samples)
     {
+      for (auto i=0; i<state->dead.num; ++i) {
+        const auto index = state->dead.index[i];
+        hits->from(index, primary);
+        state->revive(index);
+        active.add(index);
+      }
+
+      state->dead.clear();
+
       for (auto i=0; i<active.num; ++i) {
         const auto index = active.index[i];
 
 	if (!hits->is_hit(index)) {
-	  continue;
+          continue;
 	}
 
         const auto depth = state->depth[index];
@@ -106,8 +128,7 @@ namespace spt {
     , state_t<>* state
     , ray_t<>* samples)
     {
-      const auto num = active.num;
-      active.num = 0;
+      const auto num = active.clear();
 
       for (auto i=0; i<num; ++i) {
 	const auto index = active.index[i];
@@ -130,30 +151,21 @@ namespace spt {
           ++state->depth[index];
 
           // check if we have to terminate the path
-          if (terminate_path(sampler, state, index)) {
-            assert(state->path[index] < paths_per_sample);
-            state->depth[index] = 1;
-            state->path[index]++;
-
-            keep_alive = state->path[index] < paths_per_sample;
+          if (sample_bsdf(sampler, primary, hits, state, samples, index)) {
+            active.add(index);
+          }
+          else if (state->path[index] < paths_per_sample) {
+            state->mark_for_revive(index);
           }
         }
 	else {
 	  // TODO: check if we have an environment map
 
           // revive rays if the primary ray hit anything
-          assert(state->path[index] < paths_per_sample);
-          state->depth[index] = 1;
-          state->path[index]++;
-
-          keep_alive = primary->is_hit(index) &&
-            state->path[index] < paths_per_sample;
+          if (primary->is_hit(index) && state->path[index] < paths_per_sample) {
+            state->mark_for_revive(index);
+          }
 	}
-
-        if (keep_alive &&
-            sample_bsdf(sampler, primary, hits, state, samples, index)) {
-          active.add(index);
-        }
 
 	state->r.from(index, out);
       }
@@ -204,22 +216,18 @@ namespace spt {
       Imath::V3f n;
       Imath::Color3f beta;
 
-      if (state->depth[index] == 1) {
-        p  = primary->p.at(index);
-        wi = primary->wi.at(index); 
-        n  = primary->n.at(index);
+      state->depth[index]++;
 
-        bsdf = primary->bsdf[index];
-        beta = Imath::V3f(1.0f);
+      if (terminate_path(sampler, state, index)) {
+        return false;
       }
-      else {
-        p  = hits->p.at(index);
-        wi = hits->wi.at(index);
-        n  = hits->n.at(index);
 
-        bsdf = hits->bsdf[index];
-        beta = state->beta.at(index);
-      }
+      p  = hits->p.at(index);
+      wi = hits->wi.at(index);
+      n  = hits->n.at(index);
+
+      bsdf = hits->bsdf[index];
+      beta = state->beta.at(index);
 
       assert(bsdf);
 

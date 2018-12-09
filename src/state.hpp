@@ -31,7 +31,6 @@ namespace details {
   static const uint32_t MASKED   = (1 << 1);
   static const uint32_t SHADOW   = (1 << 2);
   static const uint32_t SPECULAR = (1 << 3);
-  static const uint32_t REVIVE   = (1 << 4);
 }
 
 /* a stream of rays */
@@ -80,10 +79,6 @@ struct ray_t {
     face[i] = _face;
     u[i]    = _u;
     v[i]    = _v;
-  }
-
-  inline void revive() {
-    flags[i] |= REVIVE;
   }
 
   inline void miss(uint32_t i) {
@@ -152,6 +147,17 @@ struct interaction_t {
   soa::vector3_t<N> e;
   bsdf_t* bsdf[N];
 
+  inline void from(uint32_t index, const interaction_t* o) {
+    p.from(index, o->p.at(index));
+    wi.from(index, o->wi.at(index));
+    n.from(index, o->n.at(index));
+    e.from(index, o->e.at(index));
+    flags[index] = o->flags[index];
+    s[index] = o->s[index];
+    t[index] = o->t[index];
+    bsdf[index] = o->bsdf[index];
+  } 
+
   inline bool is_hit(uint32_t i) const {
     return (flags[i] & details::HIT) == details::HIT;
   }
@@ -202,6 +208,12 @@ struct active_t {
 
   inline void add(uint32_t i) {
     index[num++] = i;
+  }
+
+  inline uint32_t clear() {
+    uint32_t n = num;
+    num = 0;
+    return n;
   }
 
   inline bool has_live_paths() const {

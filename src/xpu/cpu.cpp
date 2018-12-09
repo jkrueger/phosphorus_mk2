@@ -94,7 +94,7 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 
             details->interactions(allocator, scene, active, rays, primary);
 
-            details->sample_lights(scene, frame.sampler, active, primary, state, rays);
+            details->sample_lights(scene, frame.sampler, active, primary, primary, state, rays);
             details->trace(rays, active);
             details->integrate(
               frame.sampler
@@ -113,7 +113,7 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
               details->trace(rays, active);
 	      details->interactions(allocator, scene, active, rays, hits);
 
-	      details->sample_lights(scene, frame.sampler, active, hits, state, rays);
+	      details->sample_lights(scene, frame.sampler, active, primary, hits, state, rays);
 	      details->trace(rays, active);
 	      details->integrate(
                 frame.sampler
