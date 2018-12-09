@@ -53,14 +53,15 @@ struct material_t {
 
   void evaluate(
     allocator_t& allocator
-  , const scene_t& scene
-  , pipeline_state_t<>* state
+  , interaction_t<>* hits
   , const active_t<>& active);
 
   void evaluate(
-    const scene_t& scene
-  , occlusion_query_state_t<>* state
-  , uint32_t index);
+    const Imath::V3f& p
+  , const Imath::V3f& wi
+  , const Imath::V3f& n
+  , const Imath::V2f& st
+  , shading_result_t& result);
 
   bool is_emitter() const;
 

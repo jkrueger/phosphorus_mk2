@@ -56,7 +56,7 @@ namespace accel {
 
             auto v0v1 = _e0.at(j);
             auto v0v2 = _e1.at(j);
-            auto p    = stream->rays.wi.at(index).cross(v0v2);
+            auto p    = stream->wi.at(index).cross(v0v2);
 
             auto det = v0v1.dot(p);
 
@@ -66,7 +66,7 @@ namespace accel {
 
             auto ood = 1.0 / det;
 
-            auto t = stream->rays.p.at(index) - _v0.at(j);
+            auto t = stream->p.at(index) - _v0.at(j);
 
             auto u = t.dot(p) * ood;
             if (u < 0.0 || u > 1.0) {
@@ -75,17 +75,19 @@ namespace accel {
 
             auto q = t.cross(v0v1);
 
-            auto v = stream->rays.wi.at(index).dot(q) * ood;
+            auto v = stream->wi.at(index).dot(q) * ood;
             if (v < 0.0 || (u + v) > 1.0) {
               continue;
             }
             
             auto d = v0v2.dot(q) * ood;
-            if (d < 0.0 || d > stream->rays.d[index]) {
+            if (d < 0.0 || d > stream->d[index]) {
               continue;
             }
 
-	    stream->shade(index, meshid[j], setid[j], faceid[j], u, v);
+            if (!stream->is_shadow(index)) {
+              stream->shade(index, meshid[j], setid[j], faceid[j], u, v);
+            }
 	    stream->hit(index, d);
           }
         }
@@ -111,16 +113,16 @@ namespace accel {
 	  const auto index = indices[i];
 
 	  vector3_t<N> o(
-	      stream->rays.p.x[index]
-	    , stream->rays.p.y[index]
-	    , stream->rays.p.z[index]);
+	      stream->p.x[index]
+	    , stream->p.y[index]
+	    , stream->p.z[index]);
 
 	  vector3_t<N> wi(
-	      stream->rays.wi.x[index]
-	    , stream->rays.wi.y[index]
-	    , stream->rays.wi.z[index]);
+	      stream->wi.x[index]
+	    , stream->wi.y[index]
+	    , stream->wi.z[index]);
 
-	  const auto d = simd::load(stream->rays.d[index]);
+	  const auto d = simd::load(stream->d[index]);
 
 	  const auto p   = wi.cross(e1);
 	  const auto det = e0.dot(p);
@@ -148,7 +150,7 @@ namespace accel {
 
 	  if (mask != 0) {
 	    float dists[N];
-	    float closest = stream->rays.d[index];
+	    float closest = stream->d[index];
 
 	    simd::store(ds, dists);
 
@@ -168,16 +170,24 @@ namespace accel {
 	      simd::store(us, u);
 	      simd::store(vs, v);
 
-	      // update shortest hit distance of ray
-	      stream->shade(index, meshid[idx], setid[idx], faceid[idx], u[idx], v[idx]);
+              if (!stream->is_shadow(index)) {
+                stream->set_surface(
+                  index
+                , meshid[idx]
+                , setid[idx]
+                , faceid[idx]
+                , u[idx]
+                , v[idx]);
+              }
 	      stream->hit(index, closest);
 	    }
 	  }
 	}
       }
 
+      template<typename Stream>
       inline void intersect(
-        pipeline_state_t<>* stream
+        Stream* stream
       , uint32_t* indices
       , uint32_t num_rays) const
       {
@@ -197,15 +207,15 @@ namespace accel {
 	const auto rays = simd::load((int32_t*) indices);
 	
 	const auto o = simd::vector3_t(
-	    stream->rays.p.x
-	  , stream->rays.p.y
-	  , stream->rays.p.z
+	    stream->p.x
+	  , stream->p.y
+	  , stream->p.z
 	  , rays);
 	
 	const auto wi = simd::vector3_t(
-	    stream->rays.wi.x
-	  , stream->rays.wi.y
-	  , stream->rays.wi.z
+	    stream->wi.x
+	  , stream->wi.y
+	  , stream->wi.z
 	  , rays);
 	
 	auto d = simd::float_t<SIMD_WIDTH>::gather(stream->rays.d, rays);
@@ -261,7 +271,15 @@ namespace accel {
 	    const auto x = indices[(7-n)];
 	    const auto t = ts[n];
 
-	    stream->shade(x, meshid[t], setid[t], faceid[t], u[t], v[t]);
+            if (!stream->is_shadow(index)) {
+              stream->set_surface(
+                x
+              , meshid[t]
+              , setid[t]
+              , faceid[t]
+              , u[t]
+              , v[t]);
+            }
 	    stream->hit(x, ds[t]);
 	  }
 	}

@@ -106,21 +106,20 @@ struct material_t::details_t {
   }
 
   void eval_closure(
-    soa::shading_result_t<>& result
-  , uint32_t index
+    shading_result_t& result
   , const ClosureColor* c
-    , const Imath::Color3f w = Imath::Color3f(1,1,1)) const
+  , const Imath::Color3f w = Imath::Color3f(1,1,1)) const
   {
     switch(c->id) {
     case ClosureColor::MUL:
       {
 	const auto cw = w * c->as_mul()->weight;
-	eval_closure(result, index, c->as_mul()->closure, cw);
+	eval_closure(result, c->as_mul()->closure, cw);
 	break;
       }
     case ClosureColor::ADD:
-      eval_closure(result, index, c->as_add()->closureA, w);
-      eval_closure(result, index, c->as_add()->closureB, w);
+      eval_closure(result, c->as_add()->closureA, w);
+      eval_closure(result, c->as_add()->closureB, w);
       break;
     default:
       {
@@ -129,27 +128,29 @@ struct material_t::details_t {
 
 	switch(component->id) {
         case bsdf_t::Emissive:
-          result.e.from(index, cw);
-	  break;
+          result.e = cw;
+          // fall through to diffuse material, so we have a bsdf
+          // for lights. this shouldb be handled in the shader
+          // eventually
 	case bsdf_t::Diffuse:
-	  if (auto bsdf = result.bsdf[index]) {
-	    bsdf->add_lobe(
+	  if (result.bsdf) {
+	    result.bsdf->add_lobe(
 	      bsdf_t::Diffuse
 	    , cw
 	    , component->as<bsdf::lobes::diffuse_t>());
 	  }
 	  break;
 	case bsdf_t::Reflection:
-	  if (auto bsdf = result.bsdf[index]) {
-	    bsdf->add_lobe(
+	  if (result.bsdf) {
+	    result.bsdf->add_lobe(
 	      bsdf_t::Reflection
 	    , cw
 	    , component->as<bsdf::lobes::reflect_t>());
 	  }
 	  break;
 	case bsdf_t::Refraction:
-	  if (auto bsdf = result.bsdf[index]) {
-	    bsdf->add_lobe(
+	  if (result.bsdf) {
+	    result.bsdf->add_lobe(
 	      bsdf_t::Refraction
 	    , cw
 	    , component->as<bsdf::lobes::refract_t>());
@@ -253,54 +254,54 @@ material_t::builder_t* material_t::builder() {
 
 void material_t::evaluate(
   allocator_t& allocator
-, const scene_t& scene
-, pipeline_state_t<>* state
+, interaction_t<>* hits
 , const active_t<>& active)
 {
   for (auto i=0; i<active.num; ++i) {
     const auto index = active.index[i];
-    assert(state->is_hit(index));
-
-    const auto mesh = scene.mesh(state->shading.mesh[index]);
-    mesh->shading_parameters(state->shading, index);
+    assert(hits->is_hit(index));
 
     ShaderGlobals sg;
     memset(&sg, 0, sizeof(ShaderGlobals));
-    sg.P = state->rays.p.at(index);
-    sg.I = state->rays.wi.at(index);
-    sg.N = sg.Ng = state->shading.n.at(index);
-    sg.u = state->shading.s[index];
-    sg.v = state->shading.t[index];
+    sg.P = hits->p.at(index);
+    sg.I = hits->wi.at(index);
+    sg.N = sg.Ng = hits->n.at(index);
+    sg.u = hits->s[index];
+    sg.v = hits->t[index];
     sg.backfacing = sg.N.dot(sg.I) > 0;
 
     details->execute(sg);
 
-    state->result.bsdf[index] = new(allocator) bsdf_t();
-    
-    details->eval_closure(state->result, index, sg.Ci);
+    shading_result_t result; 
+    result.bsdf = new(allocator) bsdf_t();
+
+    details->eval_closure(result, sg.Ci);
+
+    hits->e.from(index, result.e);
+    hits->bsdf[index] = result.bsdf;
   }
 }
 
 void material_t::evaluate(
-  const scene_t& scene
-, occlusion_query_state_t<>* state
-, uint32_t index)
+  const Imath::V3f& p
+, const Imath::V3f& wi
+, const Imath::V3f& n
+, const Imath::V2f& st
+, shading_result_t& result)
 {
-  assert(index >= 0 && index <= occlusion_query_state_t<>::size);
-  
   ShaderGlobals sg;
   memset(&sg, 0, sizeof(ShaderGlobals));
-  sg.P = state->rays.p.at(index);
-  sg.I = -state->rays.wi.at(index);
-  sg.N = sg.Ng = state->shading.n.at(index);
-  sg.u = state->shading.s[index];
-  sg.v = state->shading.t[index];
+  sg.P = p;
+  sg.I = wi;
+  sg.N = sg.Ng = n;
+  sg.u = st.x;
+  sg.v = st.y;
   sg.backfacing = sg.N.dot(sg.I) < 0;
 
   details->execute(sg);
 
-  state->result.bsdf[index] = nullptr;
-  details->eval_closure(state->result, index, sg.Ci);
+  result.bsdf = nullptr;
+  details->eval_closure(result, sg.Ci);
 }
 
 bool material_t::is_emitter() const {

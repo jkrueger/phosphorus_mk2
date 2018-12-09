@@ -40,6 +40,7 @@ struct sampler_t {
   light_sample_t*  light_samples;
 
   const uint32_t spp;
+  const uint32_t paths_per_sample;
   const uint32_t path_depth;
 
   sampler_t(parsed_options_t& options);
@@ -58,7 +59,7 @@ struct sampler_t {
   }
 
   inline const light_sample_t& next_light_sample(uint32_t s, uint32_t i) const {
-    assert(s < spp);
+    assert(s < spp*paths_per_sample);
     assert(i < path_depth);
 
     return light_samples[s*path_depth+i];
