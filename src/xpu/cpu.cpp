@@ -26,19 +26,21 @@ struct cpu_t::details_t {
 
   camera_kernel_t            camera_rays;
   stream_mbvh_kernel_t       trace;
-  deferred_shading_kernel_t  shade;
+  deferred_shading_kernel_t  interactions;
   spt::light_sampler_t       sample_lights;
   spt::integrator_t          integrate;
 
-  details_t()
+  details_t(const parsed_options_t& options)
     : trace(&accel)
+    , sample_lights(options)
+    , integrate(options)
   {}
 };
 
-cpu_t::cpu_t(uint32_t concurrency)
-  : details(new details_t())
-  , concurrency(concurrency) {
-}
+cpu_t::cpu_t(const parsed_options_t& options)
+  : details(new details_t(options))
+  , concurrency(options.single_threaded ? 1 : std::thread::hardware_concurrency())
+{}
 
 cpu_t::~cpu_t() {
   delete details;
@@ -49,12 +51,10 @@ void cpu_t::preprocess(const scene_t& scene) {
     accel::mbvh_t::builder_t::scoped_t builder(details->accel.builder());
 
     std::vector<triangle_t> triangles;
-
     scene.triangles(triangles);
 
     bvh::from(builder, triangles);
   }
-  // TODO: precompute CDFs for scene lights, etc.
 }
 
 void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
@@ -65,16 +65,23 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	material_t::attach();
 	// create append only memory allocator
 	allocator_t allocator(1024*1024*100);
+
+        const auto spp = frame.sampler->spp;
+        const auto pps = frame.sampler->paths_per_sample;
 	
 	job::tiles_t::tile_t tile;
 	while (frame.tiles->next(tile)) {
 	  auto splats = new(allocator) Imath::Color3f[tile.w * tile.h];
           memset(splats, 0, sizeof(Imath::Color3f) * tile.w*tile.h);
 
-	  for (auto i=0; i<frame.sampler->spp; ++i) {
+	  for (auto i=0; i<spp; ++i) {
 	    allocator_scope_t scope(allocator);
 
-	    auto state = new(allocator) pipeline_state_t<>();
+            auto state = new(allocator) spt::state_t<>();
+
+	    auto rays = new(allocator) ray_t<>();
+            auto primary = new(allocator) interaction_t<>();
+            auto hits = new(allocator) interaction_t<>();
 
 	    const auto& samples = frame.sampler->next_pixel_samples(i);
 	    const auto& camera  = scene.camera;
@@ -82,41 +89,49 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	    active_t<> active;
 	    active.reset(0);
 
-	    details->camera_rays(camera, tile, samples, state);
+	    details->camera_rays(camera, tile, samples, rays);
+            details->trace(rays, active);
 
-	    do {
+            details->interactions(allocator, scene, active, rays, primary);
+
+            details->sample_lights(scene, frame.sampler, active, primary, primary, state, rays);
+            details->trace(rays, active);
+            details->integrate(
+              frame.sampler
+            , scene
+            , active
+            , primary
+            , primary
+            , state
+            , rays);
+
+	    while (active.has_live_paths()) {
 	      // automatically free up allocator memory in each
 	      // loop iteration
 	      allocator_scope_t scope(allocator);
 
-	      details->trace(state, active);
+              details->trace(rays, active);
+	      details->interactions(allocator, scene, active, rays, hits);
 
-	      // FIME: find the proper place for his
-	      for (auto j=0; j<active.num; ++j) {
-	      	const auto index = active.index[j];
-	      	const auto p = state->rays.p.at(index);
-	      	const auto wi = state->rays.wi.at(index);
+	      details->sample_lights(scene, frame.sampler, active, primary, hits, state, rays);
+	      details->trace(rays, active);
+	      details->integrate(
+                frame.sampler
+              , scene
+              , active
+              , primary
+              , hits
+              , state
+              , rays);
+            }
 
-	      	state->rays.p.from(index, p + wi * state->rays.d[index]);
-	      }
-
-	      details->shade(allocator, scene, state, active);
-
-	      auto shadow_samples = new(allocator) occlusion_query_state_t<>();
- 
-	      details->sample_lights(i, frame.sampler, state, active, shadow_samples);
-	      details->trace(shadow_samples, active);
-	      details->integrate(frame.sampler, scene, state, active, shadow_samples);
-
-	    } while (active.has_live_paths());
-
-	      // apply fiter
+	      // TODO: apply fiter
 
 	    // FIXME: temporary code to copy radiance values into output buffer
 	    // this should run through a filter kernel instead
 	    for (auto j=0; j<tile.w*tile.h; ++j) {
-	      const auto r = state->result.r.at(j);
-	      splats[j] += r * (1.0f / frame.sampler->spp);
+	      const auto r = state->r.at(j);
+	      splats[j] += r * (1.0f / (spp*pps));
 	    }
 	  }
 
@@ -138,8 +153,5 @@ void cpu_t::join() {
 }
 
 cpu_t* cpu_t::make(const parsed_options_t& options) {
-  const auto concurrency =
-    options.single_threaded ? 1 : std::thread::hardware_concurrency();
-
-  return new cpu_t(concurrency);
+  return new cpu_t(options);
 }

@@ -105,13 +105,30 @@ void mesh_t::triangles(uint32_t set, std::vector<triangle_t>& out) const {
 }
 
 void mesh_t::shading_parameters(
-  soa::shading_parameters_t<>& parameters
+  const ray_t<>* rays
+, interaction_t<>* hits
 , uint32_t i) const
 {
-  const auto& face = parameters.face[i];
+  Imath::V3f n;
+  Imath::V2f st;
 
-  const auto u = parameters.u[i];
-  const auto v = parameters.v[i];
+  shading_parameters(rays, n, st, i);
+
+  hits->n.from(i, n);
+  hits->s[i] = st.x;
+  hits->t[i] = st.y;
+}
+
+void mesh_t::shading_parameters(
+  const ray_t<>* rays     
+, Imath::V3f& n
+, Imath::V2f& st
+, uint32_t i) const
+{
+  const auto& face = rays->face[i];
+
+  const auto u = rays->u[i];
+  const auto v = rays->v[i];
 
   const auto w = 1 - u - v;
   const auto a = faces[face];
@@ -130,15 +147,10 @@ void mesh_t::shading_parameters(
   const auto& n1 = normals[nb];
   const auto& n2 = normals[nc];
 
-  const auto n = (w*n0+u*n1+v*n2).normalize();
-
-  parameters.n.x[i] = n.x;
-  parameters.n.y[i] = n.y;
-  parameters.n.z[i] = n.z;
+  n = (w*n0+u*n1+v*n2).normalize();
 
   if (details->uvs.size() == 0) {
-    parameters.u[i] = 0;
-    parameters.v[i] = 0;
+    st = Imath::V2f(0);
   }
   else {
     auto uva = a, uvb = b, uvc = c;
@@ -153,10 +165,7 @@ void mesh_t::shading_parameters(
     const auto uv1 = uvs[uvb];
     const auto uv2 = uvs[uvc];
 
-    const auto uv = w*uv0+u*uv1+v*uv2;
-
-    parameters.s[i] = uv.x;
-    parameters.t[i] = uv.y;
+    st = w*uv0+u*uv1+v*uv2;
   }
 }
 

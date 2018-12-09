@@ -18,7 +18,7 @@ struct cpu_t : public xpu_t {
   uint32_t concurrency;
   // TODO reference to work queues, for rays and for shading
 
-  cpu_t(uint32_t concurrency);
+  cpu_t(const parsed_options_t& options);
   ~cpu_t();
 
   void preprocess(const scene_t& scene);

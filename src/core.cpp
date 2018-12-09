@@ -14,22 +14,28 @@
 
 /* available arguments to the renderer */
 static option options[] = {
-  { "output",     0,           NULL, 'o' },
-  { "no-gpu",     0,           NULL, 'c' },
-  { "one-thread", no_argument, NULL, '1' },
-  { "spp",        0,           NULL, 's' }
+  { "output",     0,                 NULL, 'o' },
+  { "no-gpu",     no_argument,       NULL, 'c' },
+  { "one-thread", no_argument,       NULL, '1' },
+  { "spp",        required_argument, NULL, 's' },
+  { "paths",      required_argument, NULL, 'p' },
+  { "depth",      required_argument, NULL, 'd' }
 };
 
 void usage() {
   std::cerr
-    << "usage: phosphorus [-o file] [--output file] scene"
-    << std::endl;
+    << "usage: phosphorus <options> scene"
+    << std::endl
+    << "-o <path>    Output path fir the renderer" << std::endl
+    << "-s <samples> Anti Aliasing samples per pixel" << std::endl
+    << "-p <paths>   Maximum number of paths traces per sample" << std::endl
+    << "-d <depth>   Maximum depth of a single path" << std::endl;
 }
 
 bool parse_args(int argc, char** argv, parsed_options_t& parsed) {
   char ch;
 
-  while ((ch = getopt_long(argc, argv, "os:", options, nullptr)) != -1) {
+  while ((ch = getopt_long(argc, argv, "c1o:p:s:", options, nullptr)) != -1) {
     switch (ch) {
     case 'o':
       parsed.output = optarg;
@@ -45,8 +51,15 @@ bool parse_args(int argc, char** argv, parsed_options_t& parsed) {
     case 's':
       parsed.samples_per_pixel = std::atoi(optarg);
       break;
+    case 'p':
+      parsed.paths_per_sample = std::atoi(optarg);
+      break;
+    case 'd':
+      parsed.path_depth = std::atoi(optarg);
+      break;
     case '?':
     default:
+      usage();
       break;
     }
   }

@@ -43,10 +43,9 @@ void intersect(Stream* stream, const active_t<>& active, const accel::mbvh_t* bv
       while (todo != end) {
 	typename simd::float_t<accel::mbvh_t::width>::type dist;
 
-	const auto  ray  = *todo;
-	const auto& rays = stream->rays;
+	const auto ray = *todo;
 
-	if (Stream::stop_on_first_hit && stream->is_hit(ray)) {
+	if (stream->is_shadow(ray) && stream->is_hit(ray)) {
 	   ++todo;
 	   continue;
 	}
@@ -54,9 +53,9 @@ void intersect(Stream* stream, const active_t<>& active, const accel::mbvh_t* bv
 	auto hits =
 	  simd::intersect<accel::mbvh_t::width>(
 	    bounds
-	  , simd::vector3_t(rays.p.x[ray], rays.p.y[ray], rays.p.z[ray])
-	  , simd::vector3_t(1.0f/rays.wi.x[ray], 1.0f/rays.wi.y[ray], 1.0f/rays.wi.z[ray])
-	  , simd::load(rays.d[ray])
+	  , simd::vector3_t(stream->p.x[ray], stream->p.y[ray], stream->p.z[ray])
+	  , simd::vector3_t(1.0f/stream->wi.x[ray], 1.0f/stream->wi.y[ray], 1.0f/stream->wi.z[ray])
+	  , simd::load(stream->d[ray])
 	  , dist);
 
 	length = simd::add(length, simd::_and(dist, hits));
@@ -127,10 +126,6 @@ stream_mbvh_kernel_t::stream_mbvh_kernel_t(const accel::mbvh_t* bvh)
   : bvh(bvh)
 {}
 
-void stream_mbvh_kernel_t::trace(pipeline_state_t<>* state, active_t<>& active) const {
-  intersect(state, active, bvh);
-}
-
-void stream_mbvh_kernel_t::trace(occlusion_query_state_t<>* state, active_t<>& active) const {
-  intersect(state, active, bvh);
+void stream_mbvh_kernel_t::trace(ray_t<>* rays, active_t<>& active) const {
+  intersect(rays, active, bvh);
 }

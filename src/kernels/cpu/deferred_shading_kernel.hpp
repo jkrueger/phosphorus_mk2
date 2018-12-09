@@ -17,31 +17,29 @@ struct deferred_shading_kernel_t {
   };
 
   inline void operator()(
-      allocator_t& allocator
-    , const scene_t& scene
-    , pipeline_state_t<>* state
-    , const active_t<>& active) const
+    allocator_t& allocator
+  , const scene_t& scene
+  , const active_t<>& active
+  , const ray_t<>* rays
+  , interaction_t<>* hits) const
   {
-    assert(state);
+    deferred_t by_material(allocator, scene.num_materials());
+    build_interactions(scene, active, rays, hits, by_material);
 
-    deferred_t deferred(allocator, scene.num_materials());
-    sort_by_material(scene, state, active, deferred);
-
-    assert(deferred.size == scene.num_materials());
-    for (auto i=0; i<deferred.size; ++i) {
+    for (auto i=0; i<by_material.size; ++i) {
       const auto material = scene.material(i);
-      assert(material->id == i);
-      material->evaluate(allocator, scene, state, deferred.material[i]);
+      material->evaluate(allocator, hits, by_material.material[i]);
     }
 
     // TODO: copy deferred buckets back into the active set?
     // this could be helpful for integration
   }
 
-  void sort_by_material(
+  void build_interactions(
     const scene_t& scene
-  , pipeline_state_t<>* state
   , const active_t<>& active
+  , const ray_t<>* rays
+  , interaction_t<>* hits
   , deferred_t& deferred) const
   {
     // TODO: with more materials a radix sort might be faster
@@ -49,14 +47,22 @@ struct deferred_shading_kernel_t {
 
     for (auto i=0; i<active.num; ++i) {
       const auto index = active.index[i];
-      if (state->is_hit(index)) {
-	assert(state->shading.mesh[index] < scene.num_meshes());
-	const auto mesh = scene.mesh(state->shading.mesh[index]);
-	assert(mesh);
-	assert(mesh->material(state->shading.set[index]) < scene.num_materials());
-	const auto material = mesh->material(state->shading.set[index]);
-	
-	deferred.material[material].add(index);
+
+      hits->flags[index] = rays->flags[index];
+      
+      if (rays->is_hit(index)) {
+	const auto mesh = scene.mesh(rays->mesh[index]);
+	const auto material = mesh->material(rays->set[index]);
+
+        const auto p = rays->p.at(index);
+        const auto wi = rays->wi.at(index);
+
+        hits->p.from(index, p + wi * rays->d[index]);
+        hits->wi.from(index, -wi);
+
+        mesh->shading_parameters(rays, hits, index);
+
+        deferred.material[material].add(index);
       }
     }
   }

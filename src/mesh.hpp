@@ -48,7 +48,7 @@ struct mesh_t {
 
     virtual void set_normals_per_vertex() = 0;
     virtual void set_uvs_per_vertex() = 0;
-    
+
     virtual void set_normals_per_vertex_per_face() = 0;
     virtual void set_uvs_per_vertex_per_face() = 0;
   };
@@ -76,7 +76,14 @@ struct mesh_t {
 
   /* fill in the shading parameters in the state from this mesh */
   void shading_parameters(
-    soa::shading_parameters_t<>& parameters
+    const ray_t<>* rays     
+  , interaction_t<>* hits
+  , uint32_t i) const;
+
+  void shading_parameters(
+    const ray_t<>* rays     
+  , Imath::V3f& n
+  , Imath::V2f& st
   , uint32_t i) const;
 
   inline bool has_per_vertex_normals() const {

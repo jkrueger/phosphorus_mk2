@@ -2,9 +2,7 @@
 
 #include "config.hpp"
 
-#include <ImathVec.h>
-
-struct bsdf_t;
+#include <OpenEXR/ImathVec.h>
 
 namespace soa {
   template<int N>
@@ -14,6 +12,12 @@ namespace soa {
 
     Imath::V2f at(uint32_t i) const {
       return Imath::V2f(x[i], y[i]);
+    }
+
+    void from(uint32_t i, const Imath::V2f& v) {
+      assert(i >= 0 && i <= N);
+      x[i] = v.x;
+      y[i] = v.y;
     }
   };
 
@@ -33,35 +37,5 @@ namespace soa {
       y[i] = v.y;
       z[i] = v.z;
     }
-  };
-
-  /* a stream of rays */
-  template<int N = config::STREAM_SIZE>
-  struct ray_t {
-    vector3_t<N> p;
-    vector3_t<N> wi;
-    float d[N];
-  };
-
-  /* a stream of shading parameters and results */
-  template<int N = config::STREAM_SIZE>
-  struct shading_parameters_t {
-    // parameters coming out of the intersection kernel
-    uint32_t     mesh[N];
-    uint32_t     set[N];
-    uint32_t     face[N];
-    float        u[N];
-    float        v[N];
-    // computed from mesh
-    vector3_t<N> n;
-    float        s[N];
-    float        t[N];
-  };
-
-  template<int N = config::STREAM_SIZE>
-  struct shading_result_t {
-    bsdf_t*      bsdf[N];
-    vector3_t<N> e;
-    vector3_t<N> r;
   };
 }

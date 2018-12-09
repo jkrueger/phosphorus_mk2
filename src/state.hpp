@@ -7,6 +7,8 @@
 #include "math/soa.hpp"
 #include "utils/compiler.hpp"
 
+struct bsdf_t;
+
 /* Global state for the rendering of one frame */
 struct frame_state_t {
   sampler_t*    sampler;
@@ -25,66 +27,76 @@ struct frame_state_t {
 };
 
 namespace details {
-  static const uint32_t ALIVE    = 0;
-  static const uint32_t DEAD     = 0x1;
-  static const uint32_t HIT      = 0x2;
-  static const uint32_t MASKED   = 0x4;
-  static const uint32_t SPECULAR = 0x8;
+  static const uint32_t HIT      = 1;
+  static const uint32_t MASKED   = (1 << 1);
+  static const uint32_t SHADOW   = (1 << 2);
+  static const uint32_t SPECULAR = (1 << 3);
 }
 
-/* The state kept in the pipeline while rendering one 
- * stream of samples, belonign to one tile of the rendered
- * image */
-template<int N = 1024>
-struct pipeline_state_t {
+/* a stream of rays */
+template<int N = config::STREAM_SIZE>
+struct ray_t {
   static const uint32_t size = N;
   static const uint32_t step = SIMD_WIDTH;
 
-  static const bool stop_on_first_hit = false;
+  soa::vector3_t<N> p;
+  soa::vector3_t<N> wi;
+  float d[N];
 
-  typedef soa::ray_t<size> ray_t;
-  typedef soa::shading_parameters_t<size> shading_parameters_t;
-  typedef soa::shading_result_t<size> shading_result_t;
+  uint32_t mesh[N];
+  uint32_t set[N];
+  uint32_t face[N];
+  float    u[N];
+  float    v[N];
 
-  ray_t                rays;
-  shading_parameters_t shading;
-  shading_result_t     result;
+  uint8_t  flags[N];
 
-  soa::vector3_t<size> beta;
+  // inline ray_t() {
+  //   memset(flags, 0, sizeof(flags));
+  // }
 
-  uint8_t flags[size];
-  uint8_t depth[size];
-
-  inline pipeline_state_t() {
-    memset(flags, 0, size);
-    memset(depth, 0, size);
-    memset(&result.r, 0, sizeof(result.r));
-    memset(&result.e, 0, sizeof(result.e));
-
-    for (auto i=0; i<size; ++i) {
-      beta.from(i, Imath::V3f(1.0f));
-    }
+  inline void reset(
+    uint32_t i
+  , const Imath::V3f& _p
+  , const Imath::V3f& _wi
+  , float _d = std::numeric_limits<float>::max())
+  {
+    p.from(i, _p);
+    wi.from(i, _wi);
+    d[i] = _d;
+    flags[i] = 0;
   }
 
-  inline void kill(uint32_t i) {
-    flags[i] |= details::DEAD;
-  }
+  inline void set_surface(
+    uint32_t i
+  , uint32_t _mesh, uint32_t _set, uint32_t _face
+  , float _u, float _v)
+  {
+    assert(i < size);
 
-  inline bool is_dead(uint32_t i) const {
-    return (flags[i] & details::DEAD) == details::DEAD;
+    mesh[i] = _mesh;
+    set[i]  = _set;
+    face[i] = _face;
+    u[i]    = _u;
+    v[i]    = _v;
   }
 
   inline void miss(uint32_t i) {
     flags[i] &= ~details::HIT;
   }
 
-  inline void hit(uint32_t i, float d) {
+  inline void hit(uint32_t i, float _d) {
+    assert(_d < d[i]);
     flags[i] |= details::HIT;
-    rays.d[i] = d;
+    d[i] = _d;
   }
 
-  inline bool is_hit(uint32_t i) const {
-    return (flags[i] & details::HIT) == details::HIT;
+  inline void shadow(uint32_t i) {
+    flags[i] |= details::SHADOW;
+  }
+
+  inline void mask(uint32_t i) {
+    flags[i] |= details::MASKED;
   }
 
   inline void specular_bounce(uint32_t i, bool b) {
@@ -96,61 +108,55 @@ struct pipeline_state_t {
     }
   }
 
+  inline bool is_hit(uint32_t i) const {
+    return (flags[i] & details::HIT) == details::HIT;
+  }
+
+  inline bool is_masked(uint32_t i) const {
+    return (flags[i] & details::MASKED) == details::MASKED;
+  }
+
+  inline bool is_shadow(uint32_t i) const {
+    return (flags[i] & details::SHADOW) == details::SHADOW;
+  }
+
+  inline bool is_occluded(uint32_t i) const {
+    return is_hit(i) || is_masked(i);
+  }
+
   inline bool is_specular(uint32_t i) const {
     return (flags[i] & details::SPECULAR) == details::SPECULAR;
   }
-
-  inline void shade(
-    uint32_t i
-  , uint32_t mesh, uint32_t set, uint32_t face
-  , float u, float v)
-  {
-    assert(i >= 0 && i < size);
-    
-    shading.mesh[i] = mesh;
-    shading.set[i]  = set;
-    shading.face[i] = face;
-    shading.u[i]    = u;
-    shading.v[i]    = v;
-  }
 };
 
-/* The state kept while evaluating a stream of occlusion
- * querries  */
-template <int N = 1024>
-struct occlusion_query_state_t {
+/* a stream of surface interactions */
+template<int N = config::STREAM_SIZE>
+struct interaction_t {
   static const uint32_t size = N;
   static const uint32_t step = SIMD_WIDTH;
 
-  static const bool stop_on_first_hit = true;
+  soa::vector3_t<N> p;
+  soa::vector3_t<N> wi;
+  soa::vector3_t<N> n;
 
-  typedef soa::ray_t<size> ray_t;
-  typedef soa::shading_parameters_t<size> shading_parameters_t;
-  typedef soa::shading_result_t<size> shading_result_t;
+  float s[N];
+  float t[N];
 
-  ray_t rays;
-  shading_parameters_t shading;
-  shading_result_t result;
+  uint8_t flags[N];
 
-  float   pdf[size];
-  uint8_t flags[size];
+  soa::vector3_t<N> e;
+  bsdf_t* bsdf[N];
 
-  inline occlusion_query_state_t() {
-    memset(flags, 0, sizeof(flags));
-  }
-
-  inline void mask(uint32_t i) {
-    flags[i] |= details::MASKED;
-  }
-
-  inline void miss(uint32_t i) {
-    flags[i] &= ~details::HIT;
-  }
-
-  inline void hit(uint32_t i, float d) {
-    flags[i] |= details::HIT;
-    rays.d[i] = d;
-  }
+  inline void from(uint32_t index, const interaction_t* o) {
+    p.from(index, o->p.at(index));
+    wi.from(index, o->wi.at(index));
+    n.from(index, o->n.at(index));
+    e.from(index, o->e.at(index));
+    flags[index] = o->flags[index];
+    s[index] = o->s[index];
+    t[index] = o->t[index];
+    bsdf[index] = o->bsdf[index];
+  } 
 
   inline bool is_hit(uint32_t i) const {
     return (flags[i] & details::HIT) == details::HIT;
@@ -158,23 +164,28 @@ struct occlusion_query_state_t {
 
   inline bool is_masked(uint32_t i) const {
     return (flags[i] & details::MASKED) == details::MASKED;
-  } 
+  }
+
+  inline bool is_shadow(uint32_t i) const {
+    return (flags[i] & details::SHADOW) == details::SHADOW;
+  }
 
   inline bool is_occluded(uint32_t i) const {
     return is_hit(i) || is_masked(i);
   }
 
-  inline void shade(
-    uint32_t i
-  , uint32_t mesh, uint32_t set, uint32_t face
-  , float u, float v)
-  {
-    shading.mesh[i] = mesh;
-    shading.set[i]  = set;
-    shading.face[i] = face;
-    shading.u[i]    = u;
-    shading.v[i]    = v;
+  inline bool is_specular(uint32_t i) const {
+    return (flags[i] & details::SPECULAR) == details::SPECULAR;
   }
+};
+
+struct shading_result_t {
+  Imath::V3f e; // light emitted at a point
+  bsdf_t* bsdf; // scattering function for a point
+
+  inline shading_result_t()
+    : e(0)
+  {}
 };
 
 /* active masks for the pipeline and occlusion query states, 
@@ -197,6 +208,12 @@ struct active_t {
 
   inline void add(uint32_t i) {
     index[num++] = i;
+  }
+
+  inline uint32_t clear() {
+    uint32_t n = num;
+    num = 0;
+    return n;
   }
 
   inline bool has_live_paths() const {
