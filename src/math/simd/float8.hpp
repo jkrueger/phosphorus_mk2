@@ -15,6 +15,15 @@ namespace simd {
     static inline __m256 gather(const float* const p, const __m256i& i) {
       return _mm256_i32gather_ps(p, i, 4);
     }
+
+    static inline __m256 gather(
+      const float* const p
+    , const __m256&  s
+    , const __m256i& i
+    , const __m256i& m)
+    {
+      return _mm256_mask_i32gather_ps(s, p, i, m, 4);
+    }
   };
 
   inline __m256 load(float x) {
