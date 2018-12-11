@@ -94,7 +94,7 @@ namespace accel {
       }
 
       template<typename T>
-      inline void intersect2(
+      inline void iterate_rays(
 	T* stream
       , uint32_t* indices
       , uint32_t num_rays) const
@@ -186,7 +186,7 @@ namespace accel {
       }
 
       template<typename Stream>
-      inline void intersect(
+      inline void iterate_triangles(
         Stream* stream
       , uint32_t* indices
       , uint32_t num_rays) const
@@ -205,20 +205,18 @@ namespace accel {
 	auto m = zero;
 
 	const auto rays = simd::load((int32_t*) indices);
-	
+
 	const auto o = simd::vector3_t(
-	    stream->p.x
-	  , stream->p.y
-	  , stream->p.z
-	  , rays);
-	
+          simd::float_t<SIMD_WIDTH>::gather(stream->p.x, rays)
+        , simd::float_t<SIMD_WIDTH>::gather(stream->p.y, rays)
+        , simd::float_t<SIMD_WIDTH>::gather(stream->p.z, rays));
+   
 	const auto wi = simd::vector3_t(
-	    stream->wi.x
-	  , stream->wi.y
-	  , stream->wi.z
-	  , rays);
+          simd::float_t<SIMD_WIDTH>::gather(stream->wi.x, rays)
+        , simd::float_t<SIMD_WIDTH>::gather(stream->wi.y, rays)
+        , simd::float_t<SIMD_WIDTH>::gather(stream->wi.z, rays));
 	
-	auto d = simd::float_t<SIMD_WIDTH>::gather(stream->rays.d, rays);
+	auto d = simd::float_t<SIMD_WIDTH>::gather(stream->d, rays);
 	auto j = simd::load((int32_t) -1);
 	
 	for (auto i=0; i<num; ++i) {
@@ -266,21 +264,21 @@ namespace accel {
 
 	// TODO: use masked scatter instructions when available
 	while(mask != 0) {
-	  const auto n = __bscf(mask);
-	  if ((7-n) < num_rays) {
-	    const auto x = indices[(7-n)];
-	    const auto t = ts[n];
+	  const auto r = __bscf(mask);
+	  if (r < num_rays) {
+	    const auto x = indices[r];
+	    const auto t = ts[r];
 
-            if (!stream->is_shadow(index)) {
+            if (!stream->is_shadow(x)) {
               stream->set_surface(
                 x
               , meshid[t]
               , setid[t]
               , faceid[t]
-              , u[t]
-              , v[t]);
+              , u[r]
+              , v[r]);
             }
-	    stream->hit(x, ds[t]);
+	    stream->hit(x, ds[r]);
 	  }
 	}
       }

@@ -35,7 +35,7 @@ void usage() {
 bool parse_args(int argc, char** argv, parsed_options_t& parsed) {
   char ch;
 
-  while ((ch = getopt_long(argc, argv, "c1o:p:s:", options, nullptr)) != -1) {
+  while ((ch = getopt_long(argc, argv, "c1o:p:s:d:", options, nullptr)) != -1) {
     switch (ch) {
     case 'o':
       parsed.output = optarg;

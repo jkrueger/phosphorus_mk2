@@ -40,6 +40,8 @@ struct cpu_t::details_t {
 cpu_t::cpu_t(const parsed_options_t& options)
   : details(new details_t(options))
   , concurrency(options.single_threaded ? 1 : std::thread::hardware_concurrency())
+  , spp(options.samples_per_pixel)
+  , pps(options.paths_per_sample)
 {}
 
 cpu_t::~cpu_t() {
@@ -66,9 +68,8 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	// create append only memory allocator
 	allocator_t allocator(1024*1024*100);
 
-        const auto spp = frame.sampler->spp;
-        const auto pps = frame.sampler->paths_per_sample;
-	
+        auto trace_state = stream_mbvh_kernel_t::make_state();
+
 	job::tiles_t::tile_t tile;
 	while (frame.tiles->next(tile)) {
 	  auto splats = new(allocator) Imath::Color3f[tile.w * tile.h];
@@ -77,7 +78,7 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	  for (auto i=0; i<spp; ++i) {
 	    allocator_scope_t scope(allocator);
 
-            auto state = new(allocator) spt::state_t<>();
+            auto state = new(allocator) spt::state_t<>(&scene, frame.sampler);
 
 	    auto rays = new(allocator) ray_t<>();
             auto primary = new(allocator) interaction_t<>();
@@ -90,42 +91,24 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	    active.reset(0);
 
 	    details->camera_rays(camera, tile, samples, rays);
-            details->trace(rays, active);
 
+            details->trace(trace_state, rays, active);
             details->interactions(allocator, scene, active, rays, primary);
-
-            details->sample_lights(scene, frame.sampler, active, primary, primary, state, rays);
-            details->trace(rays, active);
-            details->integrate(
-              frame.sampler
-            , scene
-            , active
-            , primary
-            , primary
-            , state
-            , rays);
+            details->sample_lights(state, active, primary, primary, rays);
+            details->trace(trace_state, rays, active);
+            details->integrate(state, active, primary, rays);
 
 	    while (active.has_live_paths()) {
-	      // automatically free up allocator memory in each
-	      // loop iteration
 	      allocator_scope_t scope(allocator);
 
-              details->trace(rays, active);
+              details->trace(trace_state, rays, active);
 	      details->interactions(allocator, scene, active, rays, hits);
-
-	      details->sample_lights(scene, frame.sampler, active, primary, hits, state, rays);
-	      details->trace(rays, active);
-	      details->integrate(
-                frame.sampler
-              , scene
-              , active
-              , primary
-              , hits
-              , state
-              , rays);
+	      details->sample_lights(state, active, primary, hits, rays);
+	      details->trace(trace_state, rays, active);
+	      details->integrate(state, active, hits, rays);
             }
 
-	      // TODO: apply fiter
+	    // TODO: apply fiter
 
 	    // FIXME: temporary code to copy radiance values into output buffer
 	    // this should run through a filter kernel instead
@@ -142,6 +125,9 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 
 	  allocator.reset();
 	}
+
+        delete trace_state;
+        
       }, std::cref(scene), std::ref(frame)));
   }
 }

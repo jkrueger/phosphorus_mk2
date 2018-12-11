@@ -16,7 +16,8 @@ struct cpu_t : public xpu_t {
 
   // number of worker threads on this cpu
   uint32_t concurrency;
-  // TODO reference to work queues, for rays and for shading
+  uint32_t spp;
+  uint32_t pps;
 
   cpu_t(const parsed_options_t& options);
   ~cpu_t();

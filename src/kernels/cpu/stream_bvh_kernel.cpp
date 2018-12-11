@@ -7,12 +7,22 @@
 
 #include "ImathBoxAlgo.h"
 
+struct stream_mbvh_kernel_t::state_t{
+  stream::lanes_t<accel::mbvh_t::width> lanes;
+  stream::task_t tasks[256];
+};
+
 /* Implements MBVH-RS algorithm for tracing a set of rays through 
  * the scene */
 template<typename Stream>
-void intersect(Stream* stream, const active_t<>& active, const accel::mbvh_t* bvh) {
-  static thread_local stream::lanes_t<accel::mbvh_t::width> lanes;
-  static thread_local stream::task_t tasks[256];
+void intersect(
+  stream_mbvh_kernel_t::state_t* state
+, Stream* stream
+, const active_t<>& active
+, const accel::mbvh_t* bvh)
+{
+  auto& lanes = state->lanes;
+  auto& tasks = state->tasks;
 
   // set initial lane for root node, including all rays
   lanes.init(active);
@@ -53,8 +63,14 @@ void intersect(Stream* stream, const active_t<>& active, const accel::mbvh_t* bv
 	auto hits =
 	  simd::intersect<accel::mbvh_t::width>(
 	    bounds
-	  , simd::vector3_t(stream->p.x[ray], stream->p.y[ray], stream->p.z[ray])
-	  , simd::vector3_t(1.0f/stream->wi.x[ray], 1.0f/stream->wi.y[ray], 1.0f/stream->wi.z[ray])
+	  , simd::vector3_t(
+              stream->p.x[ray]
+            , stream->p.y[ray]
+            , stream->p.z[ray])
+	  , simd::vector3_t(
+              1.0f/stream->wi.x[ray]
+            , 1.0f/stream->wi.y[ray]
+            , 1.0f/stream->wi.z[ray])
 	  , simd::load(stream->d[ray])
 	  , dist);
 
@@ -111,7 +127,12 @@ void intersect(Stream* stream, const active_t<>& active, const accel::mbvh_t* bv
 	auto prims = 0;
 	const auto num = std::min(end - begin, (long) accel::mbvh_t::width);
 	do {
-	  bvh->triangles[index].intersect2(stream, begin, num);
+          if (num < 8) {
+            bvh->triangles[index].iterate_rays(stream, begin, num);
+          }
+          else {
+            bvh->triangles[index].iterate_triangles(stream, begin, num);
+          }
 	  prims += accel::mbvh_t::width;
 	  ++index;
 	} while(unlikely(prims < cur.prims));
@@ -126,6 +147,14 @@ stream_mbvh_kernel_t::stream_mbvh_kernel_t(const accel::mbvh_t* bvh)
   : bvh(bvh)
 {}
 
-void stream_mbvh_kernel_t::trace(ray_t<>* rays, active_t<>& active) const {
-  intersect(rays, active, bvh);
+void stream_mbvh_kernel_t::trace(
+  stream_mbvh_kernel_t::state_t* state
+, ray_t<>* rays
+, active_t<>& active) const
+{
+  intersect(state, rays, active, bvh);
+}
+
+stream_mbvh_kernel_t::state_t* stream_mbvh_kernel_t::make_state() {
+  return new stream_mbvh_kernel_t::state_t;
 }
