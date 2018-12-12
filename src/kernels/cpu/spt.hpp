@@ -103,7 +103,7 @@ namespace spt {
           // the ray through the scene, so set everything up here
 	  samples->set_surface(
 	    index
-	  , sample.mesh, sample.set, sample.face
+          , sample.mesh, sample.face
 	  , sample.uv.x, sample.uv.y);
 
 	  state->pdf[index] = sample.pdf;
@@ -186,9 +186,8 @@ namespace spt {
       const auto f = bsdf->f(wi, wo);
       const auto s = f * (std::fabs(n.dot(wi)) / state->pdf[index]);
 
-      const auto mesh = state->scene->mesh(samples->mesh[index]);
-      const auto matid = mesh->material(samples->set[index]);
-      const auto material = state->scene->material(matid);
+      const auto mesh = state->scene->mesh(samples->meshid(index));
+      const auto material = state->scene->material(samples->matid(index));
 
       shading_result_t light;
       {

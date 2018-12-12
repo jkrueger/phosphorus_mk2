@@ -51,8 +51,8 @@ struct deferred_shading_kernel_t {
       hits->flags[index] = rays->flags[index];
       
       if (rays->is_hit(index)) {
-	const auto mesh = scene.mesh(rays->mesh[index]);
-	const auto material = mesh->material(rays->set[index]);
+	const auto mesh = scene.mesh(rays->meshid(index));
+	const auto material = rays->matid(index);
 
         const auto p = rays->p.at(index);
         const auto wi = rays->wi.at(index);

@@ -44,7 +44,6 @@ struct ray_t {
   float d[N];
 
   uint32_t mesh[N];
-  uint32_t set[N];
   uint32_t face[N];
   float    u[N];
   float    v[N];
@@ -69,13 +68,12 @@ struct ray_t {
 
   inline void set_surface(
     uint32_t i
-  , uint32_t _mesh, uint32_t _set, uint32_t _face
+  , uint32_t _mesh, uint32_t _face
   , float _u, float _v)
   {
     assert(i < size);
 
     mesh[i] = _mesh;
-    set[i]  = _set;
     face[i] = _face;
     u[i]    = _u;
     v[i]    = _v;
@@ -126,6 +124,14 @@ struct ray_t {
 
   inline bool is_specular(uint32_t i) const {
     return (flags[i] & details::SPECULAR) == details::SPECULAR;
+  }
+
+  inline uint32_t meshid(uint32_t i) const {
+    return mesh[i] & 0x0000ffff;
+  }
+
+  inline uint32_t matid(uint32_t i) const {
+    return (mesh[i] & 0xffff0000) >> 16;
   }
 };
 

@@ -179,6 +179,10 @@ uint32_t triangle_t::meshid() const {
   return mesh->id;
 }
 
+uint32_t triangle_t::matid() const {
+  return mesh->sets[set].material;
+}
+
 Imath::Box3f triangle_t::bounds() const {
   Imath::Box3f bounds;
 

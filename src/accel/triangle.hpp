@@ -13,15 +13,22 @@ namespace accel {
   /* Members of this namespace store optimized triangle data, and implement 
    * intersection algorithms on them */
   namespace triangle {
+    /* Moeller-Trumbore triangle intersection tests
+     * The structure has two functions. One computes the intersection
+     * of a stream of rays with the triangles in this structure, iterating
+     * over the rays. The other iterates over the triangles, and computes
+     * the closest intersection for a N rays, where N is the simd width
+     * Sources:
+     *   Embree
+     *   Optimizing Ray-Triangle Intersection via Automated Search */
     template<int N>
     struct moeller_trumbore_t /* : nocopy_t */ {
       soa::vector3_t<N> _e0, _e1, _v0;
 
-      uint32_t meshid[N];
-      uint32_t setid[N];
-      uint32_t faceid[N];
-
       uint32_t num;
+
+      uint32_t meshid[N];
+      uint32_t faceid[N];
 
       inline moeller_trumbore_t(const triangle_t** triangles, uint32_t num)
 	: num(num)
@@ -35,21 +42,24 @@ namespace accel {
 	  _e1.x[i] = e1.x; _e1.y[i] = e1.y; _e1.z[i] = e1.z;
 	  _v0.x[i] = v0.x; _v0.y[i] = v0.y; _v0.z[i] = v0.z;
 
-	  meshid[i] = triangles[i]->mesh->id;
-	  setid[i] = triangles[i]->set;
+          const auto mesh = triangles[i]->meshid();
+          const auto mat  = triangles[i]->matid();
+
+	  meshid[i] = mesh | (mat << 16);
 	  faceid[i] = triangles[i]->face;
 	}
       }
 
       /** 
-       * Intersect each ray with each triangle stored in this accelerator, one by one
-       * This is mostly here as a baseline algorithm to verify simd implementations 
-       */
+       * Intersect each ray with each triangle stored in this accelerator, 
+       * one by one. This is mostly here as a baseline algorithm to verify 
+       * the simd implementations  */
       template<typename T>
       inline void baseline(
         T* stream
       , uint32_t* indices
-      , uint32_t num_rays) const {
+      , uint32_t num_rays) const
+      {
         for (auto i=0; i<num_rays; ++i) {
           for (auto j=0; j<num; ++j) {
             const auto index = indices[i];
@@ -86,7 +96,7 @@ namespace accel {
             }
 
             if (!stream->is_shadow(index)) {
-              stream->shade(index, meshid[j], setid[j], faceid[j], u, v);
+              stream->shade(index, meshid[j], faceid[j], u, v);
             }
 	    stream->hit(index, d);
           }
@@ -124,10 +134,10 @@ namespace accel {
 
 	  const auto d = simd::load(stream->d[index]);
 
+	  const auto t   = o - v0;
 	  const auto p   = wi.cross(e1);
 	  const auto det = e0.dot(p);
 	  const auto ood = simd::div(one, det);
-	  const auto t   = o - v0;
 	  const auto q   = t.cross(e0);
 
 	  const auto us = simd::mul(t.dot(p), ood);
@@ -174,7 +184,6 @@ namespace accel {
                 stream->set_surface(
                   index
                 , meshid[idx]
-                , setid[idx]
                 , faceid[idx]
                 , u[idx]
                 , v[idx]);
@@ -191,10 +200,6 @@ namespace accel {
       , uint32_t* indices
       , uint32_t num_rays) const
       {
-	// TODO: make a choice whether we iterate over
-	// rays or triangles, based on the number of
-	// rays and triangles
-	
 	const auto zero = simd::load(0.0f);
 	const auto one  = simd::load(1.0f);
 	const auto peps = simd::load(0.00000001f);
@@ -218,16 +223,16 @@ namespace accel {
 	
 	auto d = simd::float_t<SIMD_WIDTH>::gather(stream->d, rays);
 	auto j = simd::load((int32_t) -1);
-	
+
 	for (auto i=0; i<num; ++i) {
 	  const auto e0 = vector3_t<N>(_e0.x[i], _e0.y[i], _e0.z[i]);
 	  const auto e1 = vector3_t<N>(_e1.x[i], _e1.y[i], _e1.z[i]);
 	  const auto v0 = vector3_t<N>(_v0.x[i], _v0.y[i], _v0.z[i]);
 
+	  const auto t   = o - v0;
 	  const auto p   = wi.cross(e1);
 	  const auto det = e0.dot(p);
 	  const auto ood = simd::div(one, det);
-	  const auto t   = o - v0;
 	  const auto q   = t.cross(e0);
 
 	  const auto us = simd::mul(t.dot(p), ood);
@@ -273,7 +278,6 @@ namespace accel {
               stream->set_surface(
                 x
               , meshid[t]
-              , setid[t]
               , faceid[t]
               , u[r]
               , v[r]);

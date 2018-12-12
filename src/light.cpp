@@ -63,8 +63,7 @@ void light_t::sample(const Imath::V2f& uv, sampler_t::light_sample_t& out) const
   out.p    = triangle.barycentric_to_point(barycentric);
   out.uv   = barycentric;
   out.pdf  = 1.0f / details->area;
-  out.mesh = triangle.mesh->id;
-  out.set  = triangle.set;
+  out.mesh = triangle.meshid() | (triangle.matid() >> 16);
   out.face = triangle.face;
 }
 
