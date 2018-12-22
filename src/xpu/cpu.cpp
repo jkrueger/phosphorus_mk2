@@ -92,6 +92,7 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 
 	    details->camera_rays(camera, tile, samples, rays);
 
+            // TODO: trace primary rays as packets
             details->trace(trace_state, rays, active);
             details->interactions(allocator, scene, active, rays, primary);
             details->sample_lights(state, active, primary, primary, rays);

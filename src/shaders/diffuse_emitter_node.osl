@@ -1,0 +1,19 @@
+
+shader
+diffuse_emitter_node
+  [[ string help = "Diffuse light emitter shader" ]]
+(
+  float power = 1
+    [[ string help = "Power of the light source",
+       float min = 0, float max = 1 ]],
+
+  color Cs = 1
+    [[  string help = "Base color of the loght source",
+        float min = 0, float max = 1 ]],
+
+  output closure color Cout = 0
+    [[ string help = "Output color" ]]
+)
+{
+  Cout = (power / M_PI) * Cs * emission();
+}

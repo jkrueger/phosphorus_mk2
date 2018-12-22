@@ -26,12 +26,10 @@ struct frame_state_t {
   }
 };
 
-namespace details {
-  static const uint32_t HIT      = 1;
-  static const uint32_t MASKED   = (1 << 1);
-  static const uint32_t SHADOW   = (1 << 2);
-  static const uint32_t SPECULAR = (1 << 3);
-}
+static const uint32_t HIT      = 1;
+static const uint32_t MASKED   = (1 << 1);
+static const uint32_t SHADOW   = (1 << 2);
+static const uint32_t SPECULAR = (1 << 3);
 
 /* a stream of rays */
 template<int N = config::STREAM_SIZE>
@@ -80,42 +78,42 @@ struct ray_t {
   }
 
   inline void miss(uint32_t i) {
-    flags[i] &= ~details::HIT;
+    flags[i] &= ~HIT;
   }
 
   inline void hit(uint32_t i, float _d) {
     assert(_d < d[i]);
-    flags[i] |= details::HIT;
+    flags[i] |= HIT;
     d[i] = _d;
   }
 
   inline void shadow(uint32_t i) {
-    flags[i] |= details::SHADOW;
+    flags[i] |= SHADOW;
   }
 
   inline void mask(uint32_t i) {
-    flags[i] |= details::MASKED;
+    flags[i] |= MASKED;
   }
 
   inline void specular_bounce(uint32_t i, bool b) {
     if (b) {
-      flags[i] |= details::SPECULAR;
+      flags[i] |= SPECULAR;
     }
     else {
-      flags[i] &= ~details::SPECULAR;
+      flags[i] &= ~SPECULAR;
     }
   }
 
   inline bool is_hit(uint32_t i) const {
-    return (flags[i] & details::HIT) == details::HIT;
+    return (flags[i] & HIT) == HIT;
   }
 
   inline bool is_masked(uint32_t i) const {
-    return (flags[i] & details::MASKED) == details::MASKED;
+    return (flags[i] & MASKED) == MASKED;
   }
 
   inline bool is_shadow(uint32_t i) const {
-    return (flags[i] & details::SHADOW) == details::SHADOW;
+    return (flags[i] & SHADOW) == SHADOW;
   }
 
   inline bool is_occluded(uint32_t i) const {
@@ -123,7 +121,7 @@ struct ray_t {
   }
 
   inline bool is_specular(uint32_t i) const {
-    return (flags[i] & details::SPECULAR) == details::SPECULAR;
+    return (flags[i] & SPECULAR) == SPECULAR;
   }
 
   inline uint32_t meshid(uint32_t i) const {
@@ -165,15 +163,15 @@ struct interaction_t {
   } 
 
   inline bool is_hit(uint32_t i) const {
-    return (flags[i] & details::HIT) == details::HIT;
+    return (flags[i] & HIT) == HIT;
   }
 
   inline bool is_masked(uint32_t i) const {
-    return (flags[i] & details::MASKED) == details::MASKED;
+    return (flags[i] & MASKED) == MASKED;
   }
 
   inline bool is_shadow(uint32_t i) const {
-    return (flags[i] & details::SHADOW) == details::SHADOW;
+    return (flags[i] & SHADOW) == SHADOW;
   }
 
   inline bool is_occluded(uint32_t i) const {
@@ -181,7 +179,7 @@ struct interaction_t {
   }
 
   inline bool is_specular(uint32_t i) const {
-    return (flags[i] & details::SPECULAR) == details::SPECULAR;
+    return (flags[i] & SPECULAR) == SPECULAR;
   }
 };
 

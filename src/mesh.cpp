@@ -87,7 +87,7 @@ void mesh_t::preprocess(scene_t* scene) {
   for (auto i=0; i<details->sets.size(); ++i) {
     const auto material = scene->material(details->sets[i].material);
     if (material->is_emitter()) {
-      scene->add(light_t::make(this, i));
+      scene->add(light_t::make_area(this, i));
     }
   }
 }

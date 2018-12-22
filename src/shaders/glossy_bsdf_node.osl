@@ -1,0 +1,35 @@
+
+shader
+glossy_bsdf_node
+  [[ string help = "Glossy BSDF material" ]]
+(
+  string distribution = "ggx"
+    [[ string help = "The microfacet distribution to use",
+       string widget = "popup",
+       string options = "sharp|ggx" ]],
+
+  color Cs = 1
+    [[  string help = "Base color",
+        float min = 0, float max = 1 ]],
+        
+  float eta = 0.5
+    [[  string help = "Index of Refraction" ]],
+
+  float roughness = 0
+    [[  string help = "Roughness of the plastic",
+        float min = 0, float max = 1 ]],
+
+  output closure color Cout = 0
+    [[ string help = "Output color" ]]
+  
+)
+{
+  float r2 = roughness; // roughness * roughness;
+  
+  if (distribution == "sharp") {
+    Cout = Cs * reflection(N, eta);
+  }
+  else {
+    Cout = Cs * microfacet(distribution, N, vector(0), r2, r2, eta, 0);
+  }
+}

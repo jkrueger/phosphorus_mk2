@@ -81,15 +81,22 @@ namespace spt {
         const auto path  = state->path[index];
 	
         // get one light source sample
-        const auto light = state->scene->light(0);
+        auto sample = state->sampler->sample2();
 
-        sampler_t::light_sample_t sample;
-        light->sample(state->sampler->sample2(), sample);
+        const auto nlights = state->scene->num_lights();
+        const auto light_index = std::min((uint32_t) std::floor(sample.x * nlights), (nlights-1));
+        const auto light = state->scene->light(light_index);
+
+        const auto one_minus_epsilon = 1.0f-std::numeric_limits<float>::epsilon();
+        sample.x = std::min(sample.x * nlights - light_index, one_minus_epsilon);
+
+        sampler_t::light_sample_t point_on_light;
+        light->sample(sample, point_on_light);
 
 	const auto n = hits->n.at(index);
 	const auto p = offset(hits->p.at(index), n);
 
-	auto wi = sample.p - p;
+	auto wi = point_on_light.p - p;
 
         if (in_same_hemisphere(n, wi)) {
           const auto d = wi.length() - 0.0001f;
@@ -103,10 +110,10 @@ namespace spt {
           // the ray through the scene, so set everything up here
 	  samples->set_surface(
 	    index
-          , sample.mesh, sample.face
-	  , sample.uv.x, sample.uv.y);
+          , point_on_light.mesh, point_on_light.face
+	  , point_on_light.uv.x, point_on_light.uv.y);
 
-	  state->pdf[index] = sample.pdf;
+	  state->pdf[index] = point_on_light.pdf;
         }
         else {
           samples->mask(index);
@@ -139,9 +146,9 @@ namespace spt {
         auto keep_alive = true;
 
 	if (hits->is_hit(index)) {
-	  if (state->depth[index] == 0 || hits->is_specular(index)) {
-	    out += hits->e.at(index);
-	  }
+          if (state->depth[index] == 0 || hits->is_specular(index)) {
+            out += state->beta.at(index) * hits->e.at(index);
+          }
 
 	  // compute direct light contribution at the current
 	  // path vertex. this gets modulated by the current path weight
@@ -161,7 +168,8 @@ namespace spt {
           }
         }
 	else {
-	  // TODO: check if we have an environment map
+          // add environment lighting
+          out += state->beta.at(index) * hits->e.at(index);
 
           if (state->path[index] < paths_per_sample) {
             state->mark_for_revive(index);
@@ -189,15 +197,16 @@ namespace spt {
       const auto mesh = state->scene->mesh(samples->meshid(index));
       const auto material = state->scene->material(samples->matid(index));
 
+      assert(material->is_emitter());
+ 
       shading_result_t light;
       {
         Imath::V3f n;
         Imath::V2f st;
-
         mesh->shading_parameters(samples, n, st, index);
         material->evaluate(samples->p.at(index), wi, n, st, light);
       }
-      
+
       return state->beta.at(index) * light.e * s;
     }
 
@@ -228,12 +237,13 @@ namespace spt {
 
       assert(bsdf);
 
+      uint32_t flags;
       float pdf;
       Imath::V3f sampled;
       Imath::V2f sample = state->sampler->sample2();
 
       // sample the bsdf based on the previous path direction
-      const auto f = bsdf->sample(sample, wi, sampled, pdf);
+      const auto f = bsdf->sample(sample, wi, sampled, pdf, flags);
 
       if (color::is_black(f) || pdf == 0.0f) {
         std::cout << "black" << std::endl;
@@ -245,7 +255,7 @@ namespace spt {
       state->beta.from(index, beta * (f * (std::fabs(weight) / pdf)));
 
       rays->reset(index, offset(p, n, weight < 0.0f), sampled);
-      rays->specular_bounce(index, bsdf->is_specular());
+      rays->specular_bounce(index, bsdf_t::is_specular(flags));
 
       return true;
     }

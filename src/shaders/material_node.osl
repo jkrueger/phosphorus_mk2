@@ -1,0 +1,11 @@
+
+surface
+material_node
+  [[ string help = "Material output node" ]]
+(
+  closure color Cs = 0
+    [[ string help = "Input closure color" ]]
+)
+{
+  Ci = Cs;
+}

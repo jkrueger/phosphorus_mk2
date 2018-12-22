@@ -1,0 +1,21 @@
+
+shader
+mix_node
+ [[ string help = "Mix two input colors" ]]
+(
+  closure color A = 0
+    [[ string help = "First input color" ]],
+
+  closure color B = 0
+    [[ string help = "Second input color" ]],
+
+  float fac = 0.5
+    [[ string help = "Mixing factor",
+       float min = 0, float max = 1 ]],
+
+  output closure color Cout = 0
+    [[ string help = "Output color" ]]
+)
+{
+  Cout = A * fac + B * (1-fac);
+}

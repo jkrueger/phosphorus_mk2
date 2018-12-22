@@ -1,5 +1,6 @@
 #include "scene.hpp"
 #include "../scene.hpp"
+#include "../light.hpp"
 #include "scene/alembic.hpp"
 #include "scene/entities.hpp"
 #include "scene/material.hpp"
@@ -26,6 +27,14 @@ namespace codec {
       }
       else {
     	throw std::runtime_error("No importer for: " + path);
+      }
+    }
+
+    void import_world_data(const YAML::Node& world, scene_t& scene) {
+      if (const auto env = world["environment"]) {
+        std::cout << "\tAdding environment light" << std::endl;
+        const auto material = scene.material(env.as<std::string>());
+        scene.add(light_t::make_infinite(material));
       }
     }
 
@@ -57,6 +66,12 @@ namespace codec {
       // imported from external scene files, like alembic
       if (const auto camera = config["camera"]) {
       	scene.camera = camera.as<camera_t>();
+      }
+
+      // import world settings
+      if (const auto world = config["world"]) {
+        std::cout << "Loading world data" << std::endl;
+        import_world_data(world, scene);
       }
     }
   }

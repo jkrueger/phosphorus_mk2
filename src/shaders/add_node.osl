@@ -1,0 +1,17 @@
+
+shader
+add_node
+ [[ string help = "Add two input colors" ]]
+(
+  closure color A = 0
+    [[ string help = "First input color" ]],
+
+  closure color B = 0
+    [[ string help = "Second input color" ]],
+
+  output closure color Cout = 0
+    [[ string help = "Output color" ]]
+)
+{
+  Cout = A + B;
+}

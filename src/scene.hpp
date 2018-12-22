@@ -39,6 +39,8 @@ struct scene_t {
 
   light_t* light(uint32_t index) const;
 
+  light_t* environment() const;
+
   mesh_t* mesh(uint32_t index) const;
 
   material_t* material(uint32_t index) const;

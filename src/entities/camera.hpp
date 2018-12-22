@@ -18,8 +18,8 @@ struct camera_t {
     uint32_t height;
 
     inline film_t()
-      : width(1980)
-      , height(1080)
+      : width(960)
+      , height(960)
     {}
   } film;
 

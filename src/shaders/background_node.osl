@@ -1,0 +1,13 @@
+
+surface background_node
+  [[ string help = "Background emitter node" ]]
+(
+  color Cs = 0
+    [[ string help = "Color of the background lighting" ]],
+
+  float power = 1
+    [[ string help = "Power of the emitted background light" ]]
+)
+{
+  Ci = Cs * power * background();
+}

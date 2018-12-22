@@ -53,26 +53,27 @@ namespace YAML {
 
       material_t::builder_t::scoped_t builder(material->builder());
 
-      const auto parameters=node["parameters"];
-      for (auto i=parameters.begin(); i!=parameters.end(); ++i) {
-	const auto name = (*i)["name"].as<std::string>();
-	const auto type = (*i)["type"].as<std::string>();
-	if (type == "float") {
-	  builder->parameter(name, (*i)["value"].as<float>());
-	}
-	else if (type == "rgb") {
-	  builder->parameter(name, i->as<Imath::Color3f>());
-	}
-        else if(type == "string") {
-          builder->parameter(name, (*i)["value"].as<std::string>());
-        }
-	else {
-	  throw std::runtime_error("Unknown parameter type: " + type);
-	}
-      }
-
       const auto shaders = node["shaders"];
       for (auto i=shaders.begin(); i!=shaders.end(); ++i) {
+        const auto parameters=(*i)["parameters"];
+        for (auto j=parameters.begin(); j!=parameters.end(); ++j) {
+          const auto name = (*j)["name"].as<std::string>();
+          const auto type = (*j)["type"].as<std::string>();
+
+          if (type == "float") {
+            builder->parameter(name, (*j)["value"].as<float>());
+          }
+          else if (type == "rgb") {
+            builder->parameter(name, j->as<Imath::Color3f>());
+          }
+          else if(type == "string") {
+            builder->parameter(name, (*j)["value"].as<std::string>());
+          }
+          else {
+            throw std::runtime_error("Unknown parameter type: " + type);
+          }
+        }
+
 	builder->shader(
 	  (*i)["name"].as<std::string>()
 	, (*i)["layer"].as<std::string>()

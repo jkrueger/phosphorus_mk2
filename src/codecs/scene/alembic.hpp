@@ -7,6 +7,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-register"
 #include <Alembic/AbcCoreOgawa/All.h>
+#include <Alembic/AbcCoreHDF5/All.h>
 #include <Alembic/AbcGeom/All.h>
 #pragma clang diagnostic pop
 
@@ -59,6 +60,7 @@ namespace codec {
 	// NOTE: this is how it comes out of blender. check that this holds
 	// in general
 	const auto sensor_width = sample.getHorizontalAperture() * 10.0f;
+        std::cout << focal_length << ", " << sensor_width << std::endl;
 
 	// entity to world transform
 	scene.camera.to_world = Imath::M44f(xform);
@@ -292,10 +294,25 @@ namespace codec {
       }
 
       void import(const std::string& path, scene_t& scene) {
-	Geo::IArchive archive(Alembic::AbcCoreOgawa::ReadArchive(), path);
-	Geo::IObject  object(archive);
+        try {
+          Geo::IArchive archive(Alembic::AbcCoreOgawa::ReadArchive(), path);
+          Geo::IObject  object(archive);
 
-	import_object(object, scene, Abc::M44d());
+          import_object(object, scene, Abc::M44d());
+        }
+        catch (const Abc::Exception& e) {
+          try {
+            Geo::IArchive archive(Alembic::AbcCoreHDF5::ReadArchive(), path);
+            Geo::IObject  object(archive);
+
+            import_object(object, scene, Abc::M44d());
+          }
+          catch (const Abc::Exception& e) {
+            std::cerr
+              << "Unable to load alembic file. Not an Ogawa, or HDF5 file: " << e
+              << std::endl;
+          }
+        }
       }
     }
   }

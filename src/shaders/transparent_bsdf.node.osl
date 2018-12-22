@@ -1,0 +1,15 @@
+
+shader
+transparent_bsdf_node
+  [[ string help = "A transparent node" ]]
+(
+  color Cs = 1
+    [[  string help = "Base color",
+        float min = 0, float max = 1 ]],
+
+  output closure color Cout = 0
+    [[ string help = "Output color" ]]
+)
+{
+  Cout = Cs * transparent();
+}

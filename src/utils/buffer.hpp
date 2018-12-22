@@ -16,6 +16,13 @@ struct buffer_t {
     return p;
   }
 
+  int* write_int(int v) {
+    int* p = (int*) pos;
+    (*p) = v;
+    pos += sizeof(int);
+    return p;
+  }
+
   float* write_3f(float a, float b, float c) {
     float* p = (float*) pos;
     p[0] = a;

@@ -1,0 +1,21 @@
+
+shader environment_node
+  [[ string help = "Environment map lookup" ]]
+(
+  string filename = ""
+    [[ string help = "Texture filename" ]],
+
+  float sblur = 0
+    [[ string help = "Blur in the s direction",
+       float min = 0, float max = 1 ]],
+
+  float tblur = 0
+    [[ string help = "Blur in the s direction",
+       float min = 0, float max = 1 ]],
+
+  output color Cout = 0
+    [[ string help = "Output color" ]]
+  )
+{
+  Cout = environment(filename, I, "sblur", sblur, "tblur", tblur);
+}

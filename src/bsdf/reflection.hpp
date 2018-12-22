@@ -17,8 +17,6 @@ namespace reflection {
     pdf = 1.0f;
     wo = -wi + (2.0f * cos_theta) * params.n;
 
-    const auto out = fresnel::dielectric(cos_theta, params.eta);
-
-    return Imath::Color3f(out);
+    return Imath::Color3f(1.0f);
   }
 }

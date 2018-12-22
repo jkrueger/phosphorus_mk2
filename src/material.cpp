@@ -32,7 +32,9 @@ struct material_t::details_t {
   static thread_local ShadingContext* ctx;
 
   struct empty_params_t
-  {};
+  {
+    static const uint32_t flags = bsdf::TRANSMIT;
+  };
 
   ShaderGroupRef group;
 
@@ -50,30 +52,51 @@ struct material_t::details_t {
     service = new service_t(/* ... */);
     system  = new ShadingSystem(service, nullptr, nullptr);
 
+    system->attribute("searchpath:shader", "shaders");
+
     ClosureParam params[][32] = {
       {
-       CLOSURE_FINISH_PARAM(empty_params_t)
+        CLOSURE_FINISH_PARAM(empty_params_t)
       },
       {
-       CLOSURE_VECTOR_PARAM(bsdf::lobes::diffuse_t, n),
-       CLOSURE_FINISH_PARAM(bsdf::lobes::diffuse_t)
+        CLOSURE_VECTOR_PARAM(bsdf::lobes::diffuse_t, n),
+        CLOSURE_FINISH_PARAM(bsdf::lobes::diffuse_t)
       },
       {
-       CLOSURE_VECTOR_PARAM(bsdf::lobes::reflect_t, n),
-       CLOSURE_FLOAT_PARAM(bsdf::lobes::reflect_t, eta),
-       CLOSURE_FINISH_PARAM(bsdf::lobes::reflect_t)
+        CLOSURE_VECTOR_PARAM(bsdf::lobes::oren_nayar_t::in_t, n),
+        CLOSURE_FLOAT_PARAM(bsdf::lobes::oren_nayar_t::in_t, alpha),
+        CLOSURE_FINISH_PARAM(bsdf::lobes::oren_nayar_t::in_t)
       },
       {
-       CLOSURE_VECTOR_PARAM(bsdf::lobes::refract_t, n),
-       CLOSURE_FLOAT_PARAM(bsdf::lobes::refract_t, eta),
-       CLOSURE_FINISH_PARAM(bsdf::lobes::refract_t)
+        CLOSURE_VECTOR_PARAM(bsdf::lobes::reflect_t, n),
+        CLOSURE_FLOAT_PARAM(bsdf::lobes::reflect_t, eta),
+        CLOSURE_FINISH_PARAM(bsdf::lobes::reflect_t)
+      },
+      {
+        CLOSURE_VECTOR_PARAM(bsdf::lobes::refract_t, n),
+        CLOSURE_FLOAT_PARAM(bsdf::lobes::refract_t, eta),
+        CLOSURE_FINISH_PARAM(bsdf::lobes::refract_t)
+      },
+      {
+        CLOSURE_STRING_PARAM(bsdf::lobes::microfacet_t, distribution),
+        CLOSURE_VECTOR_PARAM(bsdf::lobes::microfacet_t, n),
+        CLOSURE_VECTOR_PARAM(bsdf::lobes::microfacet_t, u),
+        CLOSURE_FLOAT_PARAM(bsdf::lobes::microfacet_t, xalpha),
+        CLOSURE_FLOAT_PARAM(bsdf::lobes::microfacet_t, yalpha),
+        CLOSURE_FLOAT_PARAM(bsdf::lobes::microfacet_t, eta),
+        CLOSURE_INT_PARAM(bsdf::lobes::microfacet_t, refract),
+        CLOSURE_FINISH_PARAM(bsdf::lobes::microfacet_t)
       }
     };
 
     system->register_closure("emission", bsdf_t::Emissive, params[0], NULL, NULL);
+    system->register_closure("background", bsdf_t::Background, params[0], NULL, NULL);
+    system->register_closure("transparent", bsdf_t::Transparent, params[0], NULL, NULL);
     system->register_closure("diffuse", bsdf_t::Diffuse, params[1], NULL, NULL);
-    system->register_closure("reflection", bsdf_t::Reflection, params[2], NULL, NULL);
-    system->register_closure("refraction", bsdf_t::Refraction, params[3], NULL, NULL);
+    system->register_closure("oren_nayar", bsdf_t::OrenNayar, params[2], NULL, NULL);
+    system->register_closure("reflection", bsdf_t::Reflection, params[3], NULL, NULL);
+    system->register_closure("refraction", bsdf_t::Refraction, params[4], NULL, NULL);
+    system->register_closure("microfacet", bsdf_t::Microfacet, params[5], NULL, NULL);
   }
 
   static void attach() {
@@ -127,17 +150,35 @@ struct material_t::details_t {
 	const auto cw = w * Imath::Color3f(component->w);
 
 	switch(component->id) {
+        case bsdf_t::Background:
+          result.e = cw;
+          break;
         case bsdf_t::Emissive:
           result.e = cw;
-          // fall through to diffuse material, so we have a bsdf
-          // for lights. this shouldb be handled in the shader
-          // eventually
+          break;
 	case bsdf_t::Diffuse:
 	  if (result.bsdf) {
 	    result.bsdf->add_lobe(
 	      bsdf_t::Diffuse
 	    , cw
 	    , component->as<bsdf::lobes::diffuse_t>());
+	  }
+	  break;
+	case bsdf_t::OrenNayar:
+	  if (result.bsdf) {
+            const auto params = component->as<bsdf::lobes::oren_nayar_t::in_t>();
+	    result.bsdf->add_lobe(
+              bsdf_t::OrenNayar
+            , cw
+            , bsdf::lobes::oren_nayar_t(params));
+	  }
+	  break;
+	case bsdf_t::Microfacet:
+	  if (result.bsdf) {
+	    result.bsdf->add_lobe(
+	      bsdf_t::Microfacet
+	    , cw
+	    , component->as<bsdf::lobes::microfacet_t>());
 	  }
 	  break;
 	case bsdf_t::Reflection:
@@ -154,6 +195,14 @@ struct material_t::details_t {
 	      bsdf_t::Refraction
 	    , cw
 	    , component->as<bsdf::lobes::refract_t>());
+	  }
+	  break;
+	case bsdf_t::Transparent:
+	  if (result.bsdf) {
+	    result.bsdf->add_lobe(
+	      bsdf_t::Transparent
+	    , cw
+	    , component->as<empty_params_t>());
 	  }
 	  break;
 	}
@@ -216,6 +265,18 @@ struct material_builder_t : public material_t::builder_t {
 
   void parameter(
     const std::string& name
+  , int f)
+  {
+    const auto p = material->details->parameters.write_int(f);
+    
+    material_t::details_t::system->Parameter(
+      name
+    , TypeDesc::TypeInt
+    , p);
+  }
+
+  void parameter(
+    const std::string& name
   , const Imath::Color3f& c)
   {
     const auto p = material->details->parameters.write_3f(c.x, c.y, c.z);
@@ -259,7 +320,6 @@ void material_t::evaluate(
 {
   for (auto i=0; i<active.num; ++i) {
     const auto index = active.index[i];
-    assert(hits->is_hit(index));
 
     ShaderGlobals sg;
     memset(&sg, 0, sizeof(ShaderGlobals));

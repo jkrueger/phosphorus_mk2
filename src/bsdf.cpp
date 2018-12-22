@@ -1,9 +1,13 @@
 #include "bsdf.hpp"
 #include "sampling.hpp"
+#include "state.hpp"
 
 #include "bsdf/lambert.hpp"
+#include "bsdf/oren_nayar.hpp"
 #include "bsdf/reflection.hpp"
 #include "bsdf/refraction.hpp"
+#include "bsdf/microfacet.hpp"
+#include "math/fresnel.hpp"
 
 #include <cmath>
 
@@ -23,14 +27,44 @@ Imath::Color3f eval(
       result = lambert::f(param.diffuse, wi, wo);
       break;
     }
+  case bsdf_t::OrenNayar:
+    {
+      pdf = oren_nayar::pdf(param.oren_nayar, wi, wo);
+      result = oren_nayar::f(param.oren_nayar, wi, wo);
+      break;
+    }
+  case bsdf_t::Microfacet:
+    {
+      if (param.microfacet.distribution == "ggx") {
+        pdf = microfacet::pdf(param.microfacet, wi, wo);
+        result = microfacet::f(
+          param.microfacet
+        , wi
+        , wo
+        , microfacet::ggx::D
+        , microfacet::ggx::G
+        , fresnel::dielectric);
+        // std::cout << result << std::endl;
+      }
+      else {
+        std::cerr
+          << "Unsupported distribution type: "
+          << param.microfacet.distribution
+          << std::endl;
+      }
+      break;
+    }
   case bsdf_t::Reflection:
     pdf = 0.0f;
     break;
   case bsdf_t::Refraction:
     pdf = 0.0f;
     break;
+  case bsdf_t::Transparent:
+    pdf = 0.0f;
+    break;
   default:
-    std::cout << "Can't evaluate BSDF type: " << type << std::endl;
+    std::cerr << "Can't evaluate BSDF type: " << type << std::endl;
     break;
   }
 
@@ -38,7 +72,7 @@ Imath::Color3f eval(
 }
 
 bsdf_t::bsdf_t()
-  : flags(0), lobes(0)
+  : lobes(0)
 {}
 
 Imath::Color3f bsdf_t::f(const Imath::V3f& wi, const Imath::V3f& wo) const {
@@ -58,7 +92,8 @@ Imath::Color3f bsdf_t::sample(
   const Imath::V2f& sample
 , const Imath::V3f& wi
 , Imath::V3f& wo
-, float& pdf) const
+, float& pdf
+, uint32_t& sample_flags) const
 {
   auto index = std::min((uint32_t) std::floor(sample.x * lobes), (lobes-1));
 
@@ -70,34 +105,62 @@ Imath::Color3f bsdf_t::sample(
   Imath::V2f remapped(u, sample.y);
   Imath::Color3f result(0.0f);
 
-  const auto p = (param_t*) params;
+  const auto& p = ((param_t*) params)[index];
 
   switch(type[index]) {
   case Diffuse:
-    result = lambert::sample(p[index].diffuse, wi, wo, remapped, pdf);
+    result = lambert::sample(p.diffuse, wi, wo, remapped, pdf);
+    break;
+  case OrenNayar:
+    result = oren_nayar::sample(p.oren_nayar, wi, wo, remapped, pdf);
+    break;
+  case Microfacet:
+    if (p.microfacet.distribution == "ggx") {
+      result = microfacet::sample(
+        p.microfacet
+      , wi
+      , wo
+      , remapped
+      , pdf
+      , microfacet::ggx::D
+      , microfacet::ggx::G
+      , fresnel::dielectric);
+    }
+    else {
+      std::cerr
+        << "Unsupported distribution type: "
+        << p.microfacet.distribution
+        << std::endl;
+    }
     break;
   case Reflection:
-    result = reflection::sample(p[index].reflect, wi, wo, remapped, pdf);
+    result = reflection::sample(p.reflect, wi, wo, remapped, pdf);
     break;
   case Refraction:
-    result = refraction::sample(p[index].refract, wi, wo, remapped, pdf);
+    result = refraction::sample(p.refract, wi, wo, remapped, pdf);
+    break;
+  case Transparent:
+    wo = wi;
+    pdf = 1.0f;
+    result = Imath::Color3f(1.0f);
     break;
   default:
-    std::cout << "Can't sample BSDF type: " << type[index] << std::endl;
+    std::cerr << "Can't sample BSDF type: " << type[index] << std::endl;
     break;
   }
 
   result *= weight[index];
 
   for (auto i=0; i<lobes; ++i) {
-    if (i != index) {
+    if (i != index && (flags[index] & flags[i]) == flags[index]) {
       float lobe_pdf;
-      result += eval(type[i], p[i], wi, wo, lobe_pdf) * weight[i];
+      result += eval(type[i], ((param_t*) params)[i], wi, wo, lobe_pdf) * weight[i];
       pdf    += lobe_pdf;
     }
   }
 
   pdf /= lobes;
+  sample_flags = flags[index];
 
   return result;
 }

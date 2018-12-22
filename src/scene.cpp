@@ -11,6 +11,8 @@ struct scene_t::details_t {
   std::vector<material_t*> materials;
   std::vector<light_t*>    lights;
 
+  light_t* env;
+
   std::unordered_map<std::string, material_t*> materials_by_name;
 };
 
@@ -49,7 +51,16 @@ void scene_t::triangles(std::vector<triangle_t>& out) const {
 
 void scene_t::add(light_t* light) {
   light->id = details->lights.size();
-  details->lights.push_back(light);
+
+  if (light->is_infinite()) {
+    if (details->env) {
+      std::cerr << "Overwriting existing environment light" << std::endl;
+    }
+    details->env = light;
+  }
+  else {
+    details->lights.push_back(light);
+  }
 }
 
 void scene_t::add(mesh_t* mesh) {
@@ -94,4 +105,8 @@ material_t* scene_t::material(const std::string& name) const {
     return guard->second;
   }
   return nullptr;
+}
+
+light_t* scene_t::environment() const {
+  return details->env;
 }

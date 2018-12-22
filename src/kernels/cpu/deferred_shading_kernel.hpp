@@ -1,5 +1,6 @@
 #pragma once
 
+#include "light.hpp"
 #include "mesh.hpp"
 #include "utils/allocator.hpp"
 #include "utils/assert.hpp"
@@ -49,20 +50,28 @@ struct deferred_shading_kernel_t {
       const auto index = active.index[i];
 
       hits->flags[index] = rays->flags[index];
-      
+
+      const auto p = rays->p.at(index);
+      const auto wi = rays->wi.at(index);
+
+      hits->p.from(index, p + wi * rays->d[index]);
+      hits->e.from(index, Imath::Color3f(0));
+
       if (rays->is_hit(index)) {
 	const auto mesh = scene.mesh(rays->meshid(index));
 	const auto material = rays->matid(index);
 
-        const auto p = rays->p.at(index);
-        const auto wi = rays->wi.at(index);
-
-        hits->p.from(index, p + wi * rays->d[index]);
         hits->wi.from(index, -wi);
 
         mesh->shading_parameters(rays, hits, index);
 
         deferred.material[material].add(index);
+      }
+      else {
+        hits->wi.from(index, wi);
+        if (const auto env = scene.environment()) {
+          deferred.material[env->matid()].add(index);
+        }
       }
     }
   }

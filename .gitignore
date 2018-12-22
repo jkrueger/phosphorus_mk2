@@ -36,6 +36,9 @@
 *.bmp
 *.exr
 
+# OSL shader binaries
+*.oso
+
 # directories
 build
 debug

@@ -1,0 +1,27 @@
+
+shader
+color_op_node
+ [[ string help = "Binary operation node on two colors" ]]
+(
+  string operation = "mul"
+    [[ string help = "Operation to perform on the operands",
+       string widget = "popup",
+       string options = "mul" ]],
+
+  float fac = 1
+    [[ string help = "Scalar control value" ]],
+
+  color A = 0
+    [[ string help = "First input color" ]],
+
+  color B = 0
+    [[ string help = "Second input color" ]],
+
+  output color Cout = 0
+    [[ string help = "Output color" ]]
+)
+{
+  if (operation == "mul") {
+    Cout = (1-fac) * A + fac * (A * B);
+  }
+}
