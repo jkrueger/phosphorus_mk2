@@ -22,7 +22,6 @@ struct frame_state_t {
   {}
 
   inline ~frame_state_t() {
-    delete tiles;
   }
 };
 

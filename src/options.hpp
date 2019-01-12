@@ -4,9 +4,9 @@
 
 /* Parsed command line options */
 struct parsed_options_t {
-  static const uint32_t DEFAULT_SAMPLES_PER_PIXEL = 9;
+  static const uint32_t DEFAULT_SAMPLES_PER_PIXEL = 16;
   static const uint32_t DEFAULT_PATH_DEPTH = 9;
-  static const uint32_t DEFAULT_PATHS_PER_SAMPLE = 9;
+  static const uint32_t DEFAULT_PATHS_PER_SAMPLE = 16;
 
   std::string scene;
   std::string output;
@@ -15,6 +15,9 @@ struct parsed_options_t {
   bool single_threaded;
   // don't use gpu resources
   bool host_only;
+  // render in progressive mode, rather than tiled
+  // (i.e. send full frame tiles, representing one sample each, into the pipeline)
+  bool progressive;
   // number of pixel samples.
   // if set to 0, sampling is adaptive (not supported yet)
   uint32_t samples_per_pixel;
@@ -26,6 +29,7 @@ struct parsed_options_t {
   inline parsed_options_t()
     : output("out.exr")
     , single_threaded(false)
+    , progressive(false)
     , samples_per_pixel(DEFAULT_SAMPLES_PER_PIXEL)
     , paths_per_sample(DEFAULT_PATHS_PER_SAMPLE)
     , path_depth(DEFAULT_PATH_DEPTH)

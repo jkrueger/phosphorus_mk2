@@ -57,7 +57,7 @@ namespace spt {
     , active_t<>& active
     , const interaction_t<>* primary
     , interaction_t<>* hits
-    , ray_t<>* samples)
+    , ray_t<>* samples) const
     {
       for (auto i=0; i<state->dead.num; ++i) {
         const auto index = state->dead.index[i];
@@ -135,7 +135,7 @@ namespace spt {
       state_t<>* state
     , active_t<>& active
     , interaction_t<>* hits
-    , ray_t<>* samples)
+    , ray_t<>* samples) const
     {
       const auto num = active.clear();
 
@@ -246,7 +246,7 @@ namespace spt {
       const auto f = bsdf->sample(sample, wi, sampled, pdf, flags);
 
       if (color::is_black(f) || pdf == 0.0f) {
-        std::cout << "black" << std::endl;
+        // std::cout << "black" << std::endl;
 	return false;
       }
 

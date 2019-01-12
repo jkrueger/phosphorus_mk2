@@ -8,6 +8,7 @@ struct scene_t;
 
 struct light_t {
   enum type_t {
+    POINT,
     AREA,
     INFINITE
   } type;

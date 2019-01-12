@@ -21,6 +21,8 @@ struct scene_t {
   scene_t();
   ~scene_t();
 
+  void reset();
+
   void preprocess();
 
   void triangles(std::vector<triangle_t>& v) const;

@@ -39,6 +39,12 @@ namespace accel {
     mbvh_t();
     ~mbvh_t();
 
+    /** clear all data from the bvh */
+    void reset();
+
     builder_t* builder();
+
+    // the bounds of the mesh data in this accelerator
+    Imath::Box3f bounds() const;
   };
 }

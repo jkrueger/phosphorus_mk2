@@ -19,6 +19,8 @@ struct cpu_t : public xpu_t {
   uint32_t spp;
   uint32_t pps;
 
+  bool progressive;
+
   cpu_t(const parsed_options_t& options);
   ~cpu_t();
 

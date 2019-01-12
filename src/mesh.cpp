@@ -48,8 +48,12 @@ struct builder_impl_t : public mesh_t::builder_t {
     mesh->details->faces.push_back(c);
   }
 
+  void add_face_set(uint32_t id, const std::vector<uint32_t>& faces) {
+    mesh->details->sets.push_back({id, faces});
+  }
+
   void add_face_set(const material_t* material, const std::vector<uint32_t>& faces) {
-    mesh->details->sets.push_back({material->id, faces});
+    add_face_set(material->id, faces);
   }
 
   void set_normals_per_vertex() {

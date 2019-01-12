@@ -66,6 +66,7 @@ namespace codec {
 	scene.camera.to_world = Imath::M44f(xform);
 	// camera parameters
 	scene.camera.focal_length = focal_length;
+        scene.camera.fov = 2.0f * std::atan2(sensor_width * 0.5f, focal_length);
 	scene.camera.sensor_width = sensor_width;
       }
 

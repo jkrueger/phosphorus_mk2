@@ -82,7 +82,25 @@ namespace accel {
     delete details;
   }
 
+  void mbvh_t::reset() {
+    details->nodes.clear();
+    details->triangles.clear();
+
+    triangles = nullptr;
+    root = nullptr;
+
+    num_nodes = 0;
+    num_triangles = 0;
+  }
+
   mbvh_t::builder_t* mbvh_t::builder() {
     return new accel::builder_t(this);
+  }
+
+  Imath::Box3f mbvh_t::bounds() const {
+    if (root) {
+      return root->get_bounds();
+    }
+    return Imath::Box3f();
   }
 }

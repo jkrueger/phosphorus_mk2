@@ -44,6 +44,10 @@ struct camera_kernel_t {
       -1,-1,-1,-1,-1,-1,-1,-1
     };
 
+    // static const float onev[] = {
+    //   1,1,1,1,1,1,1,1
+    // };
+
     static const float seqv[] = {
       0,1,2,3,4,5,6,7
     };
@@ -60,34 +64,36 @@ struct camera_kernel_t {
     auto half   = simd::load(0.5f);
     auto nhalf  = simd::load(-0.5f);
 
-    auto fov  = 2.0f * std::atan2(camera.sensor_width * 0.5f, camera.focal_length);
-    auto zoom = simd::load(std::tan(fov * 0.5f));
+    auto zoom = simd::load(std::tan(camera.fov * 0.5f));
 
     auto px = simd::add(simd::load((float) tile.x), simd::load(seqv));
     auto py = simd::load((float) tile.y);
 
     auto off = 0;
 
-    const auto stepx = simd::div(simd::load(1.0f), simd::load((float)camera.film.width));
-    const auto stepy = simd::div(simd::load(1.0f), simd::load((float)camera.film.height));
+    const auto stepx = simd::load(1.0f / (float)camera.film.width);
+    const auto stepy = simd::load(1.0f / (float)camera.film.height);
     const auto ratio = simd::load((float)camera.film.width/(float)camera.film.height);
 
     auto sy = py;
     for (auto y=0; y<tile.h; ++y) {
-      const auto ndcy = simd::sub(one, simd::mul(simd::load(2.0f), simd::mul(simd::add(nhalf, sy), stepy)));
+      const auto ndcy = simd::sub(half, simd::mul(simd::add(nhalf, sy), stepy));
       auto sx = px;
 
       for (auto x=0; x<tile.w; x+=s, ++sample, off+=s) {
-	// const auto ndcx = simd::add(nhalf, simd::mul(sx, stepx));
-	const auto ndcx = simd::sub(simd::mul(simd::load(2.0f), simd::mul(simd::add(nhalf, sx), stepx)), one);
+	const auto ndcx = simd::sub(simd::mul(simd::add(nhalf, sx), stepx), half);
 
 	simd::vector3_t wi(
-	  sample->x
+          sample->x
 	, sample->y
-	, onev);
+        , onev);
 
-	wi.x = simd::mul(simd::add(ndcx, simd::mul(wi.x, stepx)), simd::mul(ratio, zoom));
-	wi.y = simd::mul(simd::add(ndcy, simd::mul(wi.y, stepy)), zoom);
+	wi.x = simd::mul(
+          simd::add(ndcx, simd::mul(wi.x, stepx)),
+          simd::mul(ratio, zoom));
+	wi.y = simd::mul(
+          simd::add(ndcy, simd::mul(wi.y, stepy)),
+          zoom);
 	
 	camera::compute_ray(pos, m, wi, ray, off);
 

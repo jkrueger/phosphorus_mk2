@@ -11,6 +11,8 @@ struct scene_t;
  */
 struct xpu_t {
 
+  virtual ~xpu_t();
+
   /**
    * Allow a processor type to precompute data for all instances
    * of this processor type. 

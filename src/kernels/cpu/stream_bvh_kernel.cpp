@@ -158,3 +158,7 @@ void stream_mbvh_kernel_t::trace(
 stream_mbvh_kernel_t::state_t* stream_mbvh_kernel_t::make_state() {
   return new stream_mbvh_kernel_t::state_t;
 }
+
+void stream_mbvh_kernel_t::destroy_state(state_t* state) {
+  delete state;
+}

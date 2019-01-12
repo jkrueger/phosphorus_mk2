@@ -15,7 +15,9 @@
 #include <OSL/oslexec.h>
 #pragma clang diagnostic pop
 
-using namespace OSL_v1_10;
+#include <OpenImageIO/sysutil.h>
+
+using namespace OSL_NAMESPACE;
 
 struct service_t : public RendererServices {
   ~service_t() {
@@ -46,13 +48,18 @@ struct material_t::details_t {
     : is_emitter(false)
   {}
 
-  static void boot() {
+  static void boot(const std::string& path) {
     using namespace bsdf;
-    
+
+    if (service && system) {
+      // material subsystem was already booted
+      return;
+    }
+
     service = new service_t(/* ... */);
     system  = new ShadingSystem(service, nullptr, nullptr);
 
-    system->attribute("searchpath:shader", "shaders");
+    system->attribute("searchpath:shader", path + "/shaders");
 
     ClosureParam params[][32] = {
       {
@@ -368,8 +375,8 @@ bool material_t::is_emitter() const {
   return details->is_emitter;
 }
 
-void material_t::boot(const parsed_options_t& options) {
-  details_t::boot();
+void material_t::boot(const parsed_options_t& options, const std::string& path) {
+  details_t::boot(path);
 }
 
 void material_t::attach() {

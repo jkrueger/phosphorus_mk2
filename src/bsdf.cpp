@@ -145,7 +145,7 @@ Imath::Color3f bsdf_t::sample(
     result = Imath::Color3f(1.0f);
     break;
   default:
-    std::cerr << "Can't sample BSDF type: " << type[index] << std::endl;
+    // std::cerr << "Can't sample BSDF type: " << type[index] << std::endl;
     break;
   }
 

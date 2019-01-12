@@ -23,4 +23,6 @@ struct stream_mbvh_kernel_t {
   }
 
   static state_t* make_state();
+
+  static void destroy_state(state_t* state);
 };

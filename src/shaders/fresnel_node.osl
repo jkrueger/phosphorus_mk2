@@ -1,0 +1,18 @@
+#include "fresnel.h"
+
+shader
+fresnel_node
+ [[ string help = "Output a fresnel factor for dielectric materials" ]]
+(
+  float IoR = 1.5
+    [[ string help = "Index of refraction" ]],
+
+  output float Cout = 0
+    [[ string help = "Output fresnel term" ]]
+)
+{
+  float eta  = backfacing() ? 1.0 / IoR : IoR;
+  float cosi = dot(I, N);
+
+  Cout = fresnel_dielectric(cosi, eta);
+}

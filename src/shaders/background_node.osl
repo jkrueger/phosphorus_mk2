@@ -6,8 +6,10 @@ surface background_node
     [[ string help = "Color of the background lighting" ]],
 
   float power = 1
-    [[ string help = "Power of the emitted background light" ]]
+    [[ string help = "Power of the emitted background light" ]],
+
+  output closure color Cout = 0
 )
 {
-  Ci = Cs * power * background();
+  Cout = Cs * power * background();
 }

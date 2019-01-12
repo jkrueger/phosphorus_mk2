@@ -142,7 +142,7 @@ int main(int argc, char** argv) {
 
   timeval start;
   gettimeofday(&start, 0);
-  
+
   start_devices(devices, scene, state);
   join(devices);
 
@@ -156,6 +156,9 @@ int main(int argc, char** argv) {
     << std::endl;
 
   sink->finalize();
+
+  delete sink;
+  delete sampler;
 
   std::cout << "Done" << std::endl;
   

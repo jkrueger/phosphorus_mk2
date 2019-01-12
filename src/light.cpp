@@ -26,8 +26,8 @@ struct area_light_t : public light_t::details_t {
     // the face set that defines the surface of this light source
     cdf = new float[triangles.size()];
 
-    const auto num = triangles.size(); 
-  
+    const auto num = triangles.size();
+
     for (auto i=0; i<num; ++i) {
       area += triangles[i].area();
       cdf[i] = area;
@@ -100,6 +100,8 @@ void light_t::sample(
 , sampler_t::light_sample_t& out) const
 {
   switch(type) {
+  case POINT:
+    break;
   case AREA:
     static_cast<const area_light_t*>(details)->sample(uv, out);
     break;

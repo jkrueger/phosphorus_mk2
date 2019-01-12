@@ -10,8 +10,10 @@
 struct camera_t {
   Imath::M44f to_world;
 
+  float fov;
   float focal_length;
   float sensor_width;
+  float sensor_height;
 
   struct film_t {
     uint32_t width;
@@ -25,6 +27,7 @@ struct camera_t {
 
   inline camera_t()
     : focal_length(35.0f)
-    , sensor_width(32.0f)
+    , sensor_width(36.0f)
+    , sensor_height(24.0f)
   {}
 };
