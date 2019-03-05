@@ -20,20 +20,14 @@
 #include <vector>
 
 struct cpu_t::details_t {
+  parsed_options_t options;
+  
   std::vector<std::thread> threads;
 
   accel::mbvh_t accel;
 
-  camera_kernel_t           camera_rays;
-  stream_mbvh_kernel_t      trace;
-  deferred_shading_kernel_t interactions;
-  spt::light_sampler_t      sample_lights;
-  spt::integrator_t         integrate;
-
-  details_t(const parsed_options_t& options)
-    : trace(&accel)
-    , sample_lights(options)
-    , integrate(options)
+  details_t(const parsed_options_t& options)    
+    : options(options)
   {}
 };
 
@@ -42,8 +36,14 @@ struct tile_renderer_t {
   typedef typename Accel::state_t accel_state_t;
   typedef spt::state_t<> integrator_state_t;
 
-  const cpu_t::details_t* details;
+  // rendering kernel functions
+  camera_kernel_t           camera_rays;
+  Accel                     trace;
+  deferred_shading_kernel_t interactions;
+  spt::light_sampler_t      sample_lights;
+  spt::integrator_t         integrate;
 
+  // render pipeline state
   allocator_t         allocator;
   accel_state_t*      trace_state;
   integrator_state_t* integrator_state;
@@ -52,15 +52,14 @@ struct tile_renderer_t {
   interaction_t<>*    primary;
   interaction_t<>*    hits;
 
-  inline tile_renderer_t(
-    const cpu_t::details_t* details
-  , const scene_t& scene
-  , sampler_t* sampler)
-    : details(details)
+  inline tile_renderer_t(const cpu_t* cpu, const scene_t& scene, frame_state_t& frame)
+    : trace(&cpu->details->accel)
+    , sample_lights(cpu->details->options)
+    , integrate(cpu->details->options)
     , allocator(1024*1024*100)
-    , trace_state(stream_mbvh_kernel_t::make_state())
+    , trace_state(Accel::make_state())
   {
-    integrator_state = new(allocator) spt::state_t<>(&scene, sampler);
+    integrator_state = new(allocator) spt::state_t<>(&scene, frame.sampler);
     rays = new(allocator) ray_t<>();
     primary = new(allocator) interaction_t<>();
     hits = new(allocator) interaction_t<>();
@@ -69,7 +68,19 @@ struct tile_renderer_t {
   }
 
   inline ~tile_renderer_t() {
-    stream_mbvh_kernel_t::destroy_state(trace_state);
+    Accel::destroy_state(trace_state);
+  }
+
+  inline void prepare_sample(
+    job::tiles_t::tile_t& tile
+  , uint32_t sample
+  , const scene_t& scene
+  , frame_state_t& frame)
+  {
+    const auto& samples = frame.sampler->next_pixel_samples(sample);
+    const auto& camera  = scene.camera;
+
+    camera_rays(camera, tile, samples, rays);
   }
 
   inline void trace_primary_rays(const scene_t& scene) {
@@ -81,11 +92,11 @@ struct tile_renderer_t {
   }
 
   inline void trace_rays(const scene_t& scene, interaction_t<>* out) {
-    details->trace(trace_state, rays, active);
-    details->interactions(allocator, scene, active, rays, out);
-    details->sample_lights(integrator_state, active, primary, out, rays);
-    details->trace(trace_state, rays, active);
-    details->integrate(integrator_state, active, out, rays);
+    trace(trace_state, rays, active);
+    interactions(allocator, scene, active, rays, out);
+    sample_lights(integrator_state, active, primary, out, rays);
+    trace(trace_state, rays, active);
+    integrate(integrator_state, active, out, rays);
   }
 };
 
@@ -122,7 +133,7 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 
 	job::tiles_t::tile_t tile;
 	while (frame.tiles->next(tile)) {
-	  tile_renderer_t<stream_mbvh_kernel_t> state(details, scene, frame.sampler);
+          tile_renderer_t<stream_mbvh_kernel_t> state(this, scene, frame);
 
 	  auto splats = new(state.allocator) Imath::Color3f[tile.w * tile.h];
           memset(splats, 0, sizeof(Imath::Color3f) * tile.w*tile.h);
@@ -130,10 +141,7 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	  for (auto j=0; j<spp; ++j) {
 	    allocator_scope_t scope(state.allocator);
 
-	    const auto& samples = frame.sampler->next_pixel_samples(j);
-	    const auto& camera  = scene.camera;
-
-	    details->camera_rays(camera, tile, samples, state.rays);
+            state.prepare_sample(tile, j, scene, frame);
             state.trace_primary_rays(scene);
 
 	    while (state.active.has_live_paths()) {
