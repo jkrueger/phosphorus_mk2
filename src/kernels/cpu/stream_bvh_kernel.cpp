@@ -7,7 +7,7 @@
 
 #include "ImathBoxAlgo.h"
 
-struct stream_mbvh_kernel_t::state_t{
+struct stream_mbvh_kernel_t::details_t{
   stream::lanes_t<accel::mbvh_t::width> lanes;
   stream::task_t tasks[256];
 };
@@ -16,7 +16,7 @@ struct stream_mbvh_kernel_t::state_t{
  * the scene */
 template<typename Stream>
 void intersect(
-  stream_mbvh_kernel_t::state_t* state
+  stream_mbvh_kernel_t::details_t* state
 , Stream* stream
 , const active_t<>& active
 , const accel::mbvh_t* bvh)
@@ -144,21 +144,14 @@ void intersect(
 }
 
 stream_mbvh_kernel_t::stream_mbvh_kernel_t(const accel::mbvh_t* bvh)
-  : bvh(bvh)
+  : details(new details_t())
+  , bvh(bvh)
 {}
 
-void stream_mbvh_kernel_t::trace(
-  stream_mbvh_kernel_t::state_t* state
-, ray_t<>* rays
-, active_t<>& active) const
-{
-  intersect(state, rays, active, bvh);
+stream_mbvh_kernel_t::~stream_mbvh_kernel_t() {
+  delete details;
 }
 
-stream_mbvh_kernel_t::state_t* stream_mbvh_kernel_t::make_state() {
-  return new stream_mbvh_kernel_t::state_t;
-}
-
-void stream_mbvh_kernel_t::destroy_state(state_t* state) {
-  delete state;
+void stream_mbvh_kernel_t::trace(ray_t<>* rays, active_t<>& active) const {
+  intersect(details, rays, active, bvh);
 }

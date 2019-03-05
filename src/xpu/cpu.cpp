@@ -33,33 +33,35 @@ struct cpu_t::details_t {
 
 template<typename Accel>
 struct tile_renderer_t {
-  typedef typename Accel::state_t accel_state_t;
   typedef spt::state_t<> integrator_state_t;
 
   // rendering kernel functions
   camera_kernel_t           camera_rays;
   Accel                     trace;
-  deferred_shading_kernel_t interactions;
-  spt::light_sampler_t      sample_lights;
+  deferred_shading_kernel_t shade;
+  spt::light_sampler_t      prepare_occlusion_queries;
   spt::integrator_t         integrate;
 
-  // render pipeline state
-  allocator_t         allocator;
-  accel_state_t*      trace_state;
+  // renderer state
   integrator_state_t* integrator_state;
-  active_t<>          active;
-  ray_t<>*            rays;
-  interaction_t<>*    primary;
-  interaction_t<>*    hits;
+
+  // per tile state
+  allocator_t      allocator;
+  active_t<>       active;
+  ray_t<>*         rays;
+  interaction_t<>* primary;
+  interaction_t<>* hits;
 
   inline tile_renderer_t(const cpu_t* cpu, const scene_t& scene, frame_state_t& frame)
     : trace(&cpu->details->accel)
-    , sample_lights(cpu->details->options)
+    , prepare_occlusion_queries(cpu->details->options)
     , integrate(cpu->details->options)
     , allocator(1024*1024*100)
-    , trace_state(Accel::make_state())
   {
     integrator_state = new(allocator) spt::state_t<>(&scene, frame.sampler);
+  }
+
+  inline void prepare_tile() {
     rays = new(allocator) ray_t<>();
     primary = new(allocator) interaction_t<>();
     hits = new(allocator) interaction_t<>();
@@ -67,8 +69,8 @@ struct tile_renderer_t {
     active.reset(0);
   }
 
-  inline ~tile_renderer_t() {
-    Accel::destroy_state(trace_state);
+  inline void finalize_tile() {
+    allocator.reset();
   }
 
   inline void prepare_sample(
@@ -91,11 +93,18 @@ struct tile_renderer_t {
     trace_rays(scene, hits);
   }
 
+  /** 
+   * The basic render pipleine step. 
+   * trace rays -> evaluate materials at hit points -> 
+   * find occlusion queries -> trace occlusion query rays -> 
+   * compute radiance values -> generate new paths vertices 
+   *
+   */
   inline void trace_rays(const scene_t& scene, interaction_t<>* out) {
-    trace(trace_state, rays, active);
-    interactions(allocator, scene, active, rays, out);
-    sample_lights(integrator_state, active, primary, out, rays);
-    trace(trace_state, rays, active);
+    trace(rays, active);
+    shade(allocator, scene, active, rays, out);
+    prepare_occlusion_queries(integrator_state, active, primary, out, rays);
+    trace(rays, active);
     integrate(integrator_state, active, out, rays);
   }
 };
@@ -133,26 +142,27 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 
 	job::tiles_t::tile_t tile;
 	while (frame.tiles->next(tile)) {
-          tile_renderer_t<stream_mbvh_kernel_t> state(this, scene, frame);
+          tile_renderer_t<stream_mbvh_kernel_t> renderer(this, scene, frame);
+          renderer.prepare_tile();
 
-	  auto splats = new(state.allocator) Imath::Color3f[tile.w * tile.h];
+	  auto splats = new(renderer.allocator) Imath::Color3f[tile.w * tile.h];
           memset(splats, 0, sizeof(Imath::Color3f) * tile.w*tile.h);
 
 	  for (auto j=0; j<spp; ++j) {
-	    allocator_scope_t scope(state.allocator);
+	    allocator_scope_t scope(renderer.allocator);
 
-            state.prepare_sample(tile, j, scene, frame);
-            state.trace_primary_rays(scene);
+            renderer.prepare_sample(tile, j, scene, frame);
+            renderer.trace_primary_rays(scene);
 
-	    while (state.active.has_live_paths()) {
-	      allocator_scope_t scope(state.allocator);
-	      state.trace_and_advance_paths(scene);
-	    }
+	    while (renderer.active.has_live_paths()) {
+	      allocator_scope_t scope(renderer.allocator);
+              renderer.trace_and_advance_paths(scene);
+            }
 
 	    // FIXME: temporary code to copy radiance values into output buffer
 	    // this should run through a filter kernel instead
 	    for (auto k=0; k<tile.w*tile.h; ++k) {
-	      const auto r = state.integrator_state->r.at(k);
+	      const auto r = renderer.integrator_state->r.at(k);
 	      splats[k] += r * (1.0f / (spp*pps));
 	    }
 	  }
@@ -161,6 +171,8 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	    Imath::V2i(tile.x, tile.y)
 	  , Imath::V2i(tile.w, tile.h)
 	  , splats);
+
+          renderer.finalize_tile();
 	}
       }, std::cref(scene), std::ref(frame)));
   }

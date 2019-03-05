@@ -7,6 +7,12 @@
 
 #include <cmath>
 
+/**
+ * Path tracing integrator
+ *
+ * This integrator implemtns path tracing over a path over samples
+ * in parallel. All paths are uni directional starting at the camera
+ */
 namespace spt {
   /* This stores some state needed by the path integrator */
   template<int N = 1024>
