@@ -4,15 +4,21 @@
 #include "scene.hpp"
 #include "math/sampling.hpp"
 
+#include <algorithm>
 #include <random> 
 
 struct area_light_t : public light_t::details_t {
+  mesh_t* mesh;
+  uint32_t set;
   std::vector<triangle_t> triangles;
   float area;
   float* cdf;
 
   area_light_t(mesh_t* mesh, uint32_t set)
-    : details_t(mesh->material(set)), area(0.0f)
+    : mesh(mesh)
+    , set(set)
+    , details_t(mesh->material(set))
+    , area(0.0f)
   {
     mesh->triangles(set, triangles);
   }
@@ -41,24 +47,53 @@ struct area_light_t : public light_t::details_t {
   void sample(const Imath::V2f& uv, sampler_t::light_sample_t& out) const {
     const auto num = triangles.size();
 
-    auto i = 0;
-    while (i < (num-1) && uv.x < cdf[i]) {
-      ++i;
-    }
+    // auto i = 0;
+    // while (i < (num-1) && uv.x > cdf[i]) {
+    //   ++i;
+    // }
+
+    const auto i = std::min(std::floor(uv.x * num), num - 1.0f);
 
     const auto one_minus_epsilon =
       1.0f-std::numeric_limits<float>::epsilon();
     const auto remapped =
       std::min(uv.x * num - i, one_minus_epsilon);
-    
+
     const auto& triangle    = triangles[i];
-    const auto  barycentric = triangle.sample({remapped, uv.y});
+    const auto  barycentric = triangle_t::sample({remapped, uv.y});
 
     out.p    = triangle.barycentric_to_point(barycentric);
     out.uv   = barycentric;
     out.pdf  = 1.0f / area;
     out.mesh = triangle.meshid() | (triangle.matid() << 16);
     out.face = triangle.face;
+  }
+
+  void sample(
+    const soa::vector2_t<SIMD_WIDTH>& uv
+  , sampler_t::light_samples_t<SIMD_WIDTH>& out) const
+  {
+    const auto one = simd::floatv_t(1.0f);
+    const auto num = simd::floatv_t(triangles.size());
+
+    auto x = simd::floatv_t(uv.x);
+    auto y = simd::floatv_t(uv.y);
+
+    const auto indices = simd::min(simd::floor(x * num), num - one);
+
+    const auto e = std::numeric_limits<float>::epsilon();
+    const auto one_minus_epsilon = simd::floatv_t(1.0f-e);
+
+    x = simd::min(x * num, one_minus_epsilon);
+
+    const auto barycentrics = triangle_t::sample(x, y);
+
+    out.p = mesh->barycentrics_to_point(set, indices, barycentrics);
+    out.u = barycentrics.x;
+    out.v = barycentrics.y;
+    out.pdf = simd::floatv_t(1.0f / area);
+    // out.mesh = simd::int32v_t(mesh->id | (matid << 16));
+    // out.face = mesh->face_ids(set, indices);
   }
 };
 
@@ -107,6 +142,23 @@ void light_t::sample(
     break;
   case INFINITE:
     static_cast<const infinite_light_t*>(details)->sample(uv, out);
+    break;
+  }
+}
+
+void light_t::sample(
+  const soa::vector2_t<SIMD_WIDTH>& uv
+, sampler_t::light_samples_t<SIMD_WIDTH>& out) const
+{
+  switch(type) {
+  case POINT:
+    break;
+  case AREA:
+    static_cast<const area_light_t*>(details)->sample(uv, out);
+    break;
+  case INFINITE:
+    // static_cast<const infinite_light_t*>(details)->sample(uv, out);
+    printf("SIMD sampling not implemented on infinite lights");
     break;
   }
 }

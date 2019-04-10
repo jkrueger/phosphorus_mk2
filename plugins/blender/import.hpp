@@ -66,7 +66,6 @@ namespace blender {
       mesh_t::builder_t::scoped_t builder(mesh->builder());
 
       if (use_loop_normals) {
-        std::cout << "USE LOOP NORMALS" << std::endl;
         builder->set_normals_per_vertex_per_face();
         builder->set_uvs_per_vertex_per_face();
 

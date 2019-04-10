@@ -32,7 +32,7 @@ struct allocator_t {
 
   inline char* allocate(size_t bytes) {
     // keep allocations 32 byte alligned
-    const auto alignment = ((intptr_t) pos) % 32;
+    const auto alignment = 32 - (((intptr_t) pos) % 32);
 
     if (used() + bytes + alignment > size) {
       throw std::runtime_error("Out of memory");

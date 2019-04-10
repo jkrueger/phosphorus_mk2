@@ -47,30 +47,28 @@ struct deferred_shading_kernel_t {
     // than bucket sort
 
     for (auto i=0; i<active.num; ++i) {
-      const auto index = active.index[i];
+      hits->flags[i] = rays->flags[i];
 
-      hits->flags[index] = rays->flags[index];
+      const auto p = rays->p.at(i);
+      const auto wi = rays->wi.at(i);
 
-      const auto p = rays->p.at(index);
-      const auto wi = rays->wi.at(index);
+      hits->p.from(i, p + wi * rays->d[i]);
+      hits->e.from(i, Imath::Color3f(0));
 
-      hits->p.from(index, p + wi * rays->d[index]);
-      hits->e.from(index, Imath::Color3f(0));
+      if (rays->is_hit(i)) {
+	const auto mesh = scene.mesh(rays->meshid(i));
+	const auto material = rays->matid(i);
 
-      if (rays->is_hit(index)) {
-	const auto mesh = scene.mesh(rays->meshid(index));
-	const auto material = rays->matid(index);
+        hits->wi.from(i, -wi);
 
-        hits->wi.from(index, -wi);
+        mesh->shading_parameters(rays, hits, i);
 
-        mesh->shading_parameters(rays, hits, index);
-
-        deferred.material[material].add(index);
+        deferred.material[material].add(i);
       }
       else {
-        hits->wi.from(index, wi);
+        hits->wi.from(i, wi);
         if (const auto env = scene.environment()) {
-          deferred.material[env->matid()].add(index);
+          deferred.material[env->matid()].add(i);
         }
       }
     }

@@ -24,8 +24,17 @@ struct mesh_t {
 
   /* a face set applies a material to a sub mesh */
   struct face_set_t {
-    uint32_t material;
-    std::vector<uint32_t> faces;
+    uint32_t  material;
+    uint32_t  num_faces;
+    uint32_t* faces;
+
+    inline face_set_t(uint32_t material, const std::vector<uint32_t>& _faces)
+      : material(material)
+      , num_faces(_faces.size())
+    {
+      posix_memalign((void**) &faces, 32, _faces.size() * sizeof(uint32_t));
+      memcpy(faces, _faces.data(), _faces.size() * sizeof(uint32_t));
+    }
 
     inline uint32_t mat() const {
       return material;
@@ -67,13 +76,28 @@ struct mesh_t {
   ~mesh_t();
 
   builder_t* builder();
+  
+  // builder_t* builder(
+  //   uint32_t num_vertices
+  // , uint32_t num_normals
+  // , uint32_t num_uvs
+  // , uint32_t num_faces);
 
   void preprocess(scene_t* scene);
 
   /* get a list of descriptors of the triangles in this mesh */
   void triangles(std::vector<triangle_t>& triangle) const;
 
+  /* get a list of triangles that share the same material */
   void triangles(uint32_t set, std::vector<triangle_t>& triangle) const;
+
+  simd::vector3v_t barycentrics_to_point(
+    uint32_t setid
+  , const simd::int32v_t& indices                                            
+  , const simd::vector3v_t& barycentrics) const;
+
+  /** converts an index into a face set into actual face indices in the mesh */
+  simd::int32v_t face_ids(uint32_t setid, const simd::int32v_t& indices) const;
 
   /* fill in the shading parameters in the state from this mesh */
   void shading_parameters(

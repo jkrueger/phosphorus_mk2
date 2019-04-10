@@ -30,7 +30,9 @@ namespace spt {
 
     inline state_t(const scene_t* scene, sampler_t* sampler)
       : scene(scene), sampler(sampler)
-    {
+    {}
+
+    inline void reset() {
       memset(depth, 0, sizeof(depth));
       memset(path, 0, sizeof(path));
       memset(&r, 0, sizeof(r));
@@ -38,6 +40,8 @@ namespace spt {
       for (auto i=0; i<N; ++i) {
         beta.from(i, Imath::V3f(1.0f));
       }
+
+      dead.clear();
     }
 
     inline void mark_for_revive(uint32_t i) {
@@ -58,6 +62,28 @@ namespace spt {
       : paths_per_sample(options.paths_per_sample)
     {}
 
+    inline void revive_dead_paths(
+      state_t<>* state
+    , active_t<>& active 
+    , const interaction_t<>* primary
+    , interaction_t<>* hits) const
+    {
+      assert(active.num + state->dead.num <= active_t<>::size);
+
+      for (auto i=0; i<state->dead.num; ++i) {
+        const auto pixel = state->dead.index[i];
+        const auto index = active.num;
+
+        if (primary->is_hit(pixel)) {
+          hits->from(primary, pixel, index);
+          state->revive(pixel);
+          active.add(pixel);
+        }
+      }
+
+      state->dead.clear();
+    }
+
     inline void operator()(
       state_t<>* state
     , active_t<>& active
@@ -65,65 +91,91 @@ namespace spt {
     , interaction_t<>* hits
     , ray_t<>* samples) const
     {
-      for (auto i=0; i<state->dead.num; ++i) {
-        const auto index = state->dead.index[i];
-        if (primary->is_hit(index)) {
-          hits->from(index, primary);
-          state->revive(index);
-          active.add(index);
-        }
-      }
+      // mark dead paths as alive, so we can generate new shadow rays
+      // for these paths
+      revive_dead_paths(state, active, primary, hits);
 
-      state->dead.clear();
+      const auto hit    = simd::int32v_t(HIT);
+      const auto masked = simd::int32v_t(MASKED | SHADOW);
+      const auto shadow = simd::int32v_t(SHADOW);
 
-      for (auto i=0; i<active.num; ++i) {
-        const auto index = active.index[i];
-
-	if (!hits->is_hit(index)) {
-          continue;
-	}
-
-        const auto depth = state->depth[index];
-        const auto path  = state->path[index];
-	
-        // get one light source sample
-        auto sample = state->sampler->sample2();
-
+      // iterate over alls paths, and generate shadow rays for them
+      for (auto i=0; i<active.num; i+=SIMD_WIDTH) {
+        // we pick one light for a set of SIMD_WDITH samples. this should
+        // be ok, over a large enough number of samples per pixel, and
+        // in my opinion doesn't make that much of a difference visually
+        // the way samples are layed out at the moment, the SIMD_WIDTH
+        // samples will be distributed over SIMD_WIDTH pixels
         const auto nlights = state->scene->num_lights();
-        const auto light_index = std::min((uint32_t) std::floor(sample.x * nlights), (nlights-1));
-        const auto light = state->scene->light(light_index);
+        sampler_t::light_samples_t<SIMD_WIDTH> light_samples;
 
-        const auto one_minus_epsilon = 1.0f-std::numeric_limits<float>::epsilon();
-        sample.x = std::min(sample.x * nlights - light_index, one_minus_epsilon);
+        // no good way to sample lights in parallel atm
+        // soa::vector2_t<SIMD_WIDTH> uvs;
+        // state->sampler->sample2(uvs);
 
-        sampler_t::light_sample_t point_on_light;
-        light->sample(sample, point_on_light);
+        // const auto x = state->sampler->sample();
+        // const auto l = std::min(std::floor(x * nlights), nlights - 1.0f);
 
-	const auto n = hits->n.at(index);
-	const auto p = offset(hits->p.at(index), n);
+        // const auto light = state->scene->light(l);
 
-	auto wi = point_on_light.p - p;
+        // // generate n samples form the light source
+        // light->sample(uvs, light_samples);
 
-        if (in_same_hemisphere(n, wi)) {
-          const auto d = wi.length() - 0.0001f;
-          wi.normalize();
+        for (auto i=0; i<SIMD_WIDTH; ++i) {
+          sampler_t::light_sample_t sample;
 
-          samples->reset(index, p, wi, d);
-          samples->shadow(index);
+          const auto x = state->sampler->sample();
+          const auto l = std::min(std::floor(x * nlights), nlights - 1.0f);
 
-          // the information about the surface we're going to hit
-          // comes from the light sample, and not from tracing
-          // the ray through the scene, so set everything up here
-	  samples->set_surface(
-	    index
-          , point_on_light.mesh, point_on_light.face
-	  , point_on_light.uv.x, point_on_light.uv.y);
+          const auto light = state->scene->light(l);
 
-	  state->pdf[index] = point_on_light.pdf;
+          light->sample(state->sampler->sample2(), sample);
+
+          light_samples.p.x[i] = sample.p.x;
+          light_samples.p.y[i] = sample.p.y;
+          light_samples.p.z[i] = sample.p.z;
+
+          light_samples.u.v[i] = sample.uv.x;
+          light_samples.v.v[i] = sample.uv.y;
+
+          light_samples.mesh[i] = sample.mesh;
+          light_samples.face[i] = sample.face;
+
+          light_samples.pdf.v[i] = sample.pdf;
         }
-        else {
-          samples->mask(index);
-        }
+
+        // the information about the surface we're going to hit
+        // comes from the light sample, and not from tracing
+        // the ray through the scene, so set everything up here
+        samples->set_surface(
+          i
+        , simd::int32v_t(light_samples.mesh)
+        , simd::int32v_t(light_samples.face)
+	, light_samples.u
+        , light_samples.v);
+
+        // use the sampled light to generate shadow rays
+        const simd::vector3v_t n(hits->n, i);
+        const auto p = simd::offset(simd::vector3v_t(hits->p, i), n);
+
+	auto wi = light_samples.p - p;
+
+        const auto d = wi.length() - simd::floatv_t(0.0001f);
+        wi.normalize();
+
+        // if the light source is behind the sampled point, we mask the
+        // shadow ray. this means the result of tracing it through the
+        // scene will be ignored
+        const auto is_hit = (hit & simd::int32v_t((int32_t*)(hits->flags + i))) == hit;
+        const auto ish = simd::in_same_hemisphere(n, wi);
+        const auto mask = is_hit & ish;
+        const auto flags = simd::select(mask, masked, shadow);
+
+        samples->reset(i, p, wi, d, flags);
+
+        // we store the pdfs for the light samples in the integrator
+        // state, since we need them later on
+        light_samples.pdf.store(state->pdf + i);
       }
     }
   };
@@ -151,22 +203,22 @@ namespace spt {
         auto out = state->r.at(index);
         auto keep_alive = true;
 
-	if (hits->is_hit(index)) {
-          if (state->depth[index] == 0 || hits->is_specular(index)) {
-            out += state->beta.at(index) * hits->e.at(index);
+	if (hits->is_hit(i)) {
+          if (state->depth[index] == 0 || hits->is_specular(i)) {
+            out += state->beta.at(index) * hits->e.at(i);
           }
 
 	  // compute direct light contribution at the current
 	  // path vertex. this gets modulated by the current path weight
 	  // and added to the path radiance
-	  if (!samples->is_occluded(index)) {
-	    out += li(state, samples, hits, index);
+	  if (!samples->is_occluded(i)) {
+	    out += li(state, samples, hits, index, i);
           }
 
           ++state->depth[index];
 
           // check if we have to terminate the path
-          if (sample_bsdf(state, hits, samples, index)) {
+          if (sample_bsdf(state, hits, samples, index, i, active.num)) {
             active.add(index);
           }
           else if (state->path[index] < paths_per_sample) {
@@ -175,7 +227,7 @@ namespace spt {
         }
 	else {
           // add environment lighting
-          out += state->beta.at(index) * hits->e.at(index);
+          out += state->beta.at(index) * hits->e.at(i);
 
           if (state->path[index] < paths_per_sample) {
             state->mark_for_revive(index);
@@ -190,18 +242,19 @@ namespace spt {
       state_t<>* state 
     , ray_t<>* samples
     , interaction_t<>* hits
-    , uint32_t index) const
+    , uint32_t index
+    , uint32_t to) const
     {
-      const auto bsdf = hits->bsdf[index]; 
-      const auto wi   = samples->wi.at(index);
-      const auto wo   = hits->wi.at(index);
-      const auto n    = hits->n.at(index);
+      const auto bsdf = hits->bsdf[to]; 
+      const auto wi   = samples->wi.at(to);
+      const auto wo   = hits->wi.at(to);
+      const auto n    = hits->n.at(to);
 
       const auto f = bsdf->f(wi, wo);
-      const auto s = f * (std::fabs(n.dot(wi)) / state->pdf[index]);
+      const auto s = f * (std::fabs(n.dot(wi)) / state->pdf[to]);
 
-      const auto mesh = state->scene->mesh(samples->meshid(index));
-      const auto material = state->scene->material(samples->matid(index));
+      const auto mesh = state->scene->mesh(samples->meshid(to));
+      const auto material = state->scene->material(samples->matid(to));
 
       assert(material->is_emitter());
  
@@ -209,8 +262,8 @@ namespace spt {
       {
         Imath::V3f n;
         Imath::V2f st;
-        mesh->shading_parameters(samples, n, st, index);
-        material->evaluate(samples->p.at(index), wi, n, st, light);
+        mesh->shading_parameters(samples, n, st, to);
+        material->evaluate(samples->p.at(to), wi, n, st, light);
       }
 
       return state->beta.at(index) * light.e * s;
@@ -220,7 +273,9 @@ namespace spt {
       state_t<>* state
     , const interaction_t<>* hits
     , ray_t<>* rays
-    , uint32_t index) const
+    , uint32_t index
+    , uint32_t from 
+    , uint32_t to) const
     {
       bsdf_t* bsdf;
       Imath::V3f p;
@@ -228,17 +283,17 @@ namespace spt {
       Imath::V3f n;
       Imath::Color3f beta;
 
-      state->depth[index]++;
+      // state->depth[index]++;
 
       if (terminate_path(state, index)) {
         return false;
       }
 
-      p  = hits->p.at(index);
-      wi = hits->wi.at(index);
-      n  = hits->n.at(index);
+      p = hits->p.at(from);
+      wi = hits->wi.at(from);
+      n = hits->n.at(from);
+      bsdf = hits->bsdf[from];
 
-      bsdf = hits->bsdf[index];
       beta = state->beta.at(index);
 
       assert(bsdf);
@@ -260,8 +315,8 @@ namespace spt {
 
       state->beta.from(index, beta * (f * (std::fabs(weight) / pdf)));
 
-      rays->reset(index, offset(p, n, weight < 0.0f), sampled);
-      rays->specular_bounce(index, bsdf_t::is_specular(flags));
+      rays->reset(to, offset(p, n, weight < 0.0f), sampled);
+      rays->specular_bounce(to, bsdf_t::is_specular(flags));
 
       return true;
     }

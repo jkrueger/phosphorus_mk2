@@ -30,7 +30,15 @@ struct light_t {
   void preprocess(const scene_t* scene);
 
   /* sample a point on the light source */
-  void sample(const Imath::V2f& uv, sampler_t::light_sample_t& out) const;
+  void sample(
+    const Imath::V2f& uv
+  , sampler_t::light_sample_t& out) const;
+
+  /* sample n points on a light, where n is the simd width of 
+   * the cpu */
+  void sample(
+    const soa::vector2_t<SIMD_WIDTH>& uv
+  , sampler_t::light_samples_t<SIMD_WIDTH>& out) const;
 
   inline bool is_area() const {
     return type == AREA;

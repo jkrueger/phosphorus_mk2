@@ -1,6 +1,7 @@
 #pragma once
 
 #include "state.hpp"
+#include "utils/assert.hpp"
 
 namespace stream {
   static const uint32_t RAYS_PER_LANE = (2<<17)-1;
@@ -20,9 +21,14 @@ namespace stream {
       memset(num, 0, sizeof(uint32_t) * WIDTH);
     }
 
-    inline void init(const active_t<>& a) {
-      memcpy(active[0], a.index, sizeof(uint32_t) * a.num);
-      num[0] = a.num;
+    template<typename T>
+    inline void init(const active_t<>& a, const T* stream) {
+      num[0] = 0;
+      for (auto i=0; i<a.num; ++i) {
+        if (!stream->is_masked(i)) {
+          active[0][num[0]++] = i;
+        }
+      }
     }
   };
 
@@ -45,6 +51,8 @@ namespace stream {
   , const Node* node
   , uint32_t idx)
   {
+    assert(top < 256);
+
     stack[top].offset = node->offset[idx];
     stack[top].flags  = node->num[idx];
     stack[top].d      = dists[idx];
@@ -56,6 +64,8 @@ namespace stream {
   , int32_t& top
   , uint16_t num)
   {
+    assert(top < 256);
+
     stack[top].offset   = 0;
     stack[top].num_rays = num;
     stack[top].lane     = 0;
@@ -73,6 +83,8 @@ namespace stream {
   , uint8_t  lane
   , uint16_t num)
   {
+    assert(top < 256);
+
     stack[top].offset   = node.offset[lane];
     stack[top].num_rays = num;
     stack[top].lane     = lane;
@@ -84,6 +96,8 @@ namespace stream {
 
   template<int WIDTH>
   inline void push(lanes_t<WIDTH>& lanes, uint8_t lane, uint32_t id) {
+    assert(lanes.num[lane] < RAYS_PER_LANE);
+
     auto& a = lanes.num[lane];
     lanes.active[lane][a++] = id;
   }

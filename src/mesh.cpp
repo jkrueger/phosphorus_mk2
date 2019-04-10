@@ -103,9 +103,33 @@ void mesh_t::triangles(std::vector<triangle_t>& out) const {
 }
 
 void mesh_t::triangles(uint32_t set, std::vector<triangle_t>& out) const {
-  for (auto j=0; j<details->sets[set].faces.size(); j++) {
+  for (auto j=0; j<details->sets[set].num_faces; j++) {
     out.emplace_back(this, set, details->sets[set].faces[j]*3);
   }
+}
+
+simd::int32v_t mesh_t::face_ids(uint32_t setid, const simd::int32v_t& indices) const {
+  const auto& set = details->sets[setid];
+  const auto face_indices = simd::int32v_t((int32_t*) set.faces, indices);
+  return face_indices * simd::int32v_t(3);
+}
+
+simd::vector3v_t mesh_t::barycentrics_to_point(
+  uint32_t setid
+, const simd::int32v_t& indices                                            
+, const simd::vector3v_t& barycentrics) const
+{
+  using namespace simd;
+
+  auto faceids = int32v_t((const ::int32_t*) faces, face_ids(setid, indices));
+
+  const auto vs = reinterpret_cast<const float*>(vertices);
+
+  const auto a = floatv_t(vs, faceids);
+  const auto b = floatv_t(vs, faceids + 1);
+  const auto c = floatv_t(vs, faceids + 2);
+
+  return barycentrics.scaled(a, b, c);
 }
 
 void mesh_t::shading_parameters(
@@ -222,10 +246,23 @@ Imath::V3f triangle_t::barycentric_to_point(const Imath::V2f& uv) const {
   return uv.x * a() + uv.y * b() + (1-uv.x-uv.y) * c();
 }
 
-Imath::V2f triangle_t::sample(const Imath::V2f& uv) const {
+Imath::V2f triangle_t::sample(const Imath::V2f& uv) {
   const auto x = std::sqrt(uv.x);
   const auto u = 1 - x;
   const auto v = uv.y * x;
 
   return {u, v};
+}
+
+simd::vector3v_t triangle_t::sample(
+  const simd::floatv_t& _u
+, const simd::floatv_t& _v)
+{
+  const auto one = simd::floatv_t(1.0f);
+  
+  const auto x = simd::sqrt(_u);
+  const auto u = one - x;
+  const auto v = _v * x;
+
+  return {u, v, one-u-v};
 }

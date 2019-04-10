@@ -32,7 +32,7 @@ static const uint32_t MASKED   = (1 << 1);
 static const uint32_t SHADOW   = (1 << 2);
 static const uint32_t SPECULAR = (1 << 3);
 
-/* a stream of rays */
+/* A stream of rays */
 template<int N = config::STREAM_SIZE>
 struct ray_t {
   static const uint32_t size = N;
@@ -47,11 +47,7 @@ struct ray_t {
   float    u[N];
   float    v[N];
 
-  uint8_t  flags[N];
-
-  // inline ray_t() {
-  //   memset(flags, 0, sizeof(flags));
-  // }
+  uint32_t flags[N];
 
   inline void reset(
     uint32_t i
@@ -63,6 +59,20 @@ struct ray_t {
     wi.from(i, _wi);
     d[i] = _d;
     flags[i] = 0;
+  }
+
+  template<int M>
+  inline void reset(
+    uint32_t off
+  , const simd::vector3_t<M>& _p
+  , const simd::vector3_t<M>& _wi
+  , const simd::float_t<M>& _d
+  , const simd::int32_t<M>& _flags)
+  {
+    _p.store(p, off);
+    _wi.store(wi, off);
+    _d.store(d, off);
+    _flags.store((int32_t*) flags, off);
   }
 
   inline void set_surface(
@@ -78,11 +88,28 @@ struct ray_t {
     v[i]    = _v;
   }
 
+  template<int M>
+  inline void set_surface(
+    uint32_t i
+  , const simd::int32_t<M>& _mesh
+  , const simd::int32_t<M>& _face
+  , const simd::float_t<M>& _u
+  , const simd::float_t<M>& _v)
+  {
+    assert(i < size);
+
+    _mesh.store((int32_t*) mesh + i);
+    _face.store((int32_t*) face + i);
+    _u.store(u + i);
+    _v.store(v + i);
+  }
+
   inline void miss(uint32_t i) {
     flags[i] &= ~HIT;
   }
 
   inline void hit(uint32_t i, float _d) {
+    assert(i < size);
     assert(_d < d[i]);
     flags[i] |= HIT;
     d[i] = _d;
@@ -134,11 +161,22 @@ struct ray_t {
   }
 };
 
-/* a stream of surface interactions */
+/* A stream of surface interactions
+ *
+ * A surface interaction models a point on a surface at which
+ * a ray has intersected a surface. It consists of a hitpoint,
+ * and a vector pointing away from the surface, along the incoming 
+ * ray dirrction, as well as the surface normal. It holds additional 
+ * shading properties, such as testure coordinates, light emitted
+ * from the surface, and a function describing light scattering
+ * at the point, which will be filled in by the material system 
+ */
 template<int N = config::STREAM_SIZE>
 struct interaction_t {
   static const uint32_t size = N;
   static const uint32_t step = SIMD_WIDTH;
+
+  uint32_t index[N];
 
   soa::vector3_t<N> p;
   soa::vector3_t<N> wi;
@@ -147,20 +185,20 @@ struct interaction_t {
   float s[N];
   float t[N];
 
-  uint8_t flags[N];
+  uint32_t flags[N];
 
   soa::vector3_t<N> e;
   bsdf_t* bsdf[N];
 
-  inline void from(uint32_t index, const interaction_t* o) {
-    p.from(index, o->p.at(index));
-    wi.from(index, o->wi.at(index));
-    n.from(index, o->n.at(index));
-    e.from(index, o->e.at(index));
-    flags[index] = o->flags[index];
-    s[index] = o->s[index];
-    t[index] = o->t[index];
-    bsdf[index] = o->bsdf[index];
+  inline void from(const interaction_t* o, uint32_t from, uint32_t to) {
+    p.from(to, o->p.at(from));
+    wi.from(to, o->wi.at(from));
+    n.from(to, o->n.at(from));
+    e.from(to, o->e.at(from));
+    flags[to] = o->flags[from];
+    s[to] = o->s[from];
+    t[to] = o->t[from];
+    bsdf[to] = o->bsdf[from];
   } 
 
   inline bool is_hit(uint32_t i) const {
@@ -184,6 +222,8 @@ struct interaction_t {
   }
 };
 
+/* Emitted by the material system to represent the result of 
+ * running one shader */
 struct shading_result_t {
   Imath::V3f e; // light emitted at a point
   bsdf_t* bsdf; // scattering function for a point
@@ -193,11 +233,15 @@ struct shading_result_t {
   {}
 };
 
-/* active masks for the pipeline and occlusion query states, 
-   to track which rays are currently active */
+/* Describes how many rays in the pipeline are still active,
+ * and to which pixels the active rays belong */
 template<int N = 1024>
 struct active_t {
+  static const uint32_t size = N;
+
+  // number of rays active in the pipeline
   uint32_t num;
+  // indices back to real pixels for each pipeline entry
   uint32_t index[N];
 
   inline active_t()

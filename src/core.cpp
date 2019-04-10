@@ -19,7 +19,8 @@ static option options[] = {
   { "one-thread", no_argument,       NULL, '1' },
   { "spp",        required_argument, NULL, 's' },
   { "paths",      required_argument, NULL, 'p' },
-  { "depth",      required_argument, NULL, 'd' }
+  { "depth",      required_argument, NULL, 'd' },
+  { "verbose",    no_argument,       NULL, 'v' }
 };
 
 void usage() {
@@ -29,7 +30,8 @@ void usage() {
     << "-o <path>    Output path fir the renderer" << std::endl
     << "-s <samples> Anti Aliasing samples per pixel" << std::endl
     << "-p <paths>   Maximum number of paths traces per sample" << std::endl
-    << "-d <depth>   Maximum depth of a single path" << std::endl;
+    << "-d <depth>   Maximum depth of a single path" << std::endl
+    << "-v           Print statistics while rendering" << std::endl;
 }
 
 bool parse_args(int argc, char** argv, parsed_options_t& parsed) {
@@ -60,6 +62,8 @@ bool parse_args(int argc, char** argv, parsed_options_t& parsed) {
       std::cout << "Path depth: " << std::atoi(optarg) << std::endl;
       parsed.path_depth = std::atoi(optarg);
       break;
+    case 'v':
+      parsed.verbose = true;
     case '?':
     default:
       usage();
@@ -110,6 +114,14 @@ void join(const T& devices) {
   }
 }
 
+// std::thread start_stats_printer() {
+//   return std::thread([]() {
+//     while (rendering) {
+      
+//     }
+//   });
+// }
+
 int main(int argc, char** argv) {
   parsed_options_t options;
 
@@ -145,6 +157,12 @@ int main(int argc, char** argv) {
 
   timeval start;
   gettimeofday(&start, 0);
+
+  // std::thread stats;
+
+  // if (options.verbose) {
+  //   stats = start_stats_printer();
+  // }
 
   start_devices(devices, scene, state);
   join(devices);

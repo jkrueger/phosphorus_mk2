@@ -11,25 +11,18 @@
 namespace camera {
   template<typename Ray>
   inline void compute_ray(
-    const simd::vector3_t& pos
-  , const simd::matrix44_t& m
-  , const simd::vector3_t& sample
+    const simd::vector3v_t& pos
+  , const simd::matrix44v_t& m
+  , const simd::vector3v_t& sample
   , Ray out
   , uint32_t off)
   {
-    // store position in rendering state
-    simd::store(pos.x, out->p.x + off);
-    simd::store(pos.y, out->p.y + off);
-    simd::store(pos.z, out->p.z + off);
-
-    // transform film sample
-    const auto max = simd::load(std::numeric_limits<float>::max());
+    const auto max = simd::floatv_t(std::numeric_limits<float>::max());
 
     auto wi = m * sample;
     wi.normalize();
 
-    simd::store(wi, out->wi.x + off, out->wi.y + off, out->wi.z + off);
-    simd::store(max, out->d + off);
+    out->reset(off, pos, wi, max, simd::int32v_t(0));
   }
 }
 
@@ -53,8 +46,8 @@ struct camera_kernel_t {
       0,1,2,3,4,5,6,7
     };
 
-    const simd::vector3_t pos(Imath::V3f(0,0,0) * camera.to_world);
-    const simd::matrix44_t m(camera.to_world);
+    const simd::vector3v_t pos(Imath::V3f(0,0,0) * camera.to_world);
+    const simd::matrix44v_t m(camera.to_world);
 
     const int32_t s = ray_t<N>::step;
 
@@ -84,7 +77,7 @@ struct camera_kernel_t {
       for (auto x=0; x<tile.w; x+=s, ++sample, off+=s) {
 	const auto ndcx = simd::sub(simd::mul(simd::add(nhalf, sx), stepx), half);
 
-	simd::vector3_t wi(
+	simd::vector3v_t wi(
           sample->x
 	, sample->y
         , onev);

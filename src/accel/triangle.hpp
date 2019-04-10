@@ -53,7 +53,7 @@ namespace accel {
       /** 
        * Intersect each ray with each triangle stored in this accelerator, 
        * one by one. This is mostly here as a baseline algorithm to verify 
-       * the simd implementations  */
+       * the vectorized implementations  */
       template<typename T>
       inline void baseline(
         T* stream
@@ -115,19 +115,19 @@ namespace accel {
 	  peps = simd::load(0.00000001f),
 	  meps = simd::load(-0.00000001f);
 
-	vector3_t<N> e0(_e0.x, _e0.y, _e0.z);
-        vector3_t<N> e1(_e1.x, _e1.y, _e1.z);
-	vector3_t<N> v0(_v0.x, _v0.y, _v0.z);
+        simd::vector3_t<N> e0(_e0.x, _e0.y, _e0.z);
+        simd::vector3_t<N> e1(_e1.x, _e1.y, _e1.z);
+        simd::vector3_t<N> v0(_v0.x, _v0.y, _v0.z);
 
 	for (auto i=0; i<num_rays; ++i) {
 	  const auto index = indices[i];
 
-	  vector3_t<N> o(
+          simd::vector3_t<N> o(
 	      stream->p.x[index]
 	    , stream->p.y[index]
 	    , stream->p.z[index]);
 
-	  vector3_t<N> wi(
+          simd::vector3_t<N> wi(
 	      stream->wi.x[index]
 	    , stream->wi.y[index]
 	    , stream->wi.z[index]);
@@ -159,10 +159,10 @@ namespace accel {
 		xmask));
 
 	  if (mask != 0) {
-	    float dists[N];
-	    float closest = stream->d[index];
-
+	    __aligned(32) float dists[N];
 	    simd::store(ds, dists);
+
+	    float closest = stream->d[index];
 
 	    int idx = -1;
 	    while(mask != 0) {
@@ -211,23 +211,23 @@ namespace accel {
 
 	const auto rays = simd::loadu((int32_t*) indices);
 
-	const auto o = simd::vector3_t(
-          simd::float_t<SIMD_WIDTH>::gather(stream->p.x, rays)
-        , simd::float_t<SIMD_WIDTH>::gather(stream->p.y, rays)
-        , simd::float_t<SIMD_WIDTH>::gather(stream->p.z, rays));
+	const auto o = simd::vector3_t<N>(
+          simd::float_t<N>::gather(stream->p.x, rays)
+        , simd::float_t<N>::gather(stream->p.y, rays)
+        , simd::float_t<N>::gather(stream->p.z, rays));
    
-	const auto wi = simd::vector3_t(
-          simd::float_t<SIMD_WIDTH>::gather(stream->wi.x, rays)
-        , simd::float_t<SIMD_WIDTH>::gather(stream->wi.y, rays)
-        , simd::float_t<SIMD_WIDTH>::gather(stream->wi.z, rays));
+	const auto wi = simd::vector3_t<N>(
+          simd::float_t<N>::gather(stream->wi.x, rays)
+        , simd::float_t<N>::gather(stream->wi.y, rays)
+        , simd::float_t<N>::gather(stream->wi.z, rays));
 	
-	auto d = simd::float_t<SIMD_WIDTH>::gather(stream->d, rays);
+	auto d = simd::float_t<N>::gather(stream->d, rays);
 	auto j = simd::load((int32_t) -1);
 
 	for (auto i=0; i<num; ++i) {
-	  const auto e0 = vector3_t<N>(_e0.x[i], _e0.y[i], _e0.z[i]);
-	  const auto e1 = vector3_t<N>(_e1.x[i], _e1.y[i], _e1.z[i]);
-	  const auto v0 = vector3_t<N>(_v0.x[i], _v0.y[i], _v0.z[i]);
+	  const auto e0 = simd::vector3_t<N>(_e0.x[i], _e0.y[i], _e0.z[i]);
+	  const auto e1 = simd::vector3_t<N>(_e1.x[i], _e1.y[i], _e1.z[i]);
+	  const auto v0 = simd::vector3_t<N>(_v0.x[i], _v0.y[i], _v0.z[i]);
 
 	  const auto t   = o - v0;
 	  const auto p   = wi.cross(e1);

@@ -6,7 +6,7 @@
 namespace simd {
   template<int N>
   struct aabb_t {
-    ::vector3_t<N> min, max;
+    vector3_t<N> min, max;
 
     inline aabb_t(const float* const bounds)
       : min(&(bounds[0*N]), &(bounds[1*N]), &(bounds[2*N]))
@@ -17,16 +17,16 @@ namespace simd {
   template<int N>
   inline typename float_t<N>::type intersect(
     const aabb_t<N>& aabb
-  , const ::vector3_t<N>& o
-  , const ::vector3_t<N>& ood
+  , const vector3_t<N>& o
+  , const vector3_t<N>& ood
   , const typename float_t<N>::type& d
   , typename float_t<N>::type& dist);
 
   template<>
   inline typename float_t<8>::type intersect<8>(
     const aabb_t<8>& aabb
-  , const ::vector3_t<8>& o
-  , const ::vector3_t<8>& ood
+  , const vector3_t<8>& o
+  , const vector3_t<8>& ood
   , const typename float_t<8>::type& d
   , typename float_t<8>::type& dist)
   {

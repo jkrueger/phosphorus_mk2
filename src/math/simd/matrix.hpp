@@ -7,6 +7,7 @@
 #include <ImathMatrix.h>
 #pragma clang diagnostic pop
 
+namespace simd {
 template<int N>
 struct matrix44_t
 {};
@@ -53,5 +54,6 @@ struct matrix44_t<8> {
     return out;
   }
 };
+}
 
 #endif

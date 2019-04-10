@@ -25,7 +25,7 @@ void intersect(
   auto& tasks = state->tasks;
 
   // set initial lane for root node, including all rays
-  lanes.init(active);
+  lanes.init(active, stream);
 
   // all rays were masked
   if (lanes.num[0] == 0) {
@@ -63,11 +63,11 @@ void intersect(
 	auto hits =
 	  simd::intersect<accel::mbvh_t::width>(
 	    bounds
-	  , simd::vector3_t(
+          , simd::vector3v_t(
               stream->p.x[ray]
             , stream->p.y[ray]
             , stream->p.z[ray])
-	  , simd::vector3_t(
+	  , simd::vector3v_t(
               1.0f/stream->wi.x[ray]
             , 1.0f/stream->wi.y[ray]
             , 1.0f/stream->wi.z[ray])
@@ -126,13 +126,14 @@ void intersect(
 	auto index = cur.offset;
 	auto prims = 0;
 	const auto num = std::min(end - begin, (long) accel::mbvh_t::width);
+
 	do {
-          if (num < 8) {
+          //if (num < 8) {
             bvh->triangles[index].iterate_rays(stream, begin, num);
-          }
-          else {
-            bvh->triangles[index].iterate_triangles(stream, begin, num);
-          }
+            //}
+            //else {
+            //bvh->triangles[index].iterate_triangles(stream, begin, num);
+            //}
 	  prims += accel::mbvh_t::width;
 	  ++index;
 	} while(unlikely(prims < cur.prims));
