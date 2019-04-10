@@ -3,6 +3,7 @@
 #include "sampling.hpp"
 #include "math/simd.hpp"
 #include "state.hpp"
+#include "utils/compiler.hpp"
 
 #include <cmath>
 #include <limits>
@@ -40,7 +41,7 @@ struct camera_kernel_t {
   , const Samples& samples
   , ray_t<N>* rays)
   {
-    static const float onev[] = {
+    __aligned(32) static const float onev[] = {
       -1,-1,-1,-1,-1,-1,-1,-1
     };
 
@@ -48,7 +49,7 @@ struct camera_kernel_t {
     //   1,1,1,1,1,1,1,1
     // };
 
-    static const float seqv[] = {
+    __aligned(32) static const float seqv[] = {
       0,1,2,3,4,5,6,7
     };
 

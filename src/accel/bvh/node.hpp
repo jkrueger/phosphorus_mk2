@@ -3,6 +3,10 @@
 #include <ImathBox.h>
 #include <ImathVec.h>
 
+#include <limits>
+
+#include <string.h>
+
 namespace mbvh {
   template<int N>
   struct node_t {
@@ -15,6 +19,8 @@ namespace mbvh {
     uint8_t num[N];
     // a set of flags attached to a node
     uint32_t flags[N];
+    // keep alignment
+    uint8_t pad[24];
 
     node_t() {
       for (int i=0; i<N*3; ++i) {

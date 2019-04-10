@@ -34,6 +34,10 @@ namespace simd {
     return _mm256_load_ps(x);
   }
 
+  inline __m256 loadu(const float* const x) {
+    return _mm256_loadu_ps(x);
+  }
+
   inline void store(const __m256& l, float* r) {
     _mm256_store_ps(r, l);
   }

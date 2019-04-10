@@ -23,6 +23,10 @@ namespace simd {
     return _mm256_load_si256((__m256i * const) x);
   }
 
+  inline __m256i loadu(::int32_t* const x) {
+    return _mm256_loadu_si256((__m256i * const) x);
+  }
+
   inline void store(const __m256i& l, ::int32_t* r) {
     _mm256_store_si256((__m256i*) r, l);
   }

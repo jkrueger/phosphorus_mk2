@@ -67,5 +67,5 @@ struct material_t {
 
   static void attach();
 
-  static void boot(const parsed_options_t& options, const std::string& path = "");
+  static void boot(const parsed_options_t& options, const std::string& path = ".");
 };

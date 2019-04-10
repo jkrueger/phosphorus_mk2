@@ -174,8 +174,8 @@ namespace accel {
 	    }
 
 	    if (idx != -1) {
-	      float u[N];
-	      float v[N];
+	      __aligned(32) float u[N];
+	      __aligned(32) float v[N];
 
 	      simd::store(us, u);
 	      simd::store(vs, v);
@@ -209,7 +209,7 @@ namespace accel {
 	auto v = zero;
 	auto m = zero;
 
-	const auto rays = simd::load((int32_t*) indices);
+	const auto rays = simd::loadu((int32_t*) indices);
 
 	const auto o = simd::vector3_t(
           simd::float_t<SIMD_WIDTH>::gather(stream->p.x, rays)
@@ -261,8 +261,8 @@ namespace accel {
 
 	auto mask = simd::movemask(m);
 
-	float   ds[N];
-	int32_t ts[N];
+	__aligned(32) float   ds[N];
+	__aligned(32) int32_t ts[N];
 	
 	simd::store(d, ds);
 	simd::store(j, ts);

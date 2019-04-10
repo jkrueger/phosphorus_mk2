@@ -7,6 +7,8 @@
 #include "math/soa.hpp"
 #include "utils/compiler.hpp"
 
+#include <limits>
+
 struct bsdf_t;
 
 /* Global state for the rendering of one frame */

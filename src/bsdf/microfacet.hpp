@@ -4,7 +4,7 @@
 #include "math/orthogonal_base.hpp"
 #include "math/vector.hpp"
 
-#include <OpenExr/IMathColor.h>
+#include <ImathColor.h>
 
 namespace microfacet {
   namespace ggx{

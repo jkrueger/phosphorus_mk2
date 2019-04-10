@@ -7,6 +7,8 @@
 #include <random> 
 #include <functional> 
 
+#include <cstdlib>
+
 struct sampler_t::details_t {
   std::mt19937 gen;
   std::uniform_real_distribution<float> dis;
@@ -38,7 +40,7 @@ sampler_t::~sampler_t() {
 }
 
 void sampler_t::preprocess(const scene_t& scene) {
-  pixel_samples = new pixel_sample_t<>[spp];
+  pixel_samples = (pixel_sample_t<>*) aligned_alloc(32, sizeof(pixel_sample_t<>) * spp);
 
   auto spd = (uint32_t) std::sqrt(spp);
 

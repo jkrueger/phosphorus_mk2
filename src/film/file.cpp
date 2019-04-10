@@ -1,6 +1,7 @@
 #include "file.hpp"
 
 #include <OpenImageIO/imageio.h>
+
 using namespace OIIO;
 
 namespace film {
@@ -34,7 +35,7 @@ namespace film {
   }
 
   void file_t::finalize() {
-    ImageOutput* out = ImageOutput::create(path.c_str());
+    ImageOutput::unique_ptr out = ImageOutput::create(path.c_str());
     if (!out) {
       throw std::runtime_error("Unkown image format for output file: " + path);
     }
@@ -43,6 +44,5 @@ namespace film {
     out->open(path.c_str(), spec);
     out->write_image(TypeDesc::FLOAT, pixels);
     out->close();
-    ImageOutput::destroy(out);
   }
 }

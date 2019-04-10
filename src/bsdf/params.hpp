@@ -57,7 +57,7 @@ namespace bsdf {
     struct microfacet_t {
       static const uint32_t flags = REFLECT | GLOSSY;
 
-      OpenImageIO_v1_9::ustring distribution;
+      OIIO_NAMESPACE::ustring distribution;
       Imath::V3f n;
       Imath::V3f u;
       float      xalpha;

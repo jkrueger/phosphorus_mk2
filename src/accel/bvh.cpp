@@ -2,6 +2,7 @@
 #include "bvh/builder.hpp"
 #include "bvh/node.hpp"
 #include "triangle.hpp"
+#include "utils/aligned_allocator.hpp"
 
 #include <set>
 #include <vector>
@@ -11,8 +12,11 @@ namespace accel {
     typedef mbvh::node_t<mbvh_t::width> node_t;
     typedef triangle::moeller_trumbore_t<mbvh_t::width> triangle_t;
 
-    std::vector<node_t> nodes;
-    std::vector<triangle_t> triangles;
+    typedef std::vector<node_t, aligned_allocator<node_t, 32>> nodes_t;
+    typedef std::vector<triangle_t, aligned_allocator<triangle_t, 32>> triangles_t;
+
+    nodes_t nodes;
+    triangles_t triangles;
   };
 
   struct builder_t :
@@ -25,8 +29,8 @@ namespace accel {
 
     mbvh_t* bvh;
 
-    std::vector<mbvh_t::details_t::node_t>& nodes;
-    std::vector<mbvh_t::details_t::triangle_t>& triangles;
+    mbvh_t::details_t::nodes_t& nodes;
+    mbvh_t::details_t::triangles_t& triangles;
 
     builder_t(mbvh_t* bvh)
       : bvh(bvh)

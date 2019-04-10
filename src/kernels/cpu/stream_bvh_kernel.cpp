@@ -90,7 +90,7 @@ void intersect(
 
       uint32_t ids[8];
 
-      float dists[8];
+      __aligned(32) float dists[8];
       simd::store(length, dists);
 	
       // TODO: collect stats on lane utilization to see if efficiently sorting

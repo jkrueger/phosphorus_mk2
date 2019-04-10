@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdexcept>
+#include <cstdlib>
 
 /**
  * Most allocations in the rendering pipeline are sequential
@@ -16,7 +17,7 @@ struct allocator_t {
   inline allocator_t(size_t size)
     : size(size)
   {
-    pos = mem = new char[size]; 
+    pos = mem = (char*) aligned_alloc(32, size); 
   }
 
   inline ~allocator_t() {
@@ -25,12 +26,16 @@ struct allocator_t {
   }
 
   inline char* allocate(size_t bytes) {
-    if (used() + bytes > size) {
+    // keep allocations 32 byte alligned
+    const auto alignment = ((intptr_t) pos) % 32;
+
+    if (used() + bytes + alignment > size) {
       throw std::runtime_error("Out of memory");
     }
+    pos += alignment;
     char* out = pos;
     pos += bytes;
-    
+
     return out;
   }
 

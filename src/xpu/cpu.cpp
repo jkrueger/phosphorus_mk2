@@ -120,10 +120,10 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	// create per thread state in the shading system
 	material_t::attach();
 
-        tile_renderer_t<stream_mbvh_kernel_t> state(details, scene, frame.sampler);
-
 	job::tiles_t::tile_t tile;
 	while (frame.tiles->next(tile)) {
+	  tile_renderer_t<stream_mbvh_kernel_t> state(details, scene, frame.sampler);
+
 	  auto splats = new(state.allocator) Imath::Color3f[tile.w * tile.h];
           memset(splats, 0, sizeof(Imath::Color3f) * tile.w*tile.h);
 
@@ -138,8 +138,8 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 
 	    while (state.active.has_live_paths()) {
 	      allocator_scope_t scope(state.allocator);
-              state.trace_and_advance_paths(scene);
-            }
+	      state.trace_and_advance_paths(scene);
+	    }
 
 	    // FIXME: temporary code to copy radiance values into output buffer
 	    // this should run through a filter kernel instead
@@ -153,8 +153,6 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	    Imath::V2i(tile.x, tile.y)
 	  , Imath::V2i(tile.w, tile.h)
 	  , splats);
-
-	  state.allocator.reset();
 	}
       }, std::cref(scene), std::ref(frame)));
   }

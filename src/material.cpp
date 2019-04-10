@@ -140,6 +140,16 @@ struct material_t::details_t {
   , const ClosureColor* c
   , const Imath::Color3f w = Imath::Color3f(1,1,1)) const
   {
+    // if (!c) {
+    //   if (result.bsdf) {
+    // 	result.bsdf->add_lobe(
+    // 	  bsdf_t::Transparent
+    // 	, w
+    // 	, empty_params_t());
+    //   }
+    //   return;
+    // }
+
     switch(c->id) {
     case ClosureColor::MUL:
       {
@@ -267,7 +277,8 @@ struct material_builder_t : public material_t::builder_t {
     material_t::details_t::system->Parameter(
       name
     , TypeDesc::TypeFloat
-    , p);
+    , p
+    , false);
   }
 
   void parameter(
@@ -279,7 +290,8 @@ struct material_builder_t : public material_t::builder_t {
     material_t::details_t::system->Parameter(
       name
     , TypeDesc::TypeInt
-    , p);
+    , p
+    , false);
   }
 
   void parameter(
@@ -291,7 +303,8 @@ struct material_builder_t : public material_t::builder_t {
     material_t::details_t::system->Parameter(
       name
     , TypeDesc::TypeColor
-    , p);
+    , p
+    , false);
   }
 
   void parameter(
@@ -304,7 +317,8 @@ struct material_builder_t : public material_t::builder_t {
     material_t::details_t::system->Parameter(
       name
     , TypeDesc::TypeString
-    , p);
+    , p
+    , false);
   }
 };
 

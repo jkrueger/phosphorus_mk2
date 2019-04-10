@@ -4,6 +4,7 @@
 #include <ImathVec.h>
 
 #include <memory>
+#include <vector>
 
 namespace bvh {
 
