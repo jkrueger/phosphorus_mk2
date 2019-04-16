@@ -4,10 +4,9 @@
 #include "math/sampling.hpp"
 
 #include <cmath>
+#include <cstdlib>
 #include <random> 
 #include <functional> 
-
-#include <cstdlib>
 
 struct sampler_t::details_t {
   std::mt19937 gen;
@@ -40,7 +39,11 @@ sampler_t::~sampler_t() {
 }
 
 void sampler_t::preprocess(const scene_t& scene) {
+#ifdef aligned_alloc
   pixel_samples = (pixel_sample_t<>*) aligned_alloc(32, sizeof(pixel_sample_t<>) * spp);
+#else
+  posix_memalign((void**) &pixel_samples, 32, sizeof(pixel_sample_t<>) * spp);
+#endif
 
   auto spd = (uint32_t) std::sqrt(spp);
 

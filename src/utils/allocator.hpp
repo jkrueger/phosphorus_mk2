@@ -17,11 +17,15 @@ struct allocator_t {
   inline allocator_t(size_t size)
     : size(size)
   {
-    pos = mem = (char*) aligned_alloc(32, size); 
+#ifdef aligned_alloc
+    pos = mem = (char*) aligned_alloc(32, size);
+#else
+    posix_memalign((void**) &mem, 32, size);
+#endif
   }
 
   inline ~allocator_t() {
-    delete[] mem;
+    free(mem);
     mem = pos = nullptr;
   }
 

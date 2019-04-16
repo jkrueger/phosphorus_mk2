@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdlib>
 #include <type_traits>
 
 template <typename T, std::size_t N>
@@ -29,12 +30,19 @@ public:
   struct rebind {
     using other = aligned_allocator<U, N>;
   };
-  
+
   T* allocate(std::size_t n) {
     // total size needs to be multiple of alignment
     auto size = n * sizeof(T);
     auto pad  = N - (size % N);
-    return reinterpret_cast<T*>(aligned_alloc(N, size + (pad == N ? 0 : pad)));
+
+#ifdef aligned_alloc
+    auto mem = aligned_alloc(N, size + (pad == N ? 0 : pad));
+#else
+    void* mem;
+    posix_memalign(&mem, N, size + (pad == N ? 0 : pad));
+#endif
+    return reinterpret_cast<T*>(mem);
   }
 
   void deallocate(T* p, std::size_t) {
