@@ -19,3 +19,4 @@ shader environment_node
 {
   Cout = environment(filename, I, "sblur", sblur, "tblur", tblur);
 }
+

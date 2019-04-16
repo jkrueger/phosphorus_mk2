@@ -132,7 +132,9 @@ struct material_t::details_t {
   }
 
   void execute(ShaderGlobals& sg) {
-    system->execute(ctx, *group, sg);
+    if (!system->execute(ctx, *group, sg)) {
+      std::cout << "Failed to run shader" << std::endl;
+    }
   }
 
   void eval_closure(
