@@ -49,12 +49,15 @@ bool parse_args(int argc, char** argv, parsed_options_t& parsed) {
       parsed.host_only = true;
       break;
     case 's':
+      std::cout << "Samples per pixel: " << std::atoi(optarg) << std::endl;
       parsed.samples_per_pixel = std::atoi(optarg);
       break;
     case 'p':
+      std::cout << "Paths per sample: " << std::atoi(optarg) << std::endl;
       parsed.paths_per_sample = std::atoi(optarg);
       break;
     case 'd':
+      std::cout << "Path depth: " << std::atoi(optarg) << std::endl;
       parsed.path_depth = std::atoi(optarg);
       break;
     case '?':
