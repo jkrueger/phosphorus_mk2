@@ -21,6 +21,7 @@ struct allocator_t {
     pos = mem = (char*) aligned_alloc(32, size);
 #else
     posix_memalign((void**) &mem, 32, size);
+    pos = mem;
 #endif
   }
 
