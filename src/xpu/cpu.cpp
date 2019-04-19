@@ -127,10 +127,10 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 	  auto splats = new(state.allocator) Imath::Color3f[tile.w * tile.h];
           memset(splats, 0, sizeof(Imath::Color3f) * tile.w*tile.h);
 
-	  for (auto i=0; i<spp; ++i) {
+	  for (auto j=0; j<spp; ++j) {
 	    allocator_scope_t scope(state.allocator);
 
-	    const auto& samples = frame.sampler->next_pixel_samples(i);
+	    const auto& samples = frame.sampler->next_pixel_samples(j);
 	    const auto& camera  = scene.camera;
 
 	    details->camera_rays(camera, tile, samples, state.rays);
@@ -143,9 +143,9 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 
 	    // FIXME: temporary code to copy radiance values into output buffer
 	    // this should run through a filter kernel instead
-	    for (auto j=0; j<tile.w*tile.h; ++j) {
-	      const auto r = state.integrator_state->r.at(j);
-	      splats[j] += r * (1.0f / (spp*pps));
+	    for (auto k=0; k<tile.w*tile.h; ++k) {
+	      const auto r = state.integrator_state->r.at(k);
+	      splats[k] += r * (1.0f / (spp*pps));
 	    }
 	  }
 
