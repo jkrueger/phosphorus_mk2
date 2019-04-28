@@ -128,12 +128,12 @@ void intersect(
 	const auto num = std::min(end - begin, (long) accel::mbvh_t::width);
 
 	do {
-          //if (num < 8) {
+          if (num < 8) {
             bvh->triangles[index].iterate_rays(stream, begin, num);
-            //}
-            //else {
-            //bvh->triangles[index].iterate_triangles(stream, begin, num);
-            //}
+          }
+          else {
+            bvh->triangles[index].iterate_triangles(stream, begin, num);
+          }
 	  prims += accel::mbvh_t::width;
 	  ++index;
 	} while(unlikely(prims < cur.prims));

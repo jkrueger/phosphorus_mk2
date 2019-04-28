@@ -144,9 +144,9 @@ namespace simd {
     return int32_t<N>(andnot(l.v, r.v));
   }
 
-  template<int N>
+  template<typename T, int N>
   inline int32_t<N> select(
-    const int32_t<N>& m
+    const T& m
   , const int32_t<N>& l
   , const int32_t<N>& r)
   {

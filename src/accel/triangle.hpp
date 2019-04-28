@@ -110,57 +110,50 @@ namespace accel {
       , uint32_t num_rays) const
       {
 	const auto
-	  one  = simd::load(1.0f),
-	  zero = simd::load(0.0f),
-	  peps = simd::load(0.00000001f),
-	  meps = simd::load(-0.00000001f);
+	  one  = simd::floatv_t(1.0f),
+	  zero = simd::floatv_t(0.0f),
+	  peps = simd::floatv_t(0.00000001f),
+	  meps = simd::floatv_t(-0.00000001f);
 
-        simd::vector3_t<N> e0(_e0.x, _e0.y, _e0.z);
-        simd::vector3_t<N> e1(_e1.x, _e1.y, _e1.z);
-        simd::vector3_t<N> v0(_v0.x, _v0.y, _v0.z);
+        simd::vector3_t<N> e0(_e0);
+        simd::vector3_t<N> e1(_e1);
+        simd::vector3_t<N> v0(_v0);
 
 	for (auto i=0; i<num_rays; ++i) {
 	  const auto index = indices[i];
 
           simd::vector3_t<N> o(
-	      stream->p.x[index]
-	    , stream->p.y[index]
-	    , stream->p.z[index]);
+	    stream->p.x[index]
+	  , stream->p.y[index]
+	  , stream->p.z[index]);
 
           simd::vector3_t<N> wi(
-	      stream->wi.x[index]
-	    , stream->wi.y[index]
-	    , stream->wi.z[index]);
+	    stream->wi.x[index]
+	  , stream->wi.y[index]
+	  , stream->wi.z[index]);
 
-	  const auto d = simd::load(stream->d[index]);
+	  const simd::float_t<N> d(stream->d[index]);
 
 	  const auto t   = o - v0;
 	  const auto p   = wi.cross(e1);
 	  const auto det = e0.dot(p);
-	  const auto ood = simd::div(one, det);
+	  const auto ood = one / det;
 	  const auto q   = t.cross(e0);
 
-	  const auto us = simd::mul(t.dot(p), ood);
-	  const auto vs = simd::mul(wi.dot(q), ood);
-	  const auto ds = simd::mul(e1.dot(q), ood);
+	  const auto us = t.dot(p) * ood;
+	  const auto vs = wi.dot(q) * ood;
+	  const auto ds = e1.dot(q) * ood;
 
-	  const auto xmask = simd::_or(simd::gt(det, peps), simd::lt(det, meps));
-	  const auto umask = simd::gte(us, zero);
-	  const auto vmask = simd::_and(simd::gte(vs, zero), simd::lte(simd::add(us, vs), one));
+	  const auto xmask = (det > peps) | (det < meps);
+	  const auto umask = us >= zero;
+	  const auto vmask = (vs >= zero) & ((us + vs) <= one);
+	  const auto dmask = (ds >= zero) & (ds < d);
 
-	  const auto dmask = simd::_and(simd::gte(ds, zero), simd::lt(ds, d));
-
-	  auto mask =
-	    simd::movemask(
-	      simd::_and(
-                simd::_and(
-		  simd::_and(vmask, umask),
-		  dmask),
-		xmask));
+	  auto mask = simd::to_mask(vmask & umask & dmask & xmask);
 
 	  if (mask != 0) {
 	    __aligned(32) float dists[N];
-	    simd::store(ds, dists);
+	    ds.store(dists);
 
 	    float closest = stream->d[index];
 
@@ -177,8 +170,8 @@ namespace accel {
 	      __aligned(32) float u[N];
 	      __aligned(32) float v[N];
 
-	      simd::store(us, u);
-	      simd::store(vs, v);
+	      us.store(u);
+	      vs.store(v);
 
               if (!stream->is_shadow(index)) {
                 stream->set_surface(
@@ -200,11 +193,12 @@ namespace accel {
       , uint32_t* indices
       , uint32_t num_rays) const
       {
-	const auto zero = simd::load(0.0f);
-	const auto one  = simd::load(1.0f);
-	const auto peps = simd::load(0.00000001f);
-	const auto meps = simd::load(-0.00000001f);
-	
+	const auto
+	  one  = simd::floatv_t(1.0f),
+	  zero = simd::floatv_t(0.0f),
+	  peps = simd::floatv_t(0.00000001f),
+	  meps = simd::floatv_t(-0.00000001f);
+
 	auto u = zero;
 	auto v = zero;
 	auto m = zero;
@@ -215,14 +209,14 @@ namespace accel {
           simd::float_t<N>::gather(stream->p.x, rays)
         , simd::float_t<N>::gather(stream->p.y, rays)
         , simd::float_t<N>::gather(stream->p.z, rays));
-   
+
 	const auto wi = simd::vector3_t<N>(
           simd::float_t<N>::gather(stream->wi.x, rays)
         , simd::float_t<N>::gather(stream->wi.y, rays)
         , simd::float_t<N>::gather(stream->wi.z, rays));
 	
-	auto d = simd::float_t<N>::gather(stream->d, rays);
-	auto j = simd::load((int32_t) -1);
+	auto d = simd::floatv_t(simd::float_t<N>::gather(stream->d, rays));
+	auto j = simd::int32_t<N>((int32_t) -1);
 
 	for (auto i=0; i<num; ++i) {
 	  const auto e0 = simd::vector3_t<N>(_e0.x[i], _e0.y[i], _e0.z[i]);
@@ -232,40 +226,38 @@ namespace accel {
 	  const auto t   = o - v0;
 	  const auto p   = wi.cross(e1);
 	  const auto det = e0.dot(p);
-	  const auto ood = simd::div(one, det);
+	  const auto ood = one / det;
 	  const auto q   = t.cross(e0);
 
-	  const auto us = simd::mul(t.dot(p), ood);
-	  const auto vs = simd::mul(wi.dot(q), ood);
-	  const auto ds = simd::mul(e1.dot(q), ood);
+	  const auto us = t.dot(p) * ood;
+	  const auto vs = wi.dot(q) * ood;
+	  const auto ds = e1.dot(q) * ood;
 
-	  const auto xmask = simd::_or(simd::gt(det, peps), simd::lt(det, meps));
-	  const auto umask = simd::gte(us, zero);
-	  const auto vmask = simd::_and(simd::gte(vs, zero), simd::lte(simd::add(us, vs), one));
-	  const auto dmask = simd::_and(simd::gte(ds, zero), simd::lt(ds, d));
+	  const auto xmask = (det > peps) | (det < meps);
+	  const auto umask = us >= zero;
+	  const auto vmask = (vs >= zero) & ((us + vs) <= one);
+          const auto dmask = (ds >= zero) & (ds < d);
 
-	  const auto mask =
-	    simd::_and(
-	      simd::_and(
-	        simd::_and(vmask, umask),
-		dmask),
-	      xmask);
+	  const auto mask = (vmask & umask & dmask & xmask);
 
 	  u = simd::select(mask, u, us);
 	  v = simd::select(mask, v, vs);
 	  d = simd::select(mask, d, ds);
-	  m = simd::_or(mask, m);
-
-	  j = simd::select(mask, j, simd::load(i));
+	  m = mask | m;
+	  j = simd::select(mask, j, simd::int32_t<N>(i));
 	}
 
-	auto mask = simd::movemask(m);
+	auto mask = simd::to_mask(m);
 
-	__aligned(32) float   ds[N];
+	__aligned(32) float ds[N];
+	__aligned(32) float us[N];
+	__aligned(32) float vs[N];
 	__aligned(32) int32_t ts[N];
 	
-	simd::store(d, ds);
-	simd::store(j, ts);
+	d.store(ds);
+	u.store(us);
+	v.store(vs);
+	j.store(ts);
 
 	// TODO: use masked scatter instructions when available
 	while(mask != 0) {
@@ -279,8 +271,8 @@ namespace accel {
                 x
               , meshid[t]
               , faceid[t]
-              , u[r]
-              , v[r]);
+              , us[r]
+              , vs[r]);
             }
 	    stream->hit(x, ds[r]);
 	  }

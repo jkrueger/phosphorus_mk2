@@ -120,7 +120,7 @@ struct vector3_t<8> {
     return {_mm256_rcp_ps(x), _mm256_rcp_ps(y), _mm256_rcp_ps(z)};
   }
 
-  inline __m256 dot(const vector3_t& r) const {
+  inline float_t<8> dot(const vector3_t& r) const {
     return simd::madd(x, r.x, simd::madd(y, r.y, simd::mul(z, r.z)));
   }
 
@@ -134,7 +134,7 @@ struct vector3_t<8> {
   }
 
   inline simd::float_t<8> length2() const {
-    return simd::float_t<8>(dot(*this));
+    return dot(*this);
   }
 
   inline simd::float_t<8> length() const {
@@ -143,7 +143,7 @@ struct vector3_t<8> {
 
   inline void normalize() {
     const auto l   = dot(*this);
-    const auto ool = _mm256_rcp_ps(_mm256_sqrt_ps(l));
+    const auto ool = _mm256_rcp_ps(_mm256_sqrt_ps(l.v));
 
     x = _mm256_mul_ps(x, ool);
     y = _mm256_mul_ps(y, ool);
@@ -193,8 +193,8 @@ struct vector3_t<8> {
 
   template<int N>
   inline int32_t<N> in_same_hemisphere(const vector3_t<N>& a, const vector3_t<N>& b) {
-    const auto x = a.dot(b) >= load(0.0f);
-    return int32_t<N>(_mm256_castps_si256(x));
+    const auto x = a.dot(b) >= float_t<N>(0.0f);
+    return int32_t<N>(_mm256_castps_si256(x.v));
   }
 }
 

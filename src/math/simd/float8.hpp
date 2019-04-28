@@ -155,6 +155,22 @@ namespace simd {
       simd::store(v, p + off);
     }
 
+    inline float_t operator&(const float_t& r) const {
+      return float_t(_and(v, r.v));
+    }
+
+    inline float_t operator|(const float_t& r) const {
+      return float_t(_or(v, r.v));
+    }
+
+    inline float_t operator<(const float_t& r) const {
+      return float_t(lt(v, r.v));
+    }
+
+    inline float_t operator> (const float_t& r) const {
+      return float_t(gt(v, r.v));
+    }
+
     inline float_t operator<= (const float_t& r) const {
       return float_t(lte(v, r.v));
     }
@@ -218,5 +234,19 @@ namespace simd {
   template<int N>
   inline float_t<N> sqrt(const float_t<N>& f) {
     return float_t<N>(sqrt(f.v));
+  }
+
+  template<int N>
+  inline size_t to_mask(const float_t<N>& f) {
+    return movemask(f.v);
+  }
+
+  template<int N>
+  inline float_t<N> select(
+    const float_t<N>& m
+  , const float_t<N>& l
+  , const float_t<N>& r)
+  {
+    return float_t<N>(select(m.v, l.v, r.v));
   }
 }

@@ -151,14 +151,14 @@ namespace spt {
           i
         , simd::int32v_t(light_samples.mesh)
         , simd::int32v_t(light_samples.face)
-	, light_samples.u
+        , light_samples.u
         , light_samples.v);
 
         // use the sampled light to generate shadow rays
         const simd::vector3v_t n(hits->n, i);
         const auto p = simd::offset(simd::vector3v_t(hits->p, i), n);
 
-	auto wi = light_samples.p - p;
+        auto wi = light_samples.p - p;
 
         const auto d = wi.length() - simd::floatv_t(0.0001f);
         wi.normalize();
