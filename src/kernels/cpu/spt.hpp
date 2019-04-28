@@ -24,7 +24,7 @@ namespace spt {
     uint16_t path[N];       // the number of paths traced at index
     float pdf[N];           // a pdf for a light sample at an index
     soa::vector3_t<N> beta; // the contribution of the current path vertex
-    soa::vector3_t<N> r;    // accumulated radianceover all computed paths
+    soa::vector3_t<N> r;    // accumulated radiance over all computed paths
 
     active_t<> dead;
 
@@ -212,7 +212,7 @@ namespace spt {
 	  // path vertex. this gets modulated by the current path weight
 	  // and added to the path radiance
 	  if (!samples->is_occluded(i)) {
-	    out += li(state, samples, hits, index, i);
+	    out += state->beta.at(index) * li(state, samples, hits, index, i);
           }
 
           ++state->depth[index];
@@ -266,7 +266,7 @@ namespace spt {
         material->evaluate(samples->p.at(to), wi, n, st, light);
       }
 
-      return state->beta.at(index) * light.e * s;
+      return light.e * s;
     }
 
     bool sample_bsdf(
@@ -282,8 +282,6 @@ namespace spt {
       Imath::V3f wi;
       Imath::V3f n;
       Imath::Color3f beta;
-
-      // state->depth[index]++;
 
       if (terminate_path(state, index)) {
         return false;

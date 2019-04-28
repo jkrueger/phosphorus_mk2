@@ -215,7 +215,7 @@ namespace accel {
         , simd::float_t<N>::gather(stream->wi.y, rays)
         , simd::float_t<N>::gather(stream->wi.z, rays));
 	
-	auto d = simd::floatv_t(simd::float_t<N>::gather(stream->d, rays));
+	auto d = simd::float_t<N>(simd::float_t<N>::gather(stream->d, rays));
 	auto j = simd::int32_t<N>((int32_t) -1);
 
 	for (auto i=0; i<num; ++i) {

@@ -35,6 +35,11 @@ template<typename Accel>
 struct tile_renderer_t {
   typedef spt::state_t<> integrator_state_t;
 
+  uint32_t spp;
+  uint32_t pps;
+
+  frame_state_t& frame;
+
   // rendering kernel functions
   camera_kernel_t           camera_rays;
   Accel                     trace;
@@ -52,8 +57,13 @@ struct tile_renderer_t {
   interaction_t<>* primary;
   interaction_t<>* hits;
 
+  Imath::Color3f* splats;
+
   inline tile_renderer_t(const cpu_t* cpu, const scene_t& scene, frame_state_t& frame)
-    : trace(&cpu->details->accel)
+    : spp(cpu->spp)
+    , pps(cpu->pps)
+    , frame(frame)
+    , trace(&cpu->details->accel)
     , prepare_occlusion_queries(cpu->details->options)
     , integrate(cpu->details->options)
     , allocator(1024*1024*100)
@@ -61,21 +71,19 @@ struct tile_renderer_t {
     integrator_state = new(allocator) spt::state_t<>(&scene, frame.sampler);
   }
 
-  inline void prepare_tile() {
+  inline void prepare_tile(const job::tiles_t::tile_t& tile) {
     rays = new(allocator) ray_t<>();
     primary = new(allocator) interaction_t<>();
     hits = new(allocator) interaction_t<>();
-  }
 
-  inline void finalize_tile() {
-    allocator.reset();
+    splats = new(allocator) Imath::Color3f(tile.w*tile.h);
+    memset(splats, 0, sizeof(Imath::Color3f) * tile.w*tile.h);
   }
 
   inline void prepare_sample(
-    job::tiles_t::tile_t& tile
+    const job::tiles_t::tile_t& tile
   , uint32_t sample
-  , const scene_t& scene
-  , frame_state_t& frame)
+  , const scene_t& scene)
   {
     active.reset(0);
 
@@ -108,6 +116,37 @@ struct tile_renderer_t {
     prepare_occlusion_queries(integrator_state, active, primary, out, rays);
     trace(rays, active);
     integrate(integrator_state, active, out, rays);
+  }
+
+  inline void render_tile(const job::tiles_t::tile_t& tile, const scene_t& scene) {
+    allocator_scope_t scope(allocator);
+    prepare_tile(tile);
+
+    for (auto j=0; j<spp; ++j) {
+      // free per sample state for every sample
+      allocator_scope_t scope(allocator);
+
+      prepare_sample(tile, j, scene);
+      trace_primary_rays(scene);
+
+      while (active.has_live_paths()) {
+        // clear temporary shading data, for every path segment
+        allocator_scope_t scope(allocator);
+        trace_and_advance_paths(scene);
+      }
+
+      // FIXME: temporary code to copy radiance values into output buffer
+      // this should run through a filter kernel instead
+      for (auto k=0; k<tile.w*tile.h; ++k) {
+        const auto r = integrator_state->r.at(k);
+        splats[k] += r * (1.0f / (spp * pps));
+      }
+    }
+
+    frame.film->add_tile(
+      Imath::V2i(tile.x, tile.y)
+    , Imath::V2i(tile.w, tile.h)
+    , splats);
   }
 };
 
@@ -146,38 +185,7 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
 
 	job::tiles_t::tile_t tile;
 	while (frame.tiles->next(tile)) {
-          // free per tile state for every tile
-          allocator_scope_t scope(renderer.allocator);
-          renderer.prepare_tile();
-
-	  auto splats = new(renderer.allocator) Imath::Color3f[tile.w * tile.h];
-          memset(splats, 0, sizeof(Imath::Color3f) * tile.w*tile.h);
-
-	  for (auto j=0; j<spp; ++j) {
-            // free per sample state for every sample
-	    allocator_scope_t scope(renderer.allocator);
-
-            renderer.prepare_sample(tile, j, scene, frame);
-            renderer.trace_primary_rays(scene);
-
-	    while (renderer.active.has_live_paths()) {
-              // clear temporary shading data, for every path segment
-              allocator_scope_t scope(renderer.allocator);
-              renderer.trace_and_advance_paths(scene);
-            }
-
-	    // FIXME: temporary code to copy radiance values into output buffer
-	    // this should run through a filter kernel instead
-	    for (auto k=0; k<tile.w*tile.h; ++k) {
-	      const auto r = renderer.integrator_state->r.at(k);
-	      splats[k] += r * (1.0f / (spp * pps));
-	    }
-	  }
-
-	  frame.film->add_tile(
-	    Imath::V2i(tile.x, tile.y)
-	  , Imath::V2i(tile.w, tile.h)
-	  , splats);
+          renderer.render_tile(tile, scene);
 	}
       }, std::cref(scene), std::ref(frame)));
   }
