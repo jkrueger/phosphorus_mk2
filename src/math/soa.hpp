@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config.hpp"
+#include "utils/assert.hpp"
 
 #include <OpenEXR/ImathVec.h>
 

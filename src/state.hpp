@@ -5,6 +5,7 @@
 #include "jobs/tiles.hpp"
 #include "math/simd.hpp"
 #include "math/soa.hpp"
+#include "utils/assert.hpp"
 #include "utils/compiler.hpp"
 
 #include <limits>
