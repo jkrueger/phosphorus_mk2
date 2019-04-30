@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config.hpp"
+#include "simd/vector.hpp"
 #include "utils/assert.hpp"
 
 #include <OpenEXR/ImathVec.h>
@@ -28,15 +29,31 @@ namespace soa {
     float y[N];
     float z[N];
 
-    Imath::V3f at(uint32_t i) const {
+    inline Imath::V3f at(uint32_t i) const {
       return Imath::V3f(x[i], y[i], z[i]);
     }
 
-    void from(uint32_t i, const Imath::V3f& v) {
+    inline void from(uint32_t i, const Imath::V3f& v) {
       assert(i >= 0 && i <= N);
       x[i] = v.x;
       y[i] = v.y;
       z[i] = v.z;
+    }
+
+    inline simd::vector3v_t at(uint32_t i) const {
+      return simd::vector3v_t(x[i], y[i], z[i]);
+    }
+
+    inline simd::vector3v_t stream(uint32_t off) const {
+      return simd::vector3v_t(x + off, y + off, z + off);
+    }
+
+    inline void from(const simd::vector3v_t& v) const {
+      v.store(x, y, z);
+    }
+
+    inline void from(const simd::vector3v_t& v, uint32_t i) const {
+      v.store(x + i, y + i, z + i);
     }
   };
 }

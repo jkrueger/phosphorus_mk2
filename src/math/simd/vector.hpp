@@ -2,7 +2,6 @@
 
 #include "float8.hpp"
 #include "int8.hpp"
-#include "../soa.hpp"
 
 #include <ImathVec.h>
 
@@ -84,36 +83,6 @@ struct vector3_t<8> {
     x = _mm256_i32gather_ps(_x, idx, 4);
     y = _mm256_i32gather_ps(_y, idx, 4);
     z = _mm256_i32gather_ps(_z, idx, 4);
-  }
-
-  template<int M>
-  inline vector3_t(const soa::vector3_t<M>& v)
-  {
-    x = _mm256_load_ps(v.x);
-    y = _mm256_load_ps(v.y);
-    z = _mm256_load_ps(v.z);
-  }
-
-  template<int M>
-  inline vector3_t(const soa::vector3_t<M>& v, uint32_t idx)
-  {
-    x = _mm256_load_ps(v.x + idx);
-    y = _mm256_load_ps(v.y + idx);
-    z = _mm256_load_ps(v.z + idx);
-  }
-
-  template<int M>
-  inline void store(soa::vector3_t<M>& out) const {
-    _mm256_store_ps(out.x, x);
-    _mm256_store_ps(out.y, y);
-    _mm256_store_ps(out.z, z);
-  }
-
-  template<int M>
-  inline void store(soa::vector3_t<M>& out, uint32_t off) const {
-    _mm256_store_ps(out.x + off, x);
-    _mm256_store_ps(out.y + off, y);
-    _mm256_store_ps(out.z + off, z);
   }
 
   inline vector3_t rcp() const {

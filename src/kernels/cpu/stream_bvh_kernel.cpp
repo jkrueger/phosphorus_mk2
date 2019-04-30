@@ -63,14 +63,9 @@ void intersect(
 	auto hits =
 	  simd::intersect<accel::mbvh_t::width>(
 	    bounds
-          , simd::vector3v_t(
-              stream->p.x[ray]
-            , stream->p.y[ray]
-            , stream->p.z[ray])
-	  , simd::vector3v_t(
-              1.0f/stream->wi.x[ray]
-            , 1.0f/stream->wi.y[ray]
-            , 1.0f/stream->wi.z[ray])
+          , stream->p.at(ray)
+            // one over ray direction!
+          , stream->wi.at(ray).rcp()
 	  , simd::load(stream->d[ray])
 	  , dist);
 

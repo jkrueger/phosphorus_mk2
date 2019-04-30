@@ -155,8 +155,8 @@ namespace spt {
         , light_samples.v);
 
         // use the sampled light to generate shadow rays
-        const simd::vector3v_t n(hits->n, i);
-        const auto p = simd::offset(simd::vector3v_t(hits->p, i), n);
+        const auto n = hits->n.stream(i);
+        const auto p = simd::offset(hits->p.stream(i), n);
 
         auto wi = light_samples.p - p;
 

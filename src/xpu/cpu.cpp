@@ -29,6 +29,17 @@ struct cpu_t::details_t {
   details_t(const parsed_options_t& options)    
     : options(options)
   {}
+
+  void reset() {
+    accel.reset();
+    
+    accel::mbvh_t::builder_t::scoped_t builder(accel.builder());
+
+    std::vector<triangle_t> triangles;
+    scene.triangles(triangles);
+
+    bvh::from(builder, triangles);
+  }
 };
 
 template<typename Accel>
@@ -162,16 +173,7 @@ cpu_t::~cpu_t() {
 }
 
 void cpu_t::preprocess(const scene_t& scene) {
-  {
-    details->accel.reset();
-    
-    accel::mbvh_t::builder_t::scoped_t builder(details->accel.builder());
-
-    std::vector<triangle_t> triangles;
-    scene.triangles(triangles);
-
-    bvh::from(builder, triangles);
-  }
+  details->reset();
 }
 
 void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
