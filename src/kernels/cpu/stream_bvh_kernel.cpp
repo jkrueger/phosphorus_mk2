@@ -63,9 +63,10 @@ void intersect(
 	auto hits =
 	  simd::intersect<accel::mbvh_t::width>(
 	    bounds
-          , stream->p.at(ray)
-            // one over ray direction!
-          , stream->wi.at(ray).rcp()
+	    //, stream->p.v_at(ray)
+	  , { stream->p.x[ray], stream->p.y[ray], stream->p.z[ray] }
+	    //, stream->wi.v_at(ray).rcp()
+	  , { 1.0f/stream->wi.x[ray], 1.0f/stream->wi.y[ray], 1.0f/stream->wi.z[ray] }
 	  , simd::load(stream->d[ray])
 	  , dist);
 
@@ -123,12 +124,14 @@ void intersect(
 	const auto num = std::min(end - begin, (long) accel::mbvh_t::width);
 
 	do {
-          if (num < 8) {
-            bvh->triangles[index].iterate_rays(stream, begin, num);
-          }
-          else {
-            bvh->triangles[index].iterate_triangles(stream, begin, num);
-          }
+	  bvh->triangles[index].baseline(stream, begin, num);
+	  
+          // if (num < 8) {
+	  //   bvh->triangles[index].iterate_rays(stream, begin, num);
+	  // }
+	  // else {
+          //   bvh->triangles[index].iterate_triangles(stream, begin, num);
+	  // }
 	  prims += accel::mbvh_t::width;
 	  ++index;
 	} while(unlikely(prims < cur.prims));

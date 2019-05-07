@@ -175,7 +175,7 @@ namespace spt {
 
         // we store the pdfs for the light samples in the integrator
         // state, since we need them later on
-        light_samples.pdf.store(state->pdf + i);
+        light_samples.pdf.storeu(state->pdf, i);
       }
     }
   };

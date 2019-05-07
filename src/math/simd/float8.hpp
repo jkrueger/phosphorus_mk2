@@ -24,6 +24,10 @@ namespace simd {
     _mm256_store_ps(r, l);
   }
 
+  inline void storeu(const __m256& l, float* r) {
+    _mm256_storeu_ps(r, l);
+  }
+
   inline __m256 msub(const __m256& a, const __m256& b, const __m256& c) {
     return _mm256_fmsub_ps(a, b, c);
   }
@@ -155,6 +159,10 @@ namespace simd {
       simd::store(v, p + off);
     }
 
+    inline void storeu(float* p, uint32_t off) const {
+      simd::storeu(v, p + off);
+    }
+    
     inline float_t operator&(const float_t& r) const {
       return float_t(_and(v, r.v));
     }

@@ -16,7 +16,7 @@ namespace simd {
     return _mm256_load_si256((__m256i * const) x);
   }
 
-  inline __m256i loadu(::int32_t* const x) {
+  inline __m256i loadu(const ::int32_t* const x) {
     return _mm256_loadu_si256((__m256i * const) x);
   }
 
@@ -81,6 +81,10 @@ namespace simd {
     inline int32_t(const ::int32_t* const v, const int32_t& indices)
       : v(simd::gather(v, indices.v))
     {}
+
+    static inline int32_t loadu(const ::int32_t* const p) {
+      return int32_t(simd::loadu(p));
+    }
 
     inline void store(::int32_t* p) const {
       simd::store(v, p);

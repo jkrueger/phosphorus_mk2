@@ -30,7 +30,7 @@ struct cpu_t::details_t {
     : options(options)
   {}
 
-  void reset() {
+  void reset(const scene_t& scene) {
     accel.reset();
     
     accel::mbvh_t::builder_t::scoped_t builder(accel.builder());
@@ -173,7 +173,7 @@ cpu_t::~cpu_t() {
 }
 
 void cpu_t::preprocess(const scene_t& scene) {
-  details->reset();
+  details->reset(scene);
 }
 
 void cpu_t::start(const scene_t& scene, frame_state_t& frame) {

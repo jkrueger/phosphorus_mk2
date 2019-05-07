@@ -78,11 +78,17 @@ struct vector3_t<8> {
     const float* _x
   , const float* _y
   , const float* _z
-  , const __m256i& idx)
+  , const int32_t<8>& idx)
   {
-    x = _mm256_i32gather_ps(_x, idx, 4);
-    y = _mm256_i32gather_ps(_y, idx, 4);
-    z = _mm256_i32gather_ps(_z, idx, 4);
+    x = _mm256_i32gather_ps(_x, idx.v, 4);
+    y = _mm256_i32gather_ps(_y, idx.v, 4);
+    z = _mm256_i32gather_ps(_z, idx.v, 4);
+  }
+
+  inline void store(float* _x, float* _y, float* _z) const {
+    _mm256_store_ps(_x, x);
+    _mm256_store_ps(_y, y);
+    _mm256_store_ps(_z, z);
   }
 
   inline vector3_t rcp() const {
@@ -139,16 +145,6 @@ struct vector3_t<8> {
     return {simd::mul(x, r.v), simd::mul(y, r.v), simd::mul(z, r.v)};
   }
 };
-
-  template<int N>
-  inline void store(const vector3_t<N>& v, float* x, float* y, float* z);
-
-  template<>
-  inline void store<8>(const vector3_t<8>& v, float* x, float* y, float* z) {
-    _mm256_store_ps(x, v.x);
-    _mm256_store_ps(y, v.y);
-    _mm256_store_ps(z, v.z);
-  }
 
   template<int N>
   inline vector3_t<N> offset(

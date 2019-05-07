@@ -70,8 +70,8 @@ struct ray_t {
   , const simd::float_t<M>& _d
   , const simd::int32_t<M>& _flags)
   {
-    _p.store(p, off);
-    _wi.store(wi, off);
+    p.from(_p, off);
+    wi.from(_wi, off);
     _d.store(d, off);
     _flags.store((int32_t*) flags, off);
   }

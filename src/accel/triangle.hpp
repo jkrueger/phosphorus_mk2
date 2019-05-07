@@ -96,7 +96,7 @@ namespace accel {
             }
 
             if (!stream->is_shadow(index)) {
-              stream->shade(index, meshid[j], faceid[j], u, v);
+              stream->set_surface(index, meshid[j], faceid[j], u, v);
             }
 	    stream->hit(index, d);
           }
@@ -115,22 +115,15 @@ namespace accel {
 	  peps = simd::floatv_t(0.00000001f),
 	  meps = simd::floatv_t(-0.00000001f);
 
-        simd::vector3_t<N> e0(_e0);
-        simd::vector3_t<N> e1(_e1);
-        simd::vector3_t<N> v0(_v0);
+        const auto e0 = _e0.stream();
+        const auto e1 = _e1.stream();
+        const auto v0 = _v0.stream();
 
 	for (auto i=0; i<num_rays; ++i) {
 	  const auto index = indices[i];
 
-          simd::vector3_t<N> o(
-	    stream->p.x[index]
-	  , stream->p.y[index]
-	  , stream->p.z[index]);
-
-          simd::vector3_t<N> wi(
-	    stream->wi.x[index]
-	  , stream->wi.y[index]
-	  , stream->wi.z[index]);
+	  const auto o  = stream->p.v_at(index);
+	  const auto wi = stream->wi.v_at(index);
 
 	  const simd::float_t<N> d(stream->d[index]);
 
@@ -203,25 +196,18 @@ namespace accel {
 	auto v = zero;
 	auto m = zero;
 
-	const auto rays = simd::loadu((int32_t*) indices);
+	const auto rays = simd::int32_t<N>::loadu((int32_t*) indices);
 
-	const auto o = simd::vector3_t<N>(
-          simd::float_t<N>::gather(stream->p.x, rays)
-        , simd::float_t<N>::gather(stream->p.y, rays)
-        , simd::float_t<N>::gather(stream->p.z, rays));
-
-	const auto wi = simd::vector3_t<N>(
-          simd::float_t<N>::gather(stream->wi.x, rays)
-        , simd::float_t<N>::gather(stream->wi.y, rays)
-        , simd::float_t<N>::gather(stream->wi.z, rays));
+	const auto o  = stream->p.gather(rays);
+	const auto wi = stream->wi.gather(rays);
 	
-	auto d = simd::float_t<N>(simd::float_t<N>::gather(stream->d, rays));
-	auto j = simd::int32_t<N>((int32_t) -1);
+	simd::float_t<N> d(stream->d, rays);
+	simd::int32_t<N> j((int32_t) -1);
 
 	for (auto i=0; i<num; ++i) {
-	  const auto e0 = simd::vector3_t<N>(_e0.x[i], _e0.y[i], _e0.z[i]);
-	  const auto e1 = simd::vector3_t<N>(_e1.x[i], _e1.y[i], _e1.z[i]);
-	  const auto v0 = simd::vector3_t<N>(_v0.x[i], _v0.y[i], _v0.z[i]);
+	  const simd::vector3_t<N> e0(_e0.x[i], _e0.y[i], _e0.z[i]);
+	  const simd::vector3_t<N> e1(_e1.x[i], _e1.y[i], _e1.z[i]);
+	  const simd::vector3_t<N> v0(_v0.x[i], _v0.y[i], _v0.z[i]);
 
 	  const auto t   = o - v0;
 	  const auto p   = wi.cross(e1);
