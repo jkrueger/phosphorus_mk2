@@ -15,20 +15,20 @@ namespace simd {
   };
 
   template<int N>
-  inline typename float_t<N>::type intersect(
+  inline float_t<N> intersect(
     const aabb_t<N>& aabb
   , const vector3_t<N>& o
   , const vector3_t<N>& ood
-  , const typename float_t<N>::type& d
-  , typename float_t<N>::type& dist);
+  , const float_t<N>& d
+  , float_t<N>& dist);
 
   template<>
-  inline typename float_t<8>::type intersect<8>(
+  inline float_t<8> intersect<8>(
     const aabb_t<8>& aabb
   , const vector3_t<8>& o
   , const vector3_t<8>& ood
-  , const typename float_t<8>::type& d
-  , typename float_t<8>::type& dist)
+  , const float_t<8>& d
+  , float_t<8>& dist)
   {
     const auto zero = simd::load(0.0f);
 
@@ -52,11 +52,11 @@ namespace simd {
     max_z = mul(sub(max_z, o.z), ood.z);
 
     const auto n = max(max(min_x, min_y), max(min_z, zero));
-    const auto f = min(min(max_x, max_y), min(max_z, d));
+    const auto f = min(min(max_x, max_y), min(max_z, d.v));
 
     const auto mask = lte(n, f);
 
-    dist = n;
+    dist.v = n;
 
     return mask;
   }

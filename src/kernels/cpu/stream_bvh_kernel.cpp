@@ -21,6 +21,8 @@ void intersect(
 , const active_t<>& active
 , const accel::mbvh_t* bvh)
 {
+  typedef simd::float_t<accel::mbvh_t::width> float_t;
+
   auto& lanes = state->lanes;
   auto& tasks = state->tasks;
 
@@ -32,7 +34,7 @@ void intersect(
     return;
   }
 
-  auto zero = simd::load(0.0f);
+  const float_t zero(0.0f);
 
   auto top = 0;
   push(tasks, top, lanes.num[0]);
@@ -51,7 +53,7 @@ void intersect(
       auto length = zero;
       auto end    = todo + cur.num_rays;
       while (todo != end) {
-	typename simd::float_t<accel::mbvh_t::width>::type dist;
+	float_t dist;
 
 	const auto ray = *todo;
 
@@ -65,12 +67,12 @@ void intersect(
 	    bounds
 	  , stream->p.v_at(ray)
 	  , stream->wi.v_at(ray).rcp()
-	  , simd::load(stream->d[ray])
+          , stream->d[ray]
 	  , dist);
 
-	length = simd::add(length, simd::_and(dist, hits));
+	length = length + (dist & hits);
 
-	auto mask = simd::movemask(hits);
+	auto mask = simd::to_mask(hits);
 
 	// push ray into lanes for intersected nodes
 	while(mask != 0) {
@@ -85,7 +87,7 @@ void intersect(
       uint32_t ids[8];
 
       __aligned(32) float dists[8];
-      simd::store(length, dists);
+      length.store(dists);
 	
       // TODO: collect stats on lane utilization to see if efficiently sorting
       // for smaller 'n' makes sense
