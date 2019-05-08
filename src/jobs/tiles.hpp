@@ -9,6 +9,10 @@ namespace job {
     struct tile_t {
       uint32_t x, y;
       uint32_t w, h;
+
+      uint32_t num_pixels() const {
+        return w*h;
+      }
     };
 
     uint32_t size;

@@ -46,6 +46,8 @@ template<typename Accel>
 struct tile_renderer_t {
   typedef spt::state_t<> integrator_state_t;
 
+  static const uint32_t ALLOCATOR_SIZE = 1024*1024*100; // 100MB
+  
   uint32_t spp;
   uint32_t pps;
 
@@ -77,20 +79,22 @@ struct tile_renderer_t {
     , trace(&cpu->details->accel)
     , prepare_occlusion_queries(cpu->details->options)
     , integrate(cpu->details->options)
-    , allocator(1024*1024*100)
+    , allocator(ALLOCATOR_SIZE)
   {
     integrator_state = new(allocator) spt::state_t<>(&scene, frame.sampler);
   }
 
+  /* allocate dynamic memory used to rener a tile */
   inline void prepare_tile(const job::tiles_t::tile_t& tile) {
     rays = new(allocator) ray_t<>();
     primary = new(allocator) interaction_t<>();
     hits = new(allocator) interaction_t<>();
+    splats = new(allocator) Imath::Color3f[tile.num_pixels()];
 
-    splats = new(allocator) Imath::Color3f(tile.w*tile.h);
-    memset(splats, 0, sizeof(Imath::Color3f) * tile.w*tile.h);
+    memset(splats, 0, sizeof(Imath::Color3f) * tile.num_pixels());
   }
 
+  /* setup primary rays, and reset the integrator state */
   inline void prepare_sample(
     const job::tiles_t::tile_t& tile
   , uint32_t sample
@@ -130,25 +134,25 @@ struct tile_renderer_t {
   }
 
   inline void render_tile(const job::tiles_t::tile_t& tile, const scene_t& scene) {
-    allocator_scope_t scope(allocator);
+    allocator_scope_t tile_scope(allocator);
     prepare_tile(tile);
 
     for (auto j=0; j<spp; ++j) {
       // free per sample state for every sample
-      allocator_scope_t scope(allocator);
+      allocator_scope_t sample_scope(allocator);
 
       prepare_sample(tile, j, scene);
       trace_primary_rays(scene);
 
       while (active.has_live_paths()) {
         // clear temporary shading data, for every path segment
-        allocator_scope_t scope(allocator);
+        allocator_scope_t inner_scope(allocator);
         trace_and_advance_paths(scene);
       }
 
       // FIXME: temporary code to copy radiance values into output buffer
       // this should run through a filter kernel instead
-      for (auto k=0; k<tile.w*tile.h; ++k) {
+      for (auto k=0; k<tile.num_pixels(); ++k) {
         const auto r = integrator_state->r.at(k);
         splats[k] += r * (1.0f / (spp * pps));
       }

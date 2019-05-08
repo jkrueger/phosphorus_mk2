@@ -7,13 +7,14 @@
 #include "math/soa.hpp"
 #include "utils/assert.hpp"
 #include "utils/compiler.hpp"
+#include "utils/nocopy.hpp"
 
 #include <limits>
 
 struct bsdf_t;
 
 /* Global state for the rendering of one frame */
-struct frame_state_t {
+struct frame_state_t : nocopy_t {
   sampler_t*    sampler;
   job::tiles_t* tiles;
   film_t<>*     film;
