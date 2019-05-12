@@ -10,6 +10,7 @@
 #include <random> 
 #include <functional>
 
+/* random number engine, that complies with the c++ standard */
 struct xoroshiro128plus_t {
   typedef uint64_t result_type;
 
@@ -27,7 +28,7 @@ struct xoroshiro128plus_t {
 
   uint64_t operator()() {
    static uint64_t s0 = 1451815097307991481;
-   static uint64_t s1 = 5520930533486498032; // auch hier wieder nicht beide mit 0 initialisieren
+   static uint64_t s1 = 5520930533486498032;
 
    const uint64_t result = s0 + s1;
 
@@ -50,22 +51,18 @@ struct sampler_t::details_t {
     : light_sample(0)
   {}
 
-  inline uint32_t scale(uint32_t x) {
-    return (x & 0x00ffffff) | 0x3f800000;
+  inline float to_float(uint32_t x) {
+    auto bits = (x & 0x00ffffff) | 0x3f800000;
+    return *((float*) &bits) - 1.0f;
   }
 
   inline float sample() {
-    uint32_t x = scale((uint32_t) gen());
-
-    return ((float*) &x)[0] - 1.0f;
+    return to_float((uint32_t) gen());
   }
 
   inline Imath::V2f sample2() {
     uint64_t x = gen();
-    uint32_t a = scale((uint32_t) x);
-    uint32_t b = scale((uint32_t) (x >> 32));
-     
-    return { *((float*) &a) - 1.0f, *((float*) &b) - 1.0f };
+    return { to_float((uint32_t) x), to_float((uint32_t) (x >> 32) };
   }
 
   inline uint32_t next_light_sample_set() {

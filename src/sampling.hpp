@@ -57,7 +57,7 @@ struct sampler_t {
 
   typedef sampling::details::light_sample_t light_sample_t;
 
-  typedef soa::vector2_t<config::STREAM_SIZE> samples2d_t;
+  // typedef soa::vector2_t<config::STREAM_SIZE> samples2d_t;
 
   pixel_samples_t* pixel_samples;
   light_samples_t* light_samples;
@@ -82,10 +82,10 @@ struct sampler_t {
   }
 
   /** create a precomputed set of 1d samples */
-  uint32_t request_1d_samples();
+  // uint32_t request_1d_samples();
 
   /** create a precomputed set of 2d samples */
-  uint32_t request_2d_samples();
+  // uint32_t request_2d_samples();
   
   inline const pixel_samples_t& next_pixel_samples(uint32_t i) const {
     assert(i < spp);
@@ -94,7 +94,7 @@ struct sampler_t {
 
   const light_samples_t& next_light_samples();
 
-  const float* next_1d_samples(uint32_t id);
+  // const float* next_1d_samples(uint32_t id);
 
-  const samples2d_t& next_2d_samples(uint32_t id);
+  // const samples2d_t& next_2d_samples(uint32_t id);
 };
