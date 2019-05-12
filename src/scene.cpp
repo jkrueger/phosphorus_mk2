@@ -104,6 +104,7 @@ light_t* scene_t::light(uint32_t index) const {
 }
 
 mesh_t* scene_t::mesh(uint32_t index) const {
+  assert(index < details->meshes.size());
   return details->meshes[index];
 }
 

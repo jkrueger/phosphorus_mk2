@@ -70,31 +70,31 @@ struct area_light_t : public light_t::details_t {
   }
 
   void sample(
-    const soa::vector2_t<SIMD_WIDTH>& uv
-  , sampler_t::light_samples_t<SIMD_WIDTH>& out) const
+    const soa::vector2_t<sampler_t::light_samples_t::step>& uv
+  , sampler_t::light_samples_t& out) const
   {
-    const auto one = simd::floatv_t(1.0f);
-    const auto num = simd::floatv_t(triangles.size());
+  //   const auto one = simd::floatv_t(1.0f);
+  //   const auto num = simd::floatv_t(triangles.size());
 
-    auto x = simd::floatv_t(uv.x);
-    auto y = simd::floatv_t(uv.y);
+  //   auto x = simd::floatv_t(uv.x);
+  //   auto y = simd::floatv_t(uv.y);
 
-    const auto indices = simd::min(simd::floor(x * num), num - one);
+  //   const auto indices = simd::min(simd::floor(x * num), num - one);
 
-    const auto e = std::numeric_limits<float>::epsilon();
-    const auto one_minus_epsilon = simd::floatv_t(1.0f-e);
+  //   const auto e = std::numeric_limits<float>::epsilon();
+  //   const auto one_minus_epsilon = simd::floatv_t(1.0f-e);
 
-    x = simd::min(x * num, one_minus_epsilon);
+  //   x = simd::min(x * num, one_minus_epsilon);
 
-    const auto barycentrics = triangle_t::sample(x, y);
+  //   const auto barycentrics = triangle_t::sample(x, y);
 
-    out.p = mesh->barycentrics_to_point(set, indices, barycentrics);
-    out.u = barycentrics.x;
-    out.v = barycentrics.y;
-    out.pdf = simd::floatv_t(1.0f / area);
-    // out.mesh = simd::int32v_t(mesh->id | (matid << 16));
-    // out.face = mesh->face_ids(set, indices);
-  }
+  //   out.p = mesh->barycentrics_to_point(set, indices, barycentrics);
+  //   out.u = barycentrics.x;
+  //   out.v = barycentrics.y;
+  //   out.pdf = simd::floatv_t(1.0f / area);
+  //   // out.mesh = simd::int32v_t(mesh->id | (matid << 16));
+  //   // out.face = mesh->face_ids(set, indices);
+  }  
 };
 
 struct infinite_light_t : public light_t::details_t {
@@ -147,8 +147,8 @@ void light_t::sample(
 }
 
 void light_t::sample(
-  const soa::vector2_t<SIMD_WIDTH>& uv
-, sampler_t::light_samples_t<SIMD_WIDTH>& out) const
+  const soa::vector2_t<sampler_t::light_samples_t::step>& uv
+, sampler_t::light_samples_t& out) const
 {
   switch(type) {
   case POINT:

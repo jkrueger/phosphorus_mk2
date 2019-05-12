@@ -44,6 +44,10 @@ namespace spt {
       dead.clear();
     }
 
+    inline decltype(auto) next_light_samples() {
+      return sampler->next_light_samples();
+    }
+
     inline void mark_for_revive(uint32_t i) {
       dead.add(i);
     }
@@ -89,7 +93,7 @@ namespace spt {
     , active_t<>& active
     , const interaction_t<>* primary
     , interaction_t<>* hits
-    , ray_t<>* samples) const
+    , ray_t<>* rays) const
     {
       // mark dead paths as alive, so we can generate new shadow rays
       // for these paths
@@ -99,66 +103,25 @@ namespace spt {
       const auto masked = simd::int32v_t(MASKED | SHADOW);
       const auto shadow = simd::int32v_t(SHADOW);
 
+      const auto& light_samples = state->next_light_samples();
+      const auto* samples = light_samples.samples;
+
       // iterate over alls paths, and generate shadow rays for them
-      for (auto i=0; i<active.num; i+=SIMD_WIDTH) {
-        // we pick one light for a set of SIMD_WDITH samples. this should
-        // be ok, over a large enough number of samples per pixel, and
-        // in my opinion doesn't make that much of a difference visually
-        // the way samples are layed out at the moment, the SIMD_WIDTH
-        // samples will be distributed over SIMD_WIDTH pixels
-        const auto nlights = state->scene->num_lights();
-        sampler_t::light_samples_t<SIMD_WIDTH> light_samples;
-
-        // no good way to sample lights in parallel atm
-        // soa::vector2_t<SIMD_WIDTH> uvs;
-        // state->sampler->sample2(uvs);
-
-        // const auto x = state->sampler->sample();
-        // const auto l = std::min(std::floor(x * nlights), nlights - 1.0f);
-
-        // const auto light = state->scene->light(l);
-
-        // // generate n samples form the light source
-        // light->sample(uvs, light_samples);
-
-        for (auto i=0; i<SIMD_WIDTH; ++i) {
-          sampler_t::light_sample_t sample;
-
-          const auto x = state->sampler->sample();
-          const auto l = std::min(std::floor(x * nlights), nlights - 1.0f);
-
-          const auto light = state->scene->light(l);
-
-          light->sample(state->sampler->sample2(), sample);
-
-          light_samples.p.x[i] = sample.p.x;
-          light_samples.p.y[i] = sample.p.y;
-          light_samples.p.z[i] = sample.p.z;
-
-          light_samples.u.v[i] = sample.uv.x;
-          light_samples.v.v[i] = sample.uv.y;
-
-          light_samples.mesh[i] = sample.mesh;
-          light_samples.face[i] = sample.face;
-
-          light_samples.pdf.v[i] = sample.pdf;
-        }
-
+      for (auto i=0; i<active.num; i+=SIMD_WIDTH, ++samples) {
         // the information about the surface we're going to hit
         // comes from the light sample, and not from tracing
         // the ray through the scene, so set everything up here
-        samples->set_surface(
-          i
-        , simd::int32v_t(light_samples.mesh)
-        , simd::int32v_t(light_samples.face)
-        , light_samples.u
-        , light_samples.v);
+        rays->set_surface(i,
+          simd::int32v_t(samples->mesh)
+        , simd::int32v_t(samples->face)
+        , simd::floatv_t(samples->u)
+        , simd::floatv_t(samples->v));
 
         // use the sampled light to generate shadow rays
         const auto n = hits->n.stream(i);
         const auto p = simd::offset(hits->p.stream(i), n);
 
-        auto wi = light_samples.p - p;
+        auto wi = samples->p.stream() - p;
 
         const auto d = wi.length() - simd::floatv_t(0.0001f);
         wi.normalize();
@@ -171,11 +134,11 @@ namespace spt {
         const auto mask = is_hit & ish;
         const auto flags = simd::select(mask, masked, shadow);
 
-        samples->reset(i, p, wi, d, flags);
+        rays->reset(i, p, wi, d, flags);
 
         // we store the pdfs for the light samples in the integrator
         // state, since we need them later on
-        light_samples.pdf.storeu(state->pdf, i);
+        simd::floatv_t(samples->pdf).storeu(state->pdf, i);
       }
     }
   };

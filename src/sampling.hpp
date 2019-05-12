@@ -1,6 +1,7 @@
 #pragma once
 
 #include "options.hpp"
+#include "math/config.hpp"
 #include "math/soa.hpp"
 #include "math/simd.hpp"
 #include "utils/assert.hpp"
@@ -8,44 +9,60 @@
 
 struct scene_t;
 
+namespace sampling {
+  namespace details {
+    template<int N>
+    struct pixel_samples_t {
+      static const uint32_t size=N;
+      static const uint32_t step=SIMD_WIDTH;
+
+      soa::vector2_t<step> v[size/step];
+    };
+
+    struct light_sample_t {
+      Imath::V3f p;
+      Imath::V2f uv;
+      uint32_t mesh;
+      uint32_t face;
+      float pdf;
+    };
+    
+    template<int N>
+    struct light_samples_t {
+      static const uint32_t size=N;
+      static const uint32_t step=SIMD_WIDTH;
+      
+      struct {
+        soa::vector3_t<step> p;
+        float u[step];
+        float v[step];
+        float pdf[step];
+        int32_t mesh[step];
+        int32_t face[step];
+      } samples[size/step];
+    };
+  }
+}
+
 struct sampler_t {
   struct details_t;
   details_t* details;
 
-  template<int N=1024>
-  struct pixel_sample_t {
-    static const uint32_t size=N;
-    static const uint32_t step=SIMD_WIDTH;
+  typedef sampling::details::pixel_samples_t<
+    config::STREAM_SIZE
+    > pixel_samples_t;
+  typedef sampling::details::light_samples_t<
+    config::STREAM_SIZE
+    > light_samples_t;
 
-    soa::vector2_t<step> v[size/step];
-  };
+  typedef sampling::details::light_sample_t light_sample_t;
 
-  struct light_sample_t {
-    Imath::V3f p;
-    Imath::V2f uv;
-    uint32_t mesh;
-    uint32_t face;
-    float pdf;
-  };
-
-  template<int N>
-  struct light_samples_t {
-    simd::vector3_t<N> p;
-    simd::float_t<N> u;
-    simd::float_t<N> v;
-    simd::float_t<N> pdf;
-    int32_t mesh[N];
-    int32_t face[N];
-  };
-
-  typedef pixel_sample_t<> pixel_samples_t;
+  typedef soa::vector2_t<config::STREAM_SIZE> samples2d_t;
 
   pixel_samples_t* pixel_samples;
-  light_sample_t*  light_samples;
+  light_samples_t* light_samples;
 
   const uint32_t spp;
-  const uint32_t paths_per_sample;
-  const uint32_t path_depth;
 
   sampler_t(parsed_options_t& options);
   ~sampler_t();
@@ -64,14 +81,20 @@ struct sampler_t {
     }
   }
 
+  /** create a precomputed set of 1d samples */
+  uint32_t request_1d_samples();
+
+  /** create a precomputed set of 2d samples */
+  uint32_t request_2d_samples();
+  
   inline const pixel_samples_t& next_pixel_samples(uint32_t i) const {
     assert(i < spp);
     return pixel_samples[i];
   }
 
-  inline const light_sample_t& next_light_sample(uint32_t s, uint32_t i) const {
-    assert(s < spp*paths_per_sample);
-    assert(i < path_depth);
-    return light_samples[s*path_depth+i];
-  }
+  const light_samples_t& next_light_samples();
+
+  const float* next_1d_samples(uint32_t id);
+
+  const samples2d_t& next_2d_samples(uint32_t id);
 };

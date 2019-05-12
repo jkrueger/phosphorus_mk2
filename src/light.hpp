@@ -37,8 +37,8 @@ struct light_t {
   /* sample n points on a light, where n is the simd width of 
    * the cpu */
   void sample(
-    const soa::vector2_t<SIMD_WIDTH>& uv
-  , sampler_t::light_samples_t<SIMD_WIDTH>& out) const;
+    const soa::vector2_t<sampler_t::light_samples_t::step>& uv
+  , sampler_t::light_samples_t& out) const;
 
   inline bool is_area() const {
     return type == AREA;

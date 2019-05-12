@@ -3,33 +3,79 @@
 #include "scene.hpp"
 #include "math/sampling.hpp"
 
+#include <atomic>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <random> 
-#include <functional> 
+#include <functional>
+
+struct xoroshiro128plus_t {
+  typedef uint64_t result_type;
+
+  static uint64_t min() {
+    return std::numeric_limits<uint64_t>::min();
+  }
+
+  static uint64_t max() {
+    return std::numeric_limits<uint64_t>::max();
+  }
+
+  inline uint64_t rotl (uint64_t a, int w) {
+    return a << w | a >> (64-w);
+  }
+
+  uint64_t operator()() {
+   static uint64_t s0 = 1451815097307991481;
+   static uint64_t s1 = 5520930533486498032; // auch hier wieder nicht beide mit 0 initialisieren
+
+   const uint64_t result = s0 + s1;
+
+   s1 ^= s0;
+   s0 = rotl(s0, 55) ^ s1 ^ (s1 << 14);
+   s1 = rotl(s1, 36);
+
+   return result;
+  }
+};
 
 struct sampler_t::details_t {
-  std::mt19937 gen;
-  std::uniform_real_distribution<float> dis;
+  static const uint32_t NUM_LIGHT_SAMPLE_SETS = 64;
+
+  xoroshiro128plus_t gen;
+
+  std::atomic<uint32_t> light_sample;
 
   inline details_t()
-    : dis(0.0f, 1.0f)
+    : light_sample(0)
   {}
 
+  inline uint32_t scale(uint32_t x) {
+    return (x & 0x00ffffff) | 0x3f800000;
+  }
+
   inline float sample() {
-    return dis(gen);
+    uint32_t x = scale((uint32_t) gen());
+
+    return ((float*) &x)[0] - 1.0f;
   }
 
   inline Imath::V2f sample2() {
-    return { sample(), sample() };
+    uint64_t x = gen();
+    uint32_t a = scale((uint32_t) x);
+    uint32_t b = scale((uint32_t) (x >> 32));
+     
+    return { *((float*) &a) - 1.0f, *((float*) &b) - 1.0f };
+  }
+
+  inline uint32_t next_light_sample_set() {
+    return light_sample++ & (NUM_LIGHT_SAMPLE_SETS-1);
   }
 };
 
 sampler_t::sampler_t(parsed_options_t& options)
   : details(new details_t())
   , spp(options.samples_per_pixel)
-  , paths_per_sample(options.paths_per_sample)
-  , path_depth(options.path_depth)
 {}
 
 sampler_t::~sampler_t() {
@@ -40,12 +86,14 @@ sampler_t::~sampler_t() {
 
 void sampler_t::preprocess(const scene_t& scene) {
 #ifdef aligned_alloc
-  pixel_samples = (pixel_sample_t<>*) aligned_alloc(32, sizeof(pixel_sample_t<>) * spp);
+  pixel_samples = (pixel_samples_t*) aligned_alloc(32, sizeof(pixel_sample_t<>) * spp);
+  light_samples = (light_samples_t*) aligned_alloc(32, sizeof(light_sample_t<>) * details_t::NUM_LIGHT_SAMPLE_SETS);
 #else
-  posix_memalign((void**) &pixel_samples, 32, sizeof(pixel_sample_t<>) * spp);
+  posix_memalign((void**) &pixel_samples, 32, sizeof(pixel_samples_t) * spp);
+  posix_memalign((void**) &light_samples, 32, sizeof(light_samples_t) * details_t::NUM_LIGHT_SAMPLE_SETS);
 #endif
 
-  auto spd = (uint32_t) std::sqrt(spp);
+  const auto spd = (uint32_t) std::sqrt(spp);
 
   Imath::V2f stratified[spp];
   sample::stratified_2d([this]() { return details->sample(); }, stratified, spd);
@@ -59,20 +107,24 @@ void sampler_t::preprocess(const scene_t& scene) {
     }
   }
 
-  light_samples = new light_sample_t[path_depth*spp*paths_per_sample];
+  const auto nlights = scene.num_lights();
 
-  // auto spd = (uint32_t) std::sqrt(spp);
+  for (auto i=0; i<details_t::NUM_LIGHT_SAMPLE_SETS; i++) {
+    for (auto j=0; j<light_samples_t::size/light_samples_t::step; ++j) {
+      for (auto k=0; k<light_samples_t::step; ++k) {
+        const auto l = std::min(std::floor(sample() * nlights), nlights - 1.0f);
+        const auto light = scene.light(l);
+      
+        light_sample_t sample;
+        light->sample(details->sample2(), sample);
 
-  // Imath::V2f stratified[spp];
-  // sample::stratified_2d([this]() { return details->sample(); }, stratified, spd);
-
-  for (auto i=0; i<spp; i++) {
-    for (auto j=0; j<paths_per_sample; ++j) {
-      for (auto k=0; k<path_depth; ++k) {
-        // TODO: allow sampling of an arbitrary numer of light sources
-        const auto light = scene.light(0);
-        const auto index = i*paths_per_sample+j;
-        light->sample(details->sample2(), light_samples[index*path_depth+k]);
+        auto& out = light_samples[i].samples[j];
+        out.p.from(k, sample.p);
+        out.u[k] = sample.uv.x;
+        out.v[k] = sample.uv.y;
+        out.pdf[k] = sample.pdf;
+        out.mesh[k] = sample.mesh;
+        out.face[k] = sample.face;
       }
     }
   }
@@ -84,4 +136,11 @@ float sampler_t::sample() {
 
 Imath::V2f sampler_t::sample2() {
   return details->sample2();
+}
+
+const sampler_t::light_samples_t& sampler_t::next_light_samples() {
+  const auto set = details->next_light_sample_set();
+  const auto& samples = light_samples[set];
+
+  return samples;
 }
