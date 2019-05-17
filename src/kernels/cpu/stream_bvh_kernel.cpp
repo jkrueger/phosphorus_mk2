@@ -35,6 +35,7 @@ void intersect(
   }
 
   const float_t zero(0.0f);
+  const simd::int32v_t one(1);
 
   auto top = 0;
   push(tasks, top, lanes.num[0]);
@@ -46,9 +47,9 @@ void intersect(
       const auto& node = bvh->root[cur.offset];
       auto todo = pop(lanes, cur.lane, cur.num_rays);
 
-      uint32_t num_active[accel::mbvh_t::width] = {[0 ... 7] = 0};
-
       __aligned(64) const simd::aabb_t<accel::mbvh_t::width> bounds(node.bounds);
+
+      simd::int32v_t num_active(0);
 
       auto length = zero;
       auto end    = todo + cur.num_rays;
@@ -70,6 +71,7 @@ void intersect(
           , stream->d[ray]
 	  , dist);
 
+        num_active = num_active + (one & hits);
 	length = length + (dist & hits);
 
 	auto mask = simd::to_mask(hits);
@@ -77,7 +79,6 @@ void intersect(
 	// push ray into lanes for intersected nodes
 	while(mask != 0) {
 	  auto x = __bscf(mask);
-	  num_active[x]++;
 	  push(lanes, x, *todo);
 	}
 
@@ -85,6 +86,9 @@ void intersect(
       }
 
       uint32_t ids[8];
+
+      __aligned(32) int32_t num_rays[8];
+      num_active.store(num_rays);
 
       __aligned(32) float dists[8];
       length.store(dists);
@@ -94,7 +98,7 @@ void intersect(
 
       auto n=0;
       for (auto i=0; i<8; ++i) {
-	auto num = num_active[i];
+	auto num = num_rays[i];
 	if (num > 0) {
 	  auto d = dists[i];
 	  ids[n] = i;
@@ -111,7 +115,7 @@ void intersect(
       }
 
       for (auto i=0; i<n; ++i) {
-	push(tasks, top, node, ids[i], num_active[ids[i]]);
+	push(tasks, top, node, ids[i], num_rays[ids[i]]);
       }
     }
     else {

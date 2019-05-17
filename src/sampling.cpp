@@ -62,7 +62,7 @@ struct sampler_t::details_t {
 
   inline Imath::V2f sample2() {
     uint64_t x = gen();
-    return { to_float((uint32_t) x), to_float((uint32_t) (x >> 32) };
+    return { to_float((uint32_t) x), to_float((uint32_t) (x >> 32)) };
   }
 
   inline uint32_t next_light_sample_set() {
