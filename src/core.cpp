@@ -27,7 +27,7 @@ void usage() {
   std::cerr
     << "usage: phosphorus <options> scene"
     << std::endl
-    << "-o <path>    Output path fir the renderer" << std::endl
+    << "-o <path>    Output path for the renderer" << std::endl
     << "-s <samples> Anti Aliasing samples per pixel" << std::endl
     << "-p <paths>   Maximum number of paths traces per sample" << std::endl
     << "-d <depth>   Maximum depth of a single path" << std::endl

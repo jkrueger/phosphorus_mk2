@@ -12,6 +12,35 @@ struct stream_mbvh_kernel_t::details_t{
   stream::task_t tasks[256];
 };
 
+namespace details {
+  template<int N>
+  inline uint32_t compress_and_sort_by_distance(
+    const int32_t* num_rays
+  , const float* dists
+  , uint32_t* ids) {
+    auto n=0;
+
+    for (auto i=0; i<N; ++i) {
+      auto num = num_rays[i];
+      if (num > 0) {
+        auto d = dists[i];
+        ids[n] = i;
+        for(auto j=n; j>0; --j) {
+          if (d < dists[ids[j]]) {
+            auto& a = ids[j], &b = ids[j-1];
+            a = a ^ b;
+            b = a ^ b;
+            a = a ^ b;
+          }
+        }
+        ++n;
+      }
+    }
+
+    return n;
+  }
+}
+
 /* Implements MBVH-RS algorithm for tracing a set of rays through 
  * the scene */
 template<typename Stream>
@@ -96,23 +125,9 @@ void intersect(
       // TODO: collect stats on lane utilization to see if efficiently sorting
       // for smaller 'n' makes sense
 
-      auto n=0;
-      for (auto i=0; i<8; ++i) {
-	auto num = num_rays[i];
-	if (num > 0) {
-	  auto d = dists[i];
-	  ids[n] = i;
-	  for(auto j=n; j>0; --j) {
-	    if (d < dists[ids[j]]) {
-	      auto& a = ids[j], &b = ids[j-1];
-	      a = a ^ b;
-	      b = a ^ b;
-	      a = a ^ b;
-	    }
-	  }
-	  ++n;
-	}
-      }
+      auto n= details::compress_and_sort_by_distance<
+        accel::mbvh_t::width
+        >(num_rays, dists, ids);
 
       for (auto i=0; i<n; ++i) {
 	push(tasks, top, node, ids[i], num_rays[ids[i]]);
