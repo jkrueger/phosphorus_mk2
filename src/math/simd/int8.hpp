@@ -98,11 +98,23 @@ namespace simd {
       return int32_t(_mm256_castps_si256(_and(v, r.v)));
     }
 
+    inline int32_t operator&(const float_t<8>& r) const {
+      return int32_t(_mm256_castps_si256(_and(v, r.v)));
+    }
+
     inline int32_t operator|(const int32_t& r) const {
       return int32_t(_mm256_castps_si256(_or(v, r.v)));
     }
 
+    inline int32_t operator|(const float_t<8>& r) const {
+      return int32_t(_mm256_castps_si256(_or(v, r.v)));
+    }
+
     inline int32_t operator^(const int32_t& r) const {
+      return int32_t(_mm256_castps_si256(_xor(v, r.v)));
+    }
+
+    inline int32_t operator^(const float_t<8>& r) const {
       return int32_t(_mm256_castps_si256(_xor(v, r.v)));
     }
 
