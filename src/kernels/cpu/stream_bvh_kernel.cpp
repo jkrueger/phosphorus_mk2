@@ -72,16 +72,18 @@ namespace details {
     }
     else {
       // fallback insertion sort
+      auto m = 0;
       for (auto i=0; i<N; ++i) {
         auto num = num_rays[i];
         if (num > 0) {
           auto d = dists[i];
-          ids[n] = i;
-          for(auto j=n; j>0; --j) {
+          ids[m] = i;
+          for(auto j=m; j>0; --j) {
             if (d < dists[ids[j]]) {
               swap(ids[j], ids[j-1]);
             }
           }
+          ++m;
         }
       }
     }
