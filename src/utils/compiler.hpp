@@ -13,4 +13,5 @@ inline size_t __bscf(size_t& v) {
   return i;
 }
 
-#define __aligned(n) __attribute__((aligned (n)))
+#define __aligned(n)  __attribute__((aligned (n)))
+#define __forceinline __attribute__((always_inline))

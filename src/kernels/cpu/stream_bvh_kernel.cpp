@@ -13,27 +13,76 @@ struct stream_mbvh_kernel_t::details_t{
 };
 
 namespace details {
+  template<typename T>
+  inline void swap(T& a, T& b) {
+    a = a ^ b;
+    b = a ^ b;
+    a = a ^ b;
+  }
+
   template<int N>
   inline uint32_t compress_and_sort_by_distance(
-    const int32_t* num_rays
+    size_t mask
+  , const int32_t* num_rays
   , const float* dists
   , uint32_t* ids) {
-    auto n=0;
+    const auto n = _mm_popcnt_u64(mask);
 
-    for (auto i=0; i<N; ++i) {
-      auto num = num_rays[i];
-      if (num > 0) {
-        auto d = dists[i];
-        ids[n] = i;
-        for(auto j=n; j>0; --j) {
-          if (d < dists[ids[j]]) {
-            auto& a = ids[j], &b = ids[j-1];
-            a = a ^ b;
-            b = a ^ b;
-            a = a ^ b;
+    if (n < 5) {
+      // sort using sorting networks
+      auto a = __bscf(mask);
+      if (mask == 0) {
+        ids[0] = a;
+      }
+      else {
+        auto b = __bscf(mask);
+        if (mask == 0) {
+          if (dists[b] < dists[a]) { swap(a, b); }
+
+          ids[0] = a;
+          ids[1] = b;
+        }
+        else {
+          auto c = __bscf(mask);
+          if (dists[b] < dists[a]) { swap(a, b); }
+          if (dists[c] < dists[b]) { swap(c, b); }
+          if (dists[b] < dists[a]) { swap(b, a); }
+
+          if (mask == 0) {
+            ids[0] = a;
+            ids[1] = b;
+            ids[2] = c;
+          }
+          else {
+            auto d = __bscf(mask);
+
+            if (dists[b] < dists[a]) { swap(a, b); }
+            if (dists[d] < dists[c]) { swap(d, c); }
+            if (dists[c] < dists[a]) { swap(c, a); }
+            if (dists[d] < dists[b]) { swap(d, b); }
+            if (dists[c] < dists[b]) { swap(c, b); }
+
+            ids[0] = a;
+            ids[1] = b;
+            ids[2] = c;
+            ids[3] = d;
           }
         }
-        ++n;
+      }
+    }
+    else {
+      // fallback insertion sort
+      for (auto i=0; i<N; ++i) {
+        auto num = num_rays[i];
+        if (num > 0) {
+          auto d = dists[i];
+          ids[n] = i;
+          for(auto j=n; j>0; --j) {
+            if (d < dists[ids[j]]) {
+              swap(ids[j], ids[j-1]);
+            }
+          }
+        }
       }
     }
 
@@ -116,18 +165,17 @@ void intersect(
 
       uint32_t ids[8];
 
+      auto lane_mask = simd::to_mask(num_active != simd::int32v_t(0));
+
       __aligned(32) int32_t num_rays[8];
       num_active.store(num_rays);
 
       __aligned(32) float dists[8];
       length.store(dists);
 	
-      // TODO: collect stats on lane utilization to see if efficiently sorting
-      // for smaller 'n' makes sense
-
-      auto n= details::compress_and_sort_by_distance<
+      auto n = details::compress_and_sort_by_distance<
         accel::mbvh_t::width
-        >(num_rays, dists, ids);
+        >(lane_mask, num_rays, dists, ids);
 
       for (auto i=0; i<n; ++i) {
 	push(tasks, top, node, ids[i], num_rays[ids[i]]);

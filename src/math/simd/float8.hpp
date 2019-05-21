@@ -64,6 +64,10 @@ namespace simd {
     return _mm256_cmp_ps(l, r, _CMP_EQ_OS);
   }
 
+  inline __m256 neq(const __m256& l, const __m256& r) {
+    return _mm256_cmp_ps(l, r, _CMP_NEQ_OS);
+  }
+
   inline __m256 lt(const __m256& l, const __m256& r) {
     return _mm256_cmp_ps(l, r, _CMP_LT_OS);
   }

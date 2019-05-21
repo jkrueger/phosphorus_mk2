@@ -146,6 +146,10 @@ namespace simd {
       return int32_t(eq(v, r.v));
     }
 
+    inline int32_t operator!= (const int32_t& r) const {
+      return int32_t(neq(v, r.v));
+    }
+
     inline int32_t operator<= (const int32_t& r) const {
       return int32_t(lte(v, r.v));
     }
@@ -158,6 +162,11 @@ namespace simd {
   template<int N>
   inline int32_t<N> andnot(const int32_t<N>& l, const int32_t<N>& r) {
     return int32_t<N>(andnot(l.v, r.v));
+  }
+
+  template<int N>
+  inline size_t to_mask(const int32_t<N>& i) {
+    return movemask(i.v);
   }
 
   template<typename T, int N>
