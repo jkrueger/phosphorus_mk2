@@ -166,6 +166,11 @@ namespace simd {
   }
 
   template<int N>
+  __forceinline float_t<N> operator&(const float_t<N>& l, const int32_t<N>& r) {
+    return float_t<N>(_and(l.v, r.v));
+  }
+
+  template<int N>
   __forceinline size_t to_mask(const int32_t<N>& i) {
     return movemask(i.v);
   }

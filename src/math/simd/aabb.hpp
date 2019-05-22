@@ -30,28 +30,25 @@ namespace simd {
   , const float_t<8>& d
   , float_t<8>& dist)
   {
-    const auto zero = simd::load(0.0f);
+    const auto zero = float_t<8>(0.0f);
 
-    const auto gtez_x = gte(ood.x, zero);
-    const auto gtez_y = gte(ood.y, zero);
-    const auto gtez_z = gte(ood.z, zero);
+    const auto ax = (aabb.min.x - o.x) * ood.x;
+    const auto ay = (aabb.min.y - o.y) * ood.y;
+    const auto az = (aabb.min.z - o.z) * ood.z;
 
-    auto min_x = select(gtez_x, aabb.max.x, aabb.min.x);
-    auto min_y = select(gtez_y, aabb.max.y, aabb.min.y);
-    auto min_z = select(gtez_z, aabb.max.z, aabb.min.z);
-    auto max_x = select(gtez_x, aabb.min.x, aabb.max.x);
-    auto max_y = select(gtez_y, aabb.min.y, aabb.max.y);
-    auto max_z = select(gtez_z, aabb.min.z, aabb.max.z);
+    const auto bx = (aabb.max.x - o.x) * ood.x;
+    const auto by = (aabb.max.y - o.y) * ood.y;
+    const auto bz = (aabb.max.z - o.z) * ood.z;
 
-    min_x = mul(sub(min_x, o.x), ood.x);
-    min_y = mul(sub(min_y, o.y), ood.y);
-    min_z = mul(sub(min_z, o.z), ood.z);
+    const auto min_x = min(ax, bx);
+    const auto min_y = min(ay, by);
+    const auto min_z = min(az, bz);
 
-    max_x = mul(sub(max_x, o.x), ood.x);
-    max_y = mul(sub(max_y, o.y), ood.y);
-    max_z = mul(sub(max_z, o.z), ood.z);
+    const auto max_x = max(ax, bx);
+    const auto max_y = max(ay, by);
+    const auto max_z = max(az, bz);
 
-    const auto n = max(max(min_x, min_y), max(min_z, zero));
+    const auto n = max(max(min_x, min_y), max(min_z, zero.v));
     const auto f = min(min(max_x, max_y), min(max_z, d.v));
 
     const auto mask = lte(n, f);

@@ -15,8 +15,9 @@ namespace accel {
    * nodes, which allows to do multiple bounding volume intersections
    * at the same time */
   struct mbvh_t {
-    static const uint32_t width = SIMD_WIDTH;
+    static const uint32_t width = 8;
 
+    typedef mbvh::node_t<width> node_t;
     typedef triangle::moeller_trumbore_t<width> triangle_t;
     typedef bvh::builder_t<mbvh::node_t<width>, ::triangle_t> builder_t;
 

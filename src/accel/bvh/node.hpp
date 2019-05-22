@@ -10,6 +10,8 @@
 namespace mbvh {
   template<int N>
   struct node_t {
+    static const uint32_t EMPTY_NODE = 0;
+
     // bounding volume hierachies of this node
     float bounds[2*N*3];
     // offset to right child node, or offset into a

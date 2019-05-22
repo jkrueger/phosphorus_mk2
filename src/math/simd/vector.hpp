@@ -141,6 +141,10 @@ struct vector3_t<8> {
     return {simd::sub(x, r.x), simd::sub(y, r.y), simd::sub(z, r.z)};
   }
 
+  __forceinline vector3_t operator*(const vector3_t& r) const {
+    return {simd::mul(x, r.x), simd::mul(y, r.y), simd::mul(z, r.z)};
+  }
+
   __forceinline vector3_t operator*(const float_t<8>& r) const {
     return {simd::mul(x, r.v), simd::mul(y, r.v), simd::mul(z, r.v)};
   }
