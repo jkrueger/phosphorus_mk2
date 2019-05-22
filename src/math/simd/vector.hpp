@@ -28,28 +28,28 @@ struct vector3_t<8> {
   //};
   //};
 
-  inline vector3_t()
+  __forceinline vector3_t()
   {}
 
-  inline vector3_t(const vector3_t& cpy)
+  __forceinline vector3_t(const vector3_t& cpy)
     : x(cpy.x), y(cpy.y), z(cpy.z)
   {}
 
-  inline vector3_t(
+  __forceinline vector3_t(
       const __m256& _x
     , const __m256& _y
     , const __m256& _z)
     : x(_x), y(_y), z(_z)
   {}
 
-  inline vector3_t(
+  __forceinline vector3_t(
       const float_t<8>& _x
     , const float_t<8>& _y
     , const float_t<8>& _z)
     : x(_x.v), y(_y.v), z(_z.v)
   {}
 
-  inline vector3_t(
+  __forceinline vector3_t(
     const float _x
   , const float _y
   , const float _z)
@@ -59,11 +59,11 @@ struct vector3_t<8> {
     z = _mm256_set1_ps(_z);
   }
 
-  inline vector3_t(const Imath::V3f& v)
+  __forceinline vector3_t(const Imath::V3f& v)
     : vector3_t(v.x, v.y, v.z)
   {}
 
-  inline vector3_t(
+  __forceinline vector3_t(
     const float* _x
   , const float* _y
   , const float* _z)
@@ -74,7 +74,7 @@ struct vector3_t<8> {
   }
 
   /* loads a vector from an SOA data structure via gather instructions */
-  inline vector3_t(
+  __forceinline vector3_t(
     const float* _x
   , const float* _y
   , const float* _z
@@ -85,21 +85,21 @@ struct vector3_t<8> {
     z = _mm256_i32gather_ps(_z, idx.v, 4);
   }
 
-  inline void store(float* _x, float* _y, float* _z) const {
+  __forceinline void store(float* _x, float* _y, float* _z) const {
     _mm256_store_ps(_x, x);
     _mm256_store_ps(_y, y);
     _mm256_store_ps(_z, z);
   }
 
-  inline vector3_t rcp() const {
+  __forceinline vector3_t rcp() const {
     return {_mm256_rcp_ps(x), _mm256_rcp_ps(y), _mm256_rcp_ps(z)};
   }
 
-  inline float_t<8> dot(const vector3_t& r) const {
+  __forceinline float_t<8> dot(const vector3_t& r) const {
     return simd::madd(x, r.x, simd::madd(y, r.y, simd::mul(z, r.z)));
   }
 
-  inline vector3_t cross(const vector3_t& r) const {
+  __forceinline vector3_t cross(const vector3_t& r) const {
     vector3_t out = {
       simd::msub(y, r.z, simd::mul(z, r.y)),
       simd::msub(z, r.x, simd::mul(x, r.z)),
@@ -108,15 +108,15 @@ struct vector3_t<8> {
     return out;
   }
 
-  inline simd::float_t<8> length2() const {
+  __forceinline simd::float_t<8> length2() const {
     return dot(*this);
   }
 
-  inline simd::float_t<8> length() const {
+  __forceinline simd::float_t<8> length() const {
     return simd::float_t<8>(_mm256_sqrt_ps(length2().v));
   }
 
-  inline void normalize() {
+  __forceinline void normalize() {
     const auto l   = dot(*this);
     const auto ool = _mm256_rcp_ps(_mm256_sqrt_ps(l.v));
 
@@ -125,29 +125,29 @@ struct vector3_t<8> {
     z = _mm256_mul_ps(z, ool);
   }
 
-  inline vector3_t scaled(const float_t<8>& s) const {
+  __forceinline vector3_t scaled(const float_t<8>& s) const {
     return vector3_t(mul(x, s.v), mul(y, s.v), mul(z, s.v));
   }
 
-  inline vector3_t scaled(const float_t<8>& a, const float_t<8>& b, const float_t<8>& c) const {
+  __forceinline vector3_t scaled(const float_t<8>& a, const float_t<8>& b, const float_t<8>& c) const {
     return vector3_t(mul(x, a.v), mul(y, b.v), mul(z, c.v));
   }
 
-  inline vector3_t operator+(const vector3_t& r) const {
+  __forceinline vector3_t operator+(const vector3_t& r) const {
     return {simd::add(x, r.x), simd::add(y, r.y), simd::add(z, r.z)};
   }
 
-  inline vector3_t operator-(const vector3_t& r) const {
+  __forceinline vector3_t operator-(const vector3_t& r) const {
     return {simd::sub(x, r.x), simd::sub(y, r.y), simd::sub(z, r.z)};
   }
 
-  inline vector3_t operator*(const float_t<8>& r) const {
+  __forceinline vector3_t operator*(const float_t<8>& r) const {
     return {simd::mul(x, r.v), simd::mul(y, r.v), simd::mul(z, r.v)};
   }
 };
 
   template<int N>
-  inline vector3_t<N> offset(
+  __forceinline vector3_t<N> offset(
     const vector3_t<N>& p
   , const vector3_t<N>& n
   , bool invert = false)
@@ -157,7 +157,7 @@ struct vector3_t<8> {
   }
 
   template<int N>
-  inline int32_t<N> in_same_hemisphere(const vector3_t<N>& a, const vector3_t<N>& b) {
+  __forceinline int32_t<N> in_same_hemisphere(const vector3_t<N>& a, const vector3_t<N>& b) {
     const auto x = a.dot(b) >= float_t<N>(0.0f);
     return int32_t<N>(_mm256_castps_si256(x.v));
   }

@@ -14,7 +14,7 @@ struct stream_mbvh_kernel_t::details_t{
 
 namespace details {
   template<typename T>
-  inline void swap(T& a, T& b) {
+  __forceinline void swap(T& a, T& b) {
     a = a ^ b;
     b = a ^ b;
     a = a ^ b;
@@ -25,53 +25,61 @@ namespace details {
     size_t mask
   , const int32_t* num_rays
   , const float* dists
-  , uint32_t* ids) {
+  , uint32_t* ids)
+  {
     const auto n = _mm_popcnt_u64(mask);
 
-    if (n < 5) {
-      // sort using sorting networks
-      auto a = __bscf(mask);
-      if (mask == 0) {
-        ids[0] = a;
-      }
-      else {
+    switch (n) {
+    case 0:
+      break;
+    case 1:
+      ids[0] = __bsf(mask);
+      break;
+    case 2:
+      {
+        auto a = __bscf(mask);
         auto b = __bscf(mask);
-        if (mask == 0) {
-          if (dists[b] < dists[a]) { swap(a, b); }
 
-          ids[0] = a;
-          ids[1] = b;
-        }
-        else {
-          auto c = __bscf(mask);
-          if (dists[b] < dists[a]) { swap(a, b); }
-          if (dists[c] < dists[b]) { swap(c, b); }
-          if (dists[b] < dists[a]) { swap(b, a); }
-
-          if (mask == 0) {
-            ids[0] = a;
-            ids[1] = b;
-            ids[2] = c;
-          }
-          else {
-            auto d = __bscf(mask);
-
-            if (dists[b] < dists[a]) { swap(a, b); }
-            if (dists[d] < dists[c]) { swap(d, c); }
-            if (dists[c] < dists[a]) { swap(c, a); }
-            if (dists[d] < dists[b]) { swap(d, b); }
-            if (dists[c] < dists[b]) { swap(c, b); }
-
-            ids[0] = a;
-            ids[1] = b;
-            ids[2] = c;
-            ids[3] = d;
-          }
-        }
+        if (dists[b] < dists[a]) { swap(a, b); }
+        ids[0] = a;
+        ids[1] = b;
       }
-    }
-    else {
-      // fallback insertion sort
+      break;
+    case 3:
+      {
+        auto a = __bscf(mask);
+        auto b = __bscf(mask);
+        auto c = __bscf(mask);
+
+        if (dists[b] < dists[a]) { swap(a, b); }
+        if (dists[c] < dists[b]) { swap(c, b); }
+        if (dists[b] < dists[a]) { swap(b, a); }
+
+        ids[0] = a;
+        ids[1] = b;
+        ids[2] = c;
+      }
+      break;
+    case 4:
+      {
+        auto a = __bscf(mask);
+        auto b = __bscf(mask);
+        auto c = __bscf(mask);
+        auto d = __bscf(mask);
+
+        if (dists[b] < dists[a]) { swap(a, b); }
+        if (dists[d] < dists[c]) { swap(d, c); }
+        if (dists[c] < dists[a]) { swap(c, a); }
+        if (dists[d] < dists[b]) { swap(d, b); }
+        if (dists[c] < dists[b]) { swap(c, b); }
+        
+        ids[0] = a;
+        ids[1] = b;
+        ids[2] = c;
+        ids[3] = d;
+      }
+      break;
+    default:
       auto m = 0;
       for (auto i=0; i<N; ++i) {
         auto num = num_rays[i];
@@ -115,7 +123,14 @@ void intersect(
   }
 
   const float_t zero(0.0f);
+  const simd::int32v_t zeroi(0);
   const simd::int32v_t one(1);
+
+  // storage for state used during traversal
+  __aligned(32) int32_t num_rays[8];
+  __aligned(32) float dists[8];
+  
+  uint32_t ids[8];
 
   auto top = 0;
   push(tasks, top, lanes.num[0]);
@@ -165,17 +180,12 @@ void intersect(
 	++todo;
       }
 
-      uint32_t ids[8];
-
-      auto lane_mask = simd::to_mask(num_active != simd::int32v_t(0));
-
-      __aligned(32) int32_t num_rays[8];
       num_active.store(num_rays);
-
-      __aligned(32) float dists[8];
       length.store(dists);
 	
-      auto n = details::compress_and_sort_by_distance<
+      auto lane_mask = simd::to_mask(num_active != zeroi);
+
+      const auto n = details::compress_and_sort_by_distance<
         accel::mbvh_t::width
         >(lane_mask, num_rays, dists, ids);
 

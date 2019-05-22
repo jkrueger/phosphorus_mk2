@@ -8,10 +8,10 @@ inline size_t __bsf(size_t v) {
 }
 
 inline size_t __bscf(size_t& v) {
-  size_t i = __bsf(v);
+  size_t i = __builtin_ctz(v);
   v &= v-1;
   return i;
 }
 
 #define __aligned(n)  __attribute__((aligned (n)))
-#define __forceinline __attribute__((always_inline))
+#define __forceinline __attribute__((always_inline)) inline
