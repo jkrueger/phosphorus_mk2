@@ -7,9 +7,15 @@
 #include "bsdf/reflection.hpp"
 #include "bsdf/refraction.hpp"
 #include "bsdf/microfacet.hpp"
+#include "bsdf/sheen.hpp"
+
 #include "math/fresnel.hpp"
 
 #include <cmath>
+
+namespace ct = microfacet::cook_torrance;
+
+const OIIO_NAMESPACE::ustring bsdf::lobes::microfacet_t::GGX("ggx");
 
 Imath::Color3f eval(
   bsdf_t::type_t type
@@ -35,16 +41,13 @@ Imath::Color3f eval(
     }
   case bsdf_t::Microfacet:
     {
-      if (param.microfacet.distribution == "ggx") {
-        pdf = microfacet::pdf(param.microfacet, wi, wo);
-        result = microfacet::f(
+      if (param.microfacet.is_ggx()) {
+        pdf = ct::pdf(param.microfacet, wi, wo, microfacet::ggx_t());
+        result = ct::f(
           param.microfacet
         , wi
         , wo
-        , microfacet::ggx::D
-        , microfacet::ggx::G
-        , fresnel::dielectric);
-        // std::cout << result << std::endl;
+        , microfacet::ggx_t());
       }
       else {
         std::cerr
@@ -52,6 +55,16 @@ Imath::Color3f eval(
           << param.microfacet.distribution
           << std::endl;
       }
+      break;
+    }
+  case bsdf_t::Sheen:
+    {
+      pdf = microfacet::sheen::pdf(param.sheen, wi, wo);
+      result = ct::f(
+        param.sheen
+      , wi
+      , wo
+      , microfacet::sheen::distribution_t());
       break;
     }
   case bsdf_t::Reflection:
@@ -115,16 +128,14 @@ Imath::Color3f bsdf_t::sample(
     result = oren_nayar::sample(p.oren_nayar, wi, wo, remapped, pdf);
     break;
   case Microfacet:
-    if (p.microfacet.distribution == "ggx") {
-      result = microfacet::sample(
+    if (p.microfacet.is_ggx()) {
+      result = ct::sample(
         p.microfacet
       , wi
       , wo
       , remapped
       , pdf
-      , microfacet::ggx::D
-      , microfacet::ggx::G
-      , fresnel::dielectric);
+      , microfacet::ggx_t());
     }
     else {
       std::cerr
@@ -132,6 +143,9 @@ Imath::Color3f bsdf_t::sample(
         << p.microfacet.distribution
         << std::endl;
     }
+    break;
+  case Sheen:
+    result = microfacet::sheen::sample(p.sheen, wi, wo, remapped, pdf);
     break;
   case Reflection:
     result = reflection::sample(p.reflect, wi, wo, remapped, pdf);

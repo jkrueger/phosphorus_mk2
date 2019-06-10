@@ -18,8 +18,9 @@ struct bsdf_t {
     Reflection  = 4,
     Refraction  = 8,
     Microfacet  = 16,
-    Background  = 32,
-    Transparent = 64,
+    Sheen       = 32,
+    Background  = 64,
+    Transparent = 128,
   };
 
   union param_t{
@@ -28,6 +29,7 @@ struct bsdf_t {
     bsdf::lobes::reflect_t reflect;
     bsdf::lobes::refract_t refract;
     bsdf::lobes::microfacet_t microfacet;
+    bsdf::lobes::sheen_t sheen;
   };
 
   type_t type[MaxLobes];
@@ -54,16 +56,13 @@ struct bsdf_t {
     type[lobes] = t;
     flags[lobes] = T::flags;
     weight[lobes] = c;
-    memcpy(&params[lobes*sizeof(param_t)], p, sizeof(T));
-    ++lobes;
-  }
 
-  template<typename T>
-  inline void add_lobe(type_t t, const Imath::Color3f& c, const T& p) {
-    type[lobes] = t;
-    flags[lobes] = T::flags;
-    weight[lobes] = c;
-    memcpy(&params[lobes*sizeof(param_t)], &p, sizeof(T));
+    const auto index = lobes*sizeof(param_t);
+    auto param = (T*) &params[index];
+
+    memcpy(param, p, sizeof(T));
+    param->precompute();
+
     ++lobes;
   }
 

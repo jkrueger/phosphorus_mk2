@@ -36,6 +36,8 @@ struct material_t::details_t {
   struct empty_params_t
   {
     static const uint32_t flags = bsdf::TRANSMIT;
+
+    void precompute() {}
   };
 
   ShaderGroupRef group;
@@ -70,9 +72,9 @@ struct material_t::details_t {
         CLOSURE_FINISH_PARAM(bsdf::lobes::diffuse_t)
       },
       {
-        CLOSURE_VECTOR_PARAM(bsdf::lobes::oren_nayar_t::in_t, n),
-        CLOSURE_FLOAT_PARAM(bsdf::lobes::oren_nayar_t::in_t, alpha),
-        CLOSURE_FINISH_PARAM(bsdf::lobes::oren_nayar_t::in_t)
+        CLOSURE_VECTOR_PARAM(bsdf::lobes::oren_nayar_t, n),
+        CLOSURE_FLOAT_PARAM(bsdf::lobes::oren_nayar_t, alpha),
+        CLOSURE_FINISH_PARAM(bsdf::lobes::oren_nayar_t)
       },
       {
         CLOSURE_VECTOR_PARAM(bsdf::lobes::reflect_t, n),
@@ -93,7 +95,12 @@ struct material_t::details_t {
         CLOSURE_FLOAT_PARAM(bsdf::lobes::microfacet_t, eta),
         CLOSURE_INT_PARAM(bsdf::lobes::microfacet_t, refract),
         CLOSURE_FINISH_PARAM(bsdf::lobes::microfacet_t)
-      }
+      },
+      {
+        CLOSURE_VECTOR_PARAM(bsdf::lobes::sheen_t, n),
+        CLOSURE_FLOAT_PARAM(bsdf::lobes::sheen_t, r),
+        CLOSURE_FINISH_PARAM(bsdf::lobes::sheen_t)
+      },
     };
 
     system->register_closure("emission", bsdf_t::Emissive, params[0], NULL, NULL);
@@ -104,6 +111,7 @@ struct material_t::details_t {
     system->register_closure("reflection", bsdf_t::Reflection, params[3], NULL, NULL);
     system->register_closure("refraction", bsdf_t::Refraction, params[4], NULL, NULL);
     system->register_closure("microfacet", bsdf_t::Microfacet, params[5], NULL, NULL);
+    system->register_closure("sheen", bsdf_t::Sheen, params[6], NULL, NULL);
   }
 
   static void attach() {
@@ -185,11 +193,10 @@ struct material_t::details_t {
 	  break;
 	case bsdf_t::OrenNayar:
 	  if (result.bsdf) {
-            const auto params = component->as<bsdf::lobes::oren_nayar_t::in_t>();
 	    result.bsdf->add_lobe(
               bsdf_t::OrenNayar
             , cw
-            , bsdf::lobes::oren_nayar_t(params));
+            , component->as<bsdf::lobes::oren_nayar_t>());
 	  }
 	  break;
 	case bsdf_t::Microfacet:
@@ -198,6 +205,14 @@ struct material_t::details_t {
 	      bsdf_t::Microfacet
 	    , cw
 	    , component->as<bsdf::lobes::microfacet_t>());
+	  }
+	  break;
+	case bsdf_t::Sheen:
+	  if (result.bsdf) {
+	    result.bsdf->add_lobe(
+	      bsdf_t::Sheen
+	    , cw
+	    , component->as<bsdf::lobes::sheen_t>());
 	  }
 	  break;
 	case bsdf_t::Reflection:
