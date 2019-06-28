@@ -11,6 +11,7 @@
 #include <RNA_blender_cpp.h>
 #include <RNA_types.h>
 
+#include <functional>
 #include <list>
 #include <map>
 #include <unordered_map>
@@ -33,15 +34,8 @@ namespace blender {
 
   namespace import {
     mesh_t* mesh(BL::Depsgraph& graph, BL::BlendData& data, BL::Object& object, const scene_t& scene) {
-      const auto apply_modifiers = true;
-      const auto calc_undeformed = false;
-
       auto blender_mesh =
-        data.meshes.new_from_object(
-          graph
-        , object
-        , apply_modifiers
-        , calc_undeformed);
+        data.meshes.new_from_object(object, false, graph);
 
       blender_mesh.calc_loop_triangles();
 
@@ -231,7 +225,7 @@ namespace blender {
           }
         default:
           std::cout
-            << "Don't know how to set parameter of type: "
+            << "Don't know how to set parameter " << mapped << " of type: "
             << type
             << std::endl;
           break;
@@ -325,6 +319,18 @@ namespace blender {
               }
             },
             passthrough("Color", "Cs"),
+          },
+          {
+            passthrough("BSDF", "Cout")
+          }
+        };
+      }
+      else if(node.is_a(&RNA_ShaderNodeBsdfVelvet)) {
+        return {
+          "sheen_bsdf_node",
+          {
+            passthrough("Color", "Cs"),
+            passthrough("Sigma", "roughness"),
           },
           {
             passthrough("BSDF", "Cout")
@@ -685,7 +691,7 @@ namespace blender {
 
       BL::Camera camera(object.data());
 
-      if (camera.dof_object()) {
+      if (camera.dof()) {
         // TODO: log unsupported config
         std::cout << "DOF object unsupported" << std::endl;
       }

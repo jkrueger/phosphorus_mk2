@@ -43,6 +43,8 @@ PyObject* exit_func(PyObject* /*self*/, PyObject* /*args*/) {
 }
 
 PyObject* create_func(PyObject* /*self*/, PyObject* args) {
+  printf("CREATE\n");
+
   PyObject *pyengine, *pyuserpref, *pydata, *pyregion, *pyv3d, *pyrv3d;
   int preview_osl;
 

@@ -11,4 +11,3 @@ surface background_node
 {
   Ci = Cs * power * background() + diffuse(N);
 }
-

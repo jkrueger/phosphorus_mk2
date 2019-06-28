@@ -256,8 +256,9 @@ namespace spt {
       bsdf = hits->bsdf[from];
 
       beta = state->beta.at(index);
-
-      assert(bsdf);
+      if (!bsdf) {
+        return false;
+      }
 
       uint32_t flags;
       float pdf;
@@ -268,7 +269,6 @@ namespace spt {
       const auto f = bsdf->sample(sample, wi, sampled, pdf, flags);
 
       if (color::is_black(f) || pdf == 0.0f) {
-        // std::cout << "black" << std::endl;
 	return false;
       }
 

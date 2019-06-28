@@ -1,5 +1,6 @@
 #include "sink.hpp"
 
+#include <mutex>
 #include <string>
 #include <vector>
 

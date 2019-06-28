@@ -1,0 +1,18 @@
+shader
+sheen_bsdf_node
+  [[ string help = "Sheen BSDf for velvety materials" ]]
+(
+  color Cs = 1
+    [[  string help = "Base color",
+        float min = 0, float max = 1 ]],
+
+  float roughness = 0
+    [[ string help = "Roughness of material",
+       float min = 0, float max = 1]],
+
+  output closure color Cout = 0
+    [[ string help = "Output color" ]]
+)
+{
+  Cout = Cs * sheen(N, roughness);
+}

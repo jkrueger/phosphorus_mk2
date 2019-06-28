@@ -454,6 +454,7 @@ closure color microfacet(string distribution, normal N, float alpha, float eta,
 {
     return microfacet(distribution, N, vector(0), alpha, alpha, eta, refr);
 }
+closure color sheen(normal N, float r) BUILTIN;
 closure color reflection(normal N, float eta) BUILTIN;
 closure color reflection(normal N) { return reflection (N, 0.0); }
 closure color refraction(normal N, float eta) BUILTIN;

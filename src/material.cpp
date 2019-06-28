@@ -150,16 +150,6 @@ struct material_t::details_t {
   , const ClosureColor* c
   , const Imath::Color3f w = Imath::Color3f(1,1,1)) const
   {
-    // if (!c) {
-    //   if (result.bsdf) {
-    // 	result.bsdf->add_lobe(
-    // 	  bsdf_t::Transparent
-    // 	, w
-    // 	, empty_params_t());
-    //   }
-    //   return;
-    // }
-
     switch(c->id) {
     case ClosureColor::MUL:
       {
@@ -370,13 +360,15 @@ void material_t::evaluate(
 
     details->execute(sg);
 
-    shading_result_t result; 
-    result.bsdf = new(allocator) bsdf_t();
+    if (sg.Ci) {
+      shading_result_t result; 
+      result.bsdf = new(allocator) bsdf_t();
 
-    details->eval_closure(result, sg.Ci);
+      details->eval_closure(result, sg.Ci);
 
-    hits->e.from(index, result.e);
-    hits->bsdf[index] = result.bsdf;
+      hits->e.from(index, result.e);
+      hits->bsdf[index] = result.bsdf;
+    }
   }
 }
 
@@ -397,9 +389,11 @@ void material_t::evaluate(
   sg.backfacing = sg.N.dot(sg.I) < 0;
 
   details->execute(sg);
-
   result.bsdf = nullptr;
-  details->eval_closure(result, sg.Ci);
+
+  if (sg.Ci) {
+    details->eval_closure(result, sg.Ci);
+  }
 }
 
 bool material_t::is_emitter() const {
