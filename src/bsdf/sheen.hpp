@@ -21,7 +21,7 @@ namespace microfacet {
           return t * a + (1.0f - t) * b;
         };
 
-        const auto t = 1.0f - r * r;
+        const auto t = (1.0f - r) * (1.0f - r);
 
         const auto a = interp(p0[0], p1[0], t);
         const auto b = interp(p0[1], p1[1], t);
@@ -31,7 +31,7 @@ namespace microfacet {
 
         const auto xc = std::pow(x, c);
 
-        return a / (1 + xc) + d * x + e;
+        return a / (1 + b * xc) + d * x + e;
       }
     }
 
@@ -43,7 +43,7 @@ namespace microfacet {
       { 
         const auto sin_theta = ts::sin_theta(v);
         const auto oor = 1.0f / params.r;
-      
+
         return (2.0f + oor) * std::pow(sin_theta, oor) / (2.0f * M_PI);
       }
 
