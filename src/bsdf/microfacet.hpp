@@ -23,7 +23,7 @@ namespace microfacet {
       const auto lo = base.to_local(wo);
       
       auto wh = li + lo;
-      
+
       const auto cos_ti = std::abs(ts::cos_theta(li));
       const auto cos_to = std::abs(ts::cos_theta(lo));
       

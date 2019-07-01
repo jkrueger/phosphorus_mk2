@@ -60,10 +60,15 @@ namespace blender {
       mesh_t::builder_t::scoped_t builder(mesh->builder());
 
       if (use_loop_normals) {
+        std::cout << "Use loop normals" << std::endl;
+        
         builder->set_normals_per_vertex_per_face();
         builder->set_uvs_per_vertex_per_face();
 
         blender_mesh.calc_normals_split();
+      }
+      else {
+        std::cout << "Use vertex normals" << std::endl;
       }
 
       uint32_t num_normals = 0;
@@ -90,8 +95,9 @@ namespace blender {
       for (auto id=0; f!=blender_mesh.loop_triangles.end(); ++f, ++id) {
         auto p = blender_mesh.polygons[f->polygon_index()];
         const auto& indices = f->vertices();
+        const auto smooth = p.use_smooth() || use_loop_normals;
 
-        builder->add_face(indices[0], indices[1], indices[2]);
+        builder->add_face(indices[0], indices[1], indices[2], smooth);
 
         auto material = blender_mesh.materials[p.material_index()];
         sets[material.name()].push_back(id);

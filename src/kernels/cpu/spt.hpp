@@ -167,6 +167,7 @@ namespace spt {
         auto keep_alive = true;
 
 	if (hits->is_hit(i)) {
+          // add direct lighting to path vertex
           if (state->depth[index] == 0 || hits->is_specular(i)) {
             out += state->beta.at(index) * hits->e.at(i);
           }

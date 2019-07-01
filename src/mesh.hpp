@@ -52,7 +52,7 @@ struct mesh_t {
     virtual void add_vertex(const Imath::V3f& v) = 0;
     virtual void add_normal(const Imath::V3f& n) = 0;
     virtual void add_uv(const Imath::V2f& uv) = 0;
-    virtual void add_face(uint32_t a, uint32_t b, uint32_t c) = 0;
+    virtual void add_face(uint32_t a, uint32_t b, uint32_t c, bool smooth = true) = 0;
     virtual void add_face_set(uint32_t id, const std::vector<uint32_t>& faces) = 0;
     virtual void add_face_set(const material_t* m, const std::vector<uint32_t>& faces) = 0;
 

@@ -13,6 +13,7 @@ struct mesh_t::details_t {
   std::vector<Imath::V2f> uvs;
   std::vector<uint32_t>   faces;
   std::vector<face_set_t> sets;
+  std::vector<bool>       smooth;
 };
 
 struct builder_impl_t : public mesh_t::builder_t {
@@ -42,10 +43,11 @@ struct builder_impl_t : public mesh_t::builder_t {
     mesh->details->uvs.push_back(uv);
   }
 
-  void add_face(uint32_t a, uint32_t b, uint32_t c) {
+  void add_face(uint32_t a, uint32_t b, uint32_t c, bool smooth) {
     mesh->details->faces.push_back(a);
     mesh->details->faces.push_back(b);
     mesh->details->faces.push_back(c);
+    mesh->details->smooth.push_back(smooth);
   }
 
   void add_face_set(uint32_t id, const std::vector<uint32_t>& faces) {
@@ -165,17 +167,26 @@ void mesh_t::shading_parameters(
 
   auto na = a, nb = b, nc = c;
 
-  if (!has_per_vertex_normals()) {
-    na = face;
-    nb = face+1;
-    nc = face+2;
+  if (details->smooth[face]) {
+    if (!has_per_vertex_normals()) {
+      na = face;
+      nb = face+1;
+      nc = face+2;
+    }
+
+    const auto& n0 = normals[na];
+    const auto& n1 = normals[nb];
+    const auto& n2 = normals[nc];
+
+    n = (w*n0+u*n1+v*n2).normalize();
   }
+  else {
+    const auto v0 = vertices[a];
+    const auto v1 = vertices[b];
+    const auto v2 = vertices[c];
 
-  const auto& n0 = normals[na];
-  const auto& n1 = normals[nb];
-  const auto& n2 = normals[nc];
-
-  n = (w*n0+u*n1+v*n2).normalize();
+    n = (v1 - v0).cross(v2 - v0).normalize();
+  }
 
   if (details->uvs.size() == 0) {
     st = Imath::V2f(0);
