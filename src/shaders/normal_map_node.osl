@@ -1,0 +1,16 @@
+
+shader
+normal_map_node
+ [[ string help = "Transform the input normal using a normal map" ]]
+(
+  color sample = 0
+    [[ string help = "Normal map sample" ]],
+
+  float strength = 0.5
+    [[ string help = "Strength of the perturbation" ]],
+
+  output normal Normal= 0
+    [[ string help = "Output color" ]]
+)
+{     
+}

@@ -119,6 +119,10 @@ struct material_t::details_t {
     ctx = system->get_context(pti);
   }
 
+  static void add_image(const std::string path, void* data) {
+    std::cout << "Adding packed image" << std::endl;
+  }
+
   void init() {
     group = system->ShaderGroupBegin();
   }
@@ -406,4 +410,9 @@ void material_t::boot(const parsed_options_t& options, const std::string& path) 
 
 void material_t::attach() {
   details_t::attach();
+}
+
+
+void material_t::add_image(const std::string path, void* data) {
+  details_t::add_image(path, data);
 }
