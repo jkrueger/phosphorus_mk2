@@ -10,6 +10,7 @@
 struct mesh_t::details_t {
   std::vector<Imath::V3f> vertices;
   std::vector<Imath::V3f> normals;
+  std::vector<Imath::V3f> tangents;
   std::vector<Imath::V2f> uvs;
   std::vector<uint32_t>   faces;
   std::vector<face_set_t> sets;
@@ -26,6 +27,7 @@ struct builder_impl_t : public mesh_t::builder_t {
   ~builder_impl_t() {
     mesh->vertices = mesh->details->vertices.data();
     mesh->normals  = mesh->details->normals.data();
+    mesh->tangents = mesh->details->tangents.data();
     mesh->uvs      = mesh->details->uvs.data();
     mesh->faces    = mesh->details->faces.data();
     mesh->sets     = mesh->details->sets.data();
@@ -37,6 +39,10 @@ struct builder_impl_t : public mesh_t::builder_t {
 
   void add_normal(const Imath::V3f& n) {
     mesh->details->normals.push_back(n);
+  }
+
+  void add_tangent(const Imath::V3f& n) {
+    mesh->details->tangents.push_back(n);
   }
 
   void add_uv(const Imath::V2f& uv) {

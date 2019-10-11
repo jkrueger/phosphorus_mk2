@@ -11,6 +11,8 @@
 #include <RNA_blender_cpp.h>
 #include <RNA_types.h>
 
+#include <mikktspace.h>
+
 #include <functional>
 #include <list>
 #include <map>
@@ -31,6 +33,10 @@ namespace blender {
   bool is_material(BL::ID& id) {
     return id && id.is_a(&RNA_Material);
   }
+
+  struct MikkUserData {
+    const mesh_t* mesh;
+  };
 
   namespace import {
     mesh_t* mesh(BL::Depsgraph& graph, BL::BlendData& data, BL::Object& object, const scene_t& scene) {
@@ -170,9 +176,22 @@ namespace blender {
     , BL::Image& image
     , int frame)
     {
+      std::cout << image.name() << std::endl;
+
+      if (!user) {
+        std::cout << "TEST" << std::endl;
+      }
+
+      std::cout << std::to_string(user.frame_current()) << std::endl;
+
+      if (image.packed_file()) {
+        return image.name() + "@" + std::to_string(frame);
+      }
+
       char filepath[1024];
-      BKE_image_user_frame_calc(user.ptr.data, frame);
+      // BKE_image_user_frame_calc(user.ptr.data, frame);
       BKE_image_user_file_path(user.ptr.data, image.ptr.data, filepath);
+
       return std::string(filepath);
     }
 
@@ -189,8 +208,14 @@ namespace blender {
     > parameter_mappings_t;
 
     typedef std::tuple<
+      // name of the shader
       std::string
+      // extra dependencies required by the shader, such as tangent vectors
+      // for normal maps, etc. that are computed on demand
+    , std::vector<std::string>
+      // mapping for input parameters
     , parameter_mappings_t
+      // mapping for output parameters
     , parameter_mappings_t
     > node_descriptor_t;
 
@@ -244,6 +269,7 @@ namespace blender {
       if (node.is_a(&RNA_ShaderNodeAddShader)) {
         return {
           "add_node",
+          [],
           {
             passthrough("Shader", "A"),
             passthrough("Shader_001", "B"),
@@ -256,6 +282,7 @@ namespace blender {
       else if (node.is_a(&RNA_ShaderNodeMixShader)) {
         return {
           "mix_node",
+          [],
           {
             passthrough("Fac", "fac"),
             passthrough("Closure1", "A"),
@@ -269,6 +296,7 @@ namespace blender {
       else if (node.is_a(&RNA_ShaderNodeMixRGB)) {
         return {
           "color_op_node",
+          [],
           {
             passthrough("Fac", "fac"),
             passthrough("Color1", "A"),
@@ -282,6 +310,7 @@ namespace blender {
       else if (node.is_a(&RNA_ShaderNodeFresnel)) {
         return {
           "fresnel_dielectric_node",
+          [],
           {
             passthrough("IOR", "IoR"),
           },
@@ -293,6 +322,7 @@ namespace blender {
       else if (node.is_a(&RNA_ShaderNodeBsdfDiffuse)) {
         return {
           "diffuse_bsdf_node",
+          [],
           {
             passthrough("Color", "Cs"),
           },
@@ -304,6 +334,7 @@ namespace blender {
       else if (node.is_a(&RNA_ShaderNodeBsdfGlossy)) {
         return {
           "glossy_bsdf_node",
+          [],
           {
             { "distribution",
               { "distribution", [=](material_t::builder_t::scoped_t& builder, BL::NodeSocket&, const std::string& parameter) {
@@ -334,6 +365,7 @@ namespace blender {
       else if(node.is_a(&RNA_ShaderNodeBsdfVelvet)) {
         return {
           "sheen_bsdf_node",
+          [],
           {
             passthrough("Color", "Cs"),
             passthrough("Sigma", "roughness"),
@@ -346,6 +378,7 @@ namespace blender {
       else if(node.is_a(&RNA_ShaderNodeBackground)) {
         return {
           "background_node",
+          [],
           {
             passthrough("Color", "Cs"),
             passthrough("Strength", "power"),
@@ -362,6 +395,7 @@ namespace blender {
       else if(node.is_a(&RNA_ShaderNodeEmission)) {
         return {
           "diffuse_emitter_node",
+          [],
           {
             passthrough("Color", "Cs"),
             passthrough("Strength", "power"),
@@ -374,6 +408,7 @@ namespace blender {
       else if(node.is_a(&RNA_ShaderNodeTexImage)) {
         return {
           "texture_node",
+          [],
           {
             { "filename",
                 { "filename",
@@ -381,13 +416,25 @@ namespace blender {
                       , BL::NodeSocket&
                       , const std::string& parameter)
                       {
+                        std::cout << "Texture" << std::endl;
+                        
                         BL::ShaderNodeTexImage tex(node.ptr);
                         BL::Image image(tex.image());
                         BL::ImageUser image_user(tex.image_user());
 
-                        const auto frame = const_cast<BL::Scene&>(scene).frame_current();
-                        const auto path = image_file_path(image_user, image, frame);
-                        builder->parameter(parameter, path);
+                        if (image) {
+                          const auto frame = const_cast<BL::Scene&>(scene).frame_current();
+                          const auto path = image_file_path(image_user, image, frame);
+
+                          builder->parameter(parameter, path);
+
+                          if (image.packed_file()) {
+                            material_t::add_image(path, image.ptr.data);
+                          }
+                        }
+                        else {
+                          std::cout << "Can't find image!" << std::endl;
+                        }
                       }
                 }
             },
@@ -410,6 +457,7 @@ namespace blender {
       else if(node.is_a(&RNA_ShaderNodeTexEnvironment)) {
         return {
           "environment_node",
+          [],
           {
             { "filename",
                 { "filename",
@@ -445,10 +493,24 @@ namespace blender {
           }
         };
       }
+      else if (node.is_a(&RNA_ShaderNodeNormalMap)) {
+        return {
+          "normal_map_node",
+          ["geom:tangent"],
+          {
+            passthrough("Color", "sample"),
+            passthrough("Strength", "strength")
+          },
+          {
+            passthrough("Normal", "Normal"),
+          },
+        }
+      }
       else if (node.is_a(&RNA_ShaderNodeOutputMaterial) ||
                node.is_a(&RNA_ShaderNodeOutputWorld)) {
         return {
           "material_node",
+          [],
           {
             passthrough("Surface", "Cs")
           },
