@@ -85,6 +85,11 @@ struct mesh_t {
   // , uint32_t num_uvs
   // , uint32_t num_faces);
 
+  /* allocate extra space for precomputed tangents, which might
+   * comes from external modelling packages */
+  void allocate_tangents();
+
+  /* preprocess the mesh based on  */
   void preprocess(scene_t* scene);
 
   /* get a list of descriptors of the triangles in this mesh */

@@ -42,6 +42,8 @@ struct material_t {
     virtual void parameter(
       const std::string& name
     , const std::string& s) = 0;
+
+    virtual void add_attribute(const std::string& name) = 0;
   };
 
   uint32_t id;
@@ -63,10 +65,23 @@ struct material_t {
   , const Imath::V2f& st
   , shading_result_t& result);
 
+  /* checks if this material has an emissive component. if this returns true, 
+   * meshes this material is attached to, will be considered for light sampling */
   bool is_emitter() const;
 
+  /**
+   * Checks if this material has a special attribute attached to it
+   * that signals requirements this material might have that require
+   * additional precomputation steps
+   */
+  bool has_attribute(const std::string& name) const;
+
+  /* each thread needs to call this method to register itself with the material system */
   static void attach();
 
+  /* call this to intialize the static parts of the materia system. can be called with
+   * an optional shader search path. will look for shaders in the binary directory by 
+   * default */
   static void boot(const parsed_options_t& options, const std::string& path = ".");
 
   /* add image data under a virtual path */

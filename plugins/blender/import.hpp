@@ -34,9 +34,107 @@ namespace blender {
     return id && id.is_a(&RNA_Material);
   }
 
-  struct MikkUserData {
-    const mesh_t* mesh;
-  };
+  namespace mikk {
+  
+    struct user_data_t {
+      mesh_t* mesh;
+
+      user_data_t(mesh_t* mesh) 
+       : mesh(mesh)
+       {}
+    };
+
+    int get_num_faces(const SMikkTSpaceContext* context) {
+      const user_data_t* data = (const user_data_t*) context->m_pUserData;
+      return data->mesh->num_faces;
+    }
+
+    int get_num_verts_of_face(const SMikkTSpaceContext*) {
+      return 3;
+    }
+
+    void get_position(
+      const SMikkTSpaceContext* context
+    , float p[3]
+    , const int face
+    , const int vert)
+    {
+      const user_data_t* data = (const user_data_t*) context->m_pUserData;
+      const auto mesh = data->mesh;
+      const index = mesh->faces[face * 3 + vert];
+      const auto& vertex = mesh->vertices[index];
+
+      p[0] = vertex.x;
+      p[1] = vertex.y;
+      p[2] = vertex.z;
+    }
+
+    void get_normal(
+      const SMikkTSpaceContext* context
+    , float n[3]
+    , const int face
+    , const int vert) {
+      
+      const user_data_t* data = (const user_data_t*) context->m_pUserData;
+      const auto mesh = data->mesh;
+      const index = mesh->faces[face * 3 + vert];
+      const auto& normal = mesh->vertices[index];
+
+      n[0] = normal.x;
+      n[1] = normal.y;
+      n[2] = normal.z;
+    }
+
+    void get_uv(
+      const SMikkTSpaceContext* context
+    , float uv[2]
+    , const int face
+    , const int vert) {
+      
+      const user_data_t* data = (const user_data_t*) context->m_pUserData;
+      const auto mesh = data->mesh;
+      const index = mesh->faces[face * 3 + vert];
+      const auto& uv = mesh->uvs[index];
+
+      uv[0] = uv.x;
+      uv[1] = uv.y;
+    }
+
+    void set_tangent(
+      const SMikkTSpaceContext* context
+    , const float t[2]
+    , const float sign
+    , const int face 
+    , const int vert) {
+      
+      const user_data_t* data = (const user_data_t*) context->m_pUserData;
+      const auto mesh = data->mesh;
+      const index = mesh->faces[face * 3 + vert];
+      
+      mesh->tangents[index] = Imath::V3f(T[0], T[1], T[2]);
+    }
+
+    void generate_tangents(mesh_t* mesh) {
+	    user_data_t userdata(mesh);
+
+      SMikkTSpaceInterface sm_interface;
+      memset(&sm_interface, 0, sizeof(sm_interface));
+      
+      sm_interface.m_getNumFaces = get_num_faces;
+      sm_interface.m_getNumVerticesOfFace = get_num_verts_of_face;
+      sm_interface.m_getPosition = get_position;
+      sm_interface.m_getTexCoord = get_uv;
+      sm_interface.m_getNormal = get_normal;
+      sm_interface.m_setTSpaceBasic = set_tangent;
+
+      SMikkTSpaceContext context;
+      memset(&context, 0, sizeof(context));
+      context.m_pUserData = &userdata;
+      context.m_pInterface = &sm_interface;
+      
+      genTangSpaceDefault(&context);
+    }
+  }
 
   namespace import {
     mesh_t* mesh(BL::Depsgraph& graph, BL::BlendData& data, BL::Object& object, const scene_t& scene) {
@@ -132,9 +230,17 @@ namespace blender {
           std::cout << "Expecting to have a normal per vertex" << std::endl;
         }
       }
-      
+
+      bool generate_tangents = false;
+
       for (auto& set : sets) {
-        builder->add_face_set(scene.material(set.first), set.second);
+        const auto material = scene.material(set.first);
+
+        if (material->has_attribute("geom:tangent")) {
+          generate_tangents = true;
+        }
+
+        builder->add_face_set(material, set.second);
       }
 
       uint32_t num_uvs = 0;
@@ -167,7 +273,12 @@ namespace blender {
           std::cout << "Expecting to have a uv coordinate per vertex" << std::endl;
         }
       }
- 
+
+      if (generate_tangents) {
+        mesh->allocate_tangents();
+        mikk_generate_tangents(mesh);
+      }
+
       return mesh;
     }
 
@@ -179,7 +290,7 @@ namespace blender {
       std::cout << image.name() << std::endl;
 
       if (!user) {
-        std::cout << "TEST" << std::endl;
+        std::cout << "No image user" << std::endl;
       }
 
       std::cout << std::to_string(user.frame_current()) << std::endl;

@@ -26,6 +26,10 @@ include_directories(
   /usr/local/include
   /usr/local/include/OpenEXR)
 
+target_link_directories(phosphorus
+  PUBLIC /usr/local/lib
+)
+
 target_link_libraries(phosphorus
   pthread
   IlmImf

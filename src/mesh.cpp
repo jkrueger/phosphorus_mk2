@@ -41,8 +41,8 @@ struct builder_impl_t : public mesh_t::builder_t {
     mesh->details->normals.push_back(n);
   }
 
-  void add_tangent(const Imath::V3f& n) {
-    mesh->details->tangents.push_back(n);
+  void add_tangent(const Imath::V3f& t) {
+    mesh->details->tangents.push_back(t);
   }
 
   void add_uv(const Imath::V2f& uv) {
@@ -92,6 +92,11 @@ mesh_t::~mesh_t() {
 
 mesh_t::builder_t* mesh_t::builder() {
   return new builder_impl_t(this);
+}
+
+void mesh_t::allocate_tangents() {
+  details->tangents.reserve(details->normals.size());
+  tangents = details->tangents.data();
 }
 
 void mesh_t::preprocess(scene_t* scene) {
