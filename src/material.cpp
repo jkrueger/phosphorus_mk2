@@ -17,6 +17,8 @@
 
 #include <OpenImageIO/sysutil.h>
 
+#include <set>
+
 using namespace OSL_NAMESPACE;
 
 struct service_t : public RendererServices {
@@ -45,6 +47,8 @@ struct material_t::details_t {
   buffer_t<PARAMETER_BUFFER_SIZE> parameters;
 
   bool is_emitter;
+
+  std::set<std::string> attributes;
 
   details_t()
     : is_emitter(false)
@@ -331,6 +335,11 @@ struct material_builder_t : public material_t::builder_t {
     , p
     , false);
   }
+
+  void add_attribute(const std::string& name) {
+    ustring attr(name);
+    material->details->attributes.insert(name);
+  }
 };
 
 material_t::material_t()
@@ -404,6 +413,10 @@ bool material_t::is_emitter() const {
   return details->is_emitter;
 }
 
+bool material_t::has_attribute(const std::string& name) const {
+  return details->attributes.count(name);
+}
+
 void material_t::boot(const parsed_options_t& options, const std::string& path) {
   details_t::boot(path);
 }
@@ -411,7 +424,6 @@ void material_t::boot(const parsed_options_t& options, const std::string& path) 
 void material_t::attach() {
   details_t::attach();
 }
-
 
 void material_t::add_image(const std::string path, void* data) {
   details_t::add_image(path, data);
