@@ -16,15 +16,27 @@ struct orthogonal_base_t {
     a.normalize();
     c.normalize();
   }
-
-  inline orthogonal_base_t(const Imath::V3f& z, const Imath::V3f& y)
-    : a(z.cross(y)), b(y), c(z)
+ 
+  inline orthogonal_base_t(const Imath::V3f& tangent, const Imath::V3f& n)
+    : a(tangent.cross(n)), b(n), c(tangent)
   {
     b.normalize();
   }
 
   inline Imath::V3f to_world(const Imath::V3f& v) const {
     return v.x * a + v.y * b + v.z * c;
+  }
+
+  inline Imath::V3f normal() const {
+    return b;
+  }
+
+  inline Imath::V3f tangent() const {
+    return c;
+  }
+
+  inline Imath::V3f cotangent() const {
+    return a;
   }
 };
 
@@ -36,6 +48,14 @@ struct invertible_base_t : public orthogonal_base_t {
 
   inline invertible_base_t(const Imath::V3f& n)
     : orthogonal_base_t(n),
+      // transpose base vectors
+      ia(a.x,b.x,c.x),
+      ib(a.y,b.y,c.y),
+      ic(a.z,b.z,c.z)
+  {}
+
+  inline invertible_base_t(const Imath::V3f& t, const Imath::V3f& n)
+    : orthogonal_base_t(t, n),
       // transpose base vectors
       ia(a.x,b.x,c.x),
       ib(a.y,b.y,c.y),

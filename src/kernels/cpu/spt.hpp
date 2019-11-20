@@ -226,7 +226,8 @@ namespace spt {
       {
         Imath::V3f n;
         Imath::V2f st;
-        mesh->shading_parameters(samples, n, st, to);
+        invertible_base_t _base;
+        mesh->shading_parameters(samples, n, st, _base, to);
         material->evaluate(samples->p.at(to), wi, n, st, light);
       }
 

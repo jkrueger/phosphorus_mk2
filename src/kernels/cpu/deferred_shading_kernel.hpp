@@ -56,8 +56,8 @@ struct deferred_shading_kernel_t {
       hits->e.from(i, Imath::Color3f(0));
 
       if (rays->is_hit(i)) {
-	const auto mesh = scene.mesh(rays->meshid(i));
-	const auto material = rays->matid(i);
+	      const auto mesh = scene.mesh(rays->meshid(i));
+	      const auto material = rays->matid(i);
 
         hits->wi.from(i, -wi);
 

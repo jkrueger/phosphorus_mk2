@@ -73,6 +73,7 @@ struct mesh_t {
 
   uint32_t id;
   uint32_t flags;
+  uint32_t num_faces;
 
   mesh_t();
   ~mesh_t();
@@ -116,6 +117,7 @@ struct mesh_t {
     const ray_t<>* rays     
   , Imath::V3f& n
   , Imath::V2f& st
+  , invertible_base_t& base
   , uint32_t i) const;
 
   inline bool has_per_vertex_normals() const {
