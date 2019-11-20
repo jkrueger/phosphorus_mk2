@@ -25,12 +25,13 @@ struct builder_impl_t : public mesh_t::builder_t {
   {}
 
   ~builder_impl_t() {
-    mesh->vertices = mesh->details->vertices.data();
-    mesh->normals  = mesh->details->normals.data();
-    mesh->tangents = mesh->details->tangents.data();
-    mesh->uvs      = mesh->details->uvs.data();
-    mesh->faces    = mesh->details->faces.data();
-    mesh->sets     = mesh->details->sets.data();
+    mesh->vertices  = mesh->details->vertices.data();
+    mesh->normals   = mesh->details->normals.data();
+    mesh->tangents  = mesh->details->tangents.size() ? mesh->details->tangents.data() : nullptr;
+    mesh->uvs       = mesh->details->uvs.data();
+    mesh->faces     = mesh->details->faces.data();
+    mesh->sets      = mesh->details->sets.data();
+    mesh->num_faces = mesh->details->faces.size() / 3;
   }
 
   void add_vertex(const Imath::V3f& v) {
@@ -84,6 +85,7 @@ struct builder_impl_t : public mesh_t::builder_t {
 mesh_t::mesh_t()
   : details(new details_t())
   , flags(UvPerVertex | NormalsPerVertex)
+  , num_faces(0)
 {}
 
 mesh_t::~mesh_t() {
@@ -153,7 +155,7 @@ void mesh_t::shading_parameters(
   Imath::V3f n;
   Imath::V2f st;
 
-  shading_parameters(rays, n, st, i);
+  shading_parameters(rays, n, st, hits->xform[i], i);
 
   hits->n.from(i, n);
   hits->s[i] = st.x;
@@ -164,6 +166,7 @@ void mesh_t::shading_parameters(
   const ray_t<>* rays     
 , Imath::V3f& n
 , Imath::V2f& st
+, invertible_base_t& base
 , uint32_t i) const
 {
   const auto& face = rays->face[i];
@@ -178,7 +181,7 @@ void mesh_t::shading_parameters(
 
   auto na = a, nb = b, nc = c;
 
-  if (details->smooth[face]) {
+  if (details->smooth[face/3]) {
     if (!has_per_vertex_normals()) {
       na = face;
       nb = face+1;
@@ -199,6 +202,28 @@ void mesh_t::shading_parameters(
     n = (v1 - v0).cross(v2 - v0).normalize();
   }
 
+  // compute base, depending on whether we have explicit tangents or not
+  if (tangents) {
+    if (details->smooth[face/3]) {
+      const auto t0 = tangents[na];
+      const auto t1 = tangents[nb];
+      const auto t2 = tangents[nc];
+
+      const auto t = (w*t0+u*t1+v*t2).normalize();
+
+      base = invertible_base_t(n, t);
+    }
+    else {
+      std::cout 
+        << "Normal Mapping is only supported for smooth surfaces at the moment" 
+        << std::endl;
+    }
+  }
+  else {
+    base = invertible_base_t(n);
+  }
+
+  // compute uv coordinates for texture mapping
   if (details->uvs.size() == 0) {
     st = Imath::V2f(0);
   }

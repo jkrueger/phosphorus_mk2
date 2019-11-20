@@ -33,7 +33,12 @@ include_directories(
  ${BLENDER_PATH}/git/intern/guardedalloc
  ${BLENDER_PATH}/git/intern/mikktspace
  ${BLENDER_PATH}/git/source/blender/makesdna
- ${BLENDER_PATH}/lib/python-3.7/include/python3.7m)
+ ${BLENDER_PATH}/lib/darwin/python-3.7/include/python3.7m)
+
+target_link_directories(_phosphoros
+  PUBLIC
+  /usr/local/lib
+  /usr/local/lib/pugixml-1.8)
 
 target_link_libraries(_phosphoros
   xml2
@@ -70,7 +75,7 @@ list (JOIN _CLANG_LIBRARIES " " CLANG_LIBRARIES)
 SET( CMAKE_CC_COMPILER "clang")
 SET( CMAKE_CXX_COMPILER "clang++")
 SET( LIBRARIES "${LLVM_LIBRARIES} ${CLANG_LIBRARIES}" )
-SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -O3 -march=native -fno-rtti" )
+SET( CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -std=c++14 -O3 -march=native -fno-rtti" )
 SET( CMAKE_SHARED_LINKER_FLAGS "${CMAKE_CXX_LDFLAGS} ${LIBRARY_PATHS} ${LIBRARIES} -flto -undefined dynamic_lookup" )
 
 set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${INCLUDE_PATHS} -g -std=c++14 -march=native -fno-rtti -D_DEBUG" )

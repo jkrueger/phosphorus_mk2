@@ -12,5 +12,19 @@ normal_map_node
   output normal Normal= 0
     [[ string help = "Output color" ]]
 )
-{     
+{
+  vector tangent;
+  color scaled = 2.0 * color(sample[0] - 0.5, sample[1] - 0.5, sample[2] - 0.5);
+
+  if (getattribute("geom:tangent", tangent)) {
+    vector cotangent = cross(N, tangent);
+    // compute new normal
+    Normal = normalize(scaled[0] * tangent + scaled[1] * cotangent + scaled[2] * N);
+  }
+  else {
+    Normal = normal(0, 0, 0);
+  }
+
+  // modify original normal given the input strength
+  Normal = normalize(N + (N - Normal) * max(strength, 0.0));
 }

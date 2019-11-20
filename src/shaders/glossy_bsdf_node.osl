@@ -11,6 +11,9 @@ glossy_bsdf_node
   color Cs = 1
     [[  string help = "Base color",
         float min = 0, float max = 1 ]],
+
+  normal shadingNormal = N
+    [[ string help = "The normal used for shading calculations" ]],
         
   float eta = 0.5
     [[  string help = "Index of Refraction" ]],
@@ -27,9 +30,9 @@ glossy_bsdf_node
   float r2 = roughness; // roughness * roughness;
   
   if (distribution == "sharp") {
-    Cout = Cs * reflection(N, eta);
+    Cout = Cs * reflection(shadingNormal, eta);
   }
   else {
-    Cout = Cs * microfacet(distribution, N, vector(0), r2, r2, eta, 0);
+    Cout = Cs * microfacet(distribution, shadingNormal, vector(0), r2, r2, eta, 0);
   }
 }

@@ -4,8 +4,10 @@ diffuse_bsdf_node
   [[ string help = "Lambertian diffuse BSDF shader" ]]
 (
   color Cs = 1
-    [[  string help = "Base color",
-        float min = 0, float max = 1 ]],
+    [[ string help = "Base material color" ]],
+
+  normal shadingNormal = N
+    [[ string help = "The normal used for shading calculations" ]],
 
   float roughness = 0
     [[ string help = "Roughness of material",
@@ -19,6 +21,6 @@ diffuse_bsdf_node
     Cout = Cs * diffuse(N);
   }
   else {
-    Cout = Cs * oren_nayar(N, roughness);
+    Cout = Cs * oren_nayar(shadingNormal, roughness);
   }
 }

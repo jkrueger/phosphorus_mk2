@@ -22,9 +22,69 @@
 using namespace OSL_NAMESPACE;
 
 struct service_t : public RendererServices {
+  static const ustring tangent;
+
+  /* describes the rendered object to osl */
+  struct object_t {
+    interaction_t<>* hits;
+    uint32_t i;
+  };
+
   ~service_t() {
   }
-};
+
+/*
+  bool transform_points(
+    ShaderGlobals* sg
+  , ustring from, ustring to
+  , float time
+  , const Vec3* Pin, Vec3* Pout, int npoints
+  , TypeDesc::VECSEMANTICS vectype) 
+  {
+
+
+    for (auto i=0; i<npoints, ++i) {
+      if (from == world && to == object) {
+        Pout[i] = xform.to_local(Pin[i]);
+      }
+      else if (from == object && to == world) {
+        Pout[i] = xform.to_world(Pin[i]);
+      }
+      else if (from == to) {
+        Pout[i] = Pin[i];
+      }
+      else {
+        std::cout 
+        << "Don't know how to transform from " 
+        << from << " to " << to 
+        << std::endl;
+      }
+    }
+  }
+*/
+  bool get_attribute(
+    ShaderGlobals* sg
+  , bool derivatives
+  , ustring object
+  , TypeDesc type
+  , ustring name
+  , void* val)
+  {
+    // std::cout << "getattr: " << name << std::endl;
+
+    if (sg && sg->objdata) {
+      object_t* o = (object_t*) sg->objdata;
+      if (name == tangent) {
+        *((Imath::V3f*) val) = o->hits->xform[o->i].tangent();
+        return true;
+      }
+    }
+
+    return false;
+  }
+};  
+
+const ustring service_t::tangent("geom:tangent");
 
 struct material_t::details_t {
   static const uint32_t PARAMETER_BUFFER_SIZE = 256;
@@ -362,6 +422,8 @@ void material_t::evaluate(
   for (auto i=0; i<active.num; ++i) {
     const auto index = active.index[i];
 
+    service_t::object_t obj{hits, index};
+
     ShaderGlobals sg;
     memset(&sg, 0, sizeof(ShaderGlobals));
     sg.P = hits->p.at(index);
@@ -370,6 +432,7 @@ void material_t::evaluate(
     sg.u = hits->s[index];
     sg.v = hits->t[index];
     sg.backfacing = sg.N.dot(sg.I) > 0;
+    sg.objdata = &obj;
 
     details->execute(sg);
 

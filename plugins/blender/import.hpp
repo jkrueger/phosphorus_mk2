@@ -49,7 +49,7 @@ namespace blender {
       return data->mesh->num_faces;
     }
 
-    int get_num_verts_of_face(const SMikkTSpaceContext*) {
+    int get_num_verts_of_face(const SMikkTSpaceContext*, int) {
       return 3;
     }
 
@@ -61,7 +61,7 @@ namespace blender {
     {
       const user_data_t* data = (const user_data_t*) context->m_pUserData;
       const auto mesh = data->mesh;
-      const index = mesh->faces[face * 3 + vert];
+      const auto index = mesh->faces[face * 3 + vert];
       const auto& vertex = mesh->vertices[index];
 
       p[0] = vertex.x;
@@ -77,7 +77,7 @@ namespace blender {
       
       const user_data_t* data = (const user_data_t*) context->m_pUserData;
       const auto mesh = data->mesh;
-      const index = mesh->faces[face * 3 + vert];
+      const auto index = mesh->faces[face * 3 + vert];
       const auto& normal = mesh->vertices[index];
 
       n[0] = normal.x;
@@ -87,17 +87,17 @@ namespace blender {
 
     void get_uv(
       const SMikkTSpaceContext* context
-    , float uv[2]
+    , float out[2]
     , const int face
     , const int vert) {
       
       const user_data_t* data = (const user_data_t*) context->m_pUserData;
       const auto mesh = data->mesh;
-      const index = mesh->faces[face * 3 + vert];
+      const auto index = mesh->faces[face * 3 + vert];
       const auto& uv = mesh->uvs[index];
 
-      uv[0] = uv.x;
-      uv[1] = uv.y;
+      out[0] = uv.x;
+      out[1] = uv.y;
     }
 
     void set_tangent(
@@ -109,12 +109,14 @@ namespace blender {
       
       const user_data_t* data = (const user_data_t*) context->m_pUserData;
       const auto mesh = data->mesh;
-      const index = mesh->faces[face * 3 + vert];
+      const auto index = mesh->faces[face * 3 + vert];
       
-      mesh->tangents[index] = Imath::V3f(T[0], T[1], T[2]);
+      mesh->tangents[index] = Imath::V3f(t[0], t[1], t[2]);
     }
 
     void generate_tangents(mesh_t* mesh) {
+      std::cout << "start generate tangents" << std::endl;
+
 	    user_data_t userdata(mesh);
 
       SMikkTSpaceInterface sm_interface;
@@ -133,6 +135,8 @@ namespace blender {
       context.m_pInterface = &sm_interface;
       
       genTangSpaceDefault(&context);
+
+      std::cout << "end generate tangents" << std::endl;
     }
   }
 
@@ -269,14 +273,19 @@ namespace blender {
         }
       }
       else {
-        if (num_uvs != num_vertices) {
-          std::cout << "Expecting to have a uv coordinate per vertex" << std::endl;
+        if (blender_mesh.uv_layers.length() != 0 && num_uvs != num_vertices) {
+          std::cout 
+          << "Expecting to have a uv coordinate per vertex: " 
+          << num_uvs << " != " << num_vertices 
+          << std::endl;
         }
       }
 
+      std::cout << "Generate tangents" << std::endl;
+
       if (generate_tangents) {
         mesh->allocate_tangents();
-        mikk_generate_tangents(mesh);
+        mikk::generate_tangents(mesh);
       }
 
       return mesh;
@@ -380,7 +389,7 @@ namespace blender {
       if (node.is_a(&RNA_ShaderNodeAddShader)) {
         return {
           "add_node",
-          [],
+          {},
           {
             passthrough("Shader", "A"),
             passthrough("Shader_001", "B"),
@@ -393,7 +402,7 @@ namespace blender {
       else if (node.is_a(&RNA_ShaderNodeMixShader)) {
         return {
           "mix_node",
-          [],
+          {},
           {
             passthrough("Fac", "fac"),
             passthrough("Closure1", "A"),
@@ -407,7 +416,7 @@ namespace blender {
       else if (node.is_a(&RNA_ShaderNodeMixRGB)) {
         return {
           "color_op_node",
-          [],
+          {},
           {
             passthrough("Fac", "fac"),
             passthrough("Color1", "A"),
@@ -421,7 +430,7 @@ namespace blender {
       else if (node.is_a(&RNA_ShaderNodeFresnel)) {
         return {
           "fresnel_dielectric_node",
-          [],
+          {},
           {
             passthrough("IOR", "IoR"),
           },
@@ -433,9 +442,10 @@ namespace blender {
       else if (node.is_a(&RNA_ShaderNodeBsdfDiffuse)) {
         return {
           "diffuse_bsdf_node",
-          [],
+          {},
           {
             passthrough("Color", "Cs"),
+            passthrough("Normal", "shadingNormal"),
           },
           {
             passthrough("BSDF", "Cout")
@@ -445,7 +455,7 @@ namespace blender {
       else if (node.is_a(&RNA_ShaderNodeBsdfGlossy)) {
         return {
           "glossy_bsdf_node",
-          [],
+          {},
           {
             { "distribution",
               { "distribution", [=](material_t::builder_t::scoped_t& builder, BL::NodeSocket&, const std::string& parameter) {
@@ -467,6 +477,7 @@ namespace blender {
               }
             },
             passthrough("Color", "Cs"),
+            passthrough("Normal", "shadingNormal"),
           },
           {
             passthrough("BSDF", "Cout")
@@ -476,10 +487,11 @@ namespace blender {
       else if(node.is_a(&RNA_ShaderNodeBsdfVelvet)) {
         return {
           "sheen_bsdf_node",
-          [],
+          {},
           {
             passthrough("Color", "Cs"),
             passthrough("Sigma", "roughness"),
+            passthrough("Normal", "shadingNormal"),
           },
           {
             passthrough("BSDF", "Cout")
@@ -489,7 +501,7 @@ namespace blender {
       else if(node.is_a(&RNA_ShaderNodeBackground)) {
         return {
           "background_node",
-          [],
+          {},
           {
             passthrough("Color", "Cs"),
             passthrough("Strength", "power"),
@@ -506,7 +518,7 @@ namespace blender {
       else if(node.is_a(&RNA_ShaderNodeEmission)) {
         return {
           "diffuse_emitter_node",
-          [],
+          {},
           {
             passthrough("Color", "Cs"),
             passthrough("Strength", "power"),
@@ -519,7 +531,7 @@ namespace blender {
       else if(node.is_a(&RNA_ShaderNodeTexImage)) {
         return {
           "texture_node",
-          [],
+          {},
           {
             { "filename",
                 { "filename",
@@ -568,7 +580,7 @@ namespace blender {
       else if(node.is_a(&RNA_ShaderNodeTexEnvironment)) {
         return {
           "environment_node",
-          [],
+          {},
           {
             { "filename",
                 { "filename",
@@ -607,7 +619,7 @@ namespace blender {
       else if (node.is_a(&RNA_ShaderNodeNormalMap)) {
         return {
           "normal_map_node",
-          ["geom:tangent"],
+          {"geom:tangent"},
           {
             passthrough("Color", "sample"),
             passthrough("Strength", "strength")
@@ -615,13 +627,13 @@ namespace blender {
           {
             passthrough("Normal", "Normal"),
           },
-        }
+        };
       }
       else if (node.is_a(&RNA_ShaderNodeOutputMaterial) ||
                node.is_a(&RNA_ShaderNodeOutputWorld)) {
         return {
           "material_node",
-          [],
+          {},
           {
             passthrough("Surface", "Cs")
           },
@@ -634,7 +646,7 @@ namespace blender {
       }
 
       return {
-        "<unknown>", {}, {}
+        "<unknown>", {}, {}, {}
       };
     }
 
@@ -643,7 +655,7 @@ namespace blender {
     , material_t::builder_t::scoped_t& builder
     , BL::ShaderNode& node)
     {
-      const auto mappings = std::get<1>(desc);
+      const auto mappings = std::get<2>(desc);
 
       BL::Node::inputs_iterator i;
       for (node.inputs.begin(i); i!=node.inputs.end(); ++i) {
@@ -749,6 +761,10 @@ namespace blender {
           if (std::get<0>(desc) != "<unknown>") {
             set_parameters(desc, builder, node);
             builder->shader(std::get<0>(desc), node.name(), "surface");
+            for (const auto& attribute : std::get<1>(desc)) {
+              std::cout << "attribute: " << attribute << std::endl;
+              builder->add_attribute(attribute);
+            }
             descriptors[node.name()] = desc;
           }
         }
@@ -773,8 +789,8 @@ namespace blender {
         auto from_desc = descriptors[from.node().name()];
         auto to_desc = descriptors[to.node().name()];
 
-        auto from_mapping = std::get<2>(from_desc)[from.identifier()];
-        auto to_mapping = std::get<1>(to_desc)[to.identifier()];
+        auto from_mapping = std::get<3>(from_desc)[from.identifier()];
+        auto to_mapping = std::get<2>(to_desc)[to.identifier()];
 
         auto from_name = std::get<0>(from_mapping);
         auto to_name = std::get<0>(to_mapping);

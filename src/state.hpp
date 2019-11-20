@@ -3,6 +3,7 @@
 #include "film.hpp"
 #include "sampling.hpp"
 #include "jobs/tiles.hpp"
+#include "math/orthogonal_base.hpp"
 #include "math/simd.hpp"
 #include "math/soa.hpp"
 #include "utils/assert.hpp"
@@ -192,6 +193,10 @@ struct interaction_t {
   soa::vector3_t<N> e;
   bsdf_t* bsdf[N];
 
+  /* a transformation from and to this points tangent space */
+  invertible_base_t xform[N];
+
+  /* copy an interaction */
   inline void from(const interaction_t* o, uint32_t from, uint32_t to) {
     p.from(to, o->p.at(from));
     wi.from(to, o->wi.at(from));
@@ -201,7 +206,7 @@ struct interaction_t {
     s[to] = o->s[from];
     t[to] = o->t[from];
     bsdf[to] = o->bsdf[from];
-  } 
+  }
 
   inline bool is_hit(uint32_t i) const {
     return (flags[i] & HIT) == HIT;
