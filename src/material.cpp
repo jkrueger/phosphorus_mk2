@@ -126,6 +126,7 @@ struct material_t::details_t {
     system  = new ShadingSystem(service, nullptr, nullptr);
 
     system->attribute("searchpath:shader", path + "/shaders");
+    system->texturesys()->attribute("max_memory_MB", 16384);
 
     ClosureParam params[][32] = {
       {

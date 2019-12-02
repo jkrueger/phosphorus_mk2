@@ -27,15 +27,15 @@ struct orthogonal_base_t {
     return v.x * a + v.y * b + v.z * c;
   }
 
-  inline Imath::V3f normal() const {
+  inline const Imath::V3f& normal() const {
     return b;
   }
 
-  inline Imath::V3f tangent() const {
+  inline const Imath::V3f& tangent() const {
     return c;
   }
 
-  inline Imath::V3f cotangent() const {
+  inline const Imath::V3f& cotangent() const {
     return a;
   }
 };

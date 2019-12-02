@@ -339,6 +339,19 @@ namespace blender {
     , parameter_mappings_t
     > node_descriptor_t;
 
+    /* for certain parameter we ignore the blender default value, since there is none
+     * initialization is expected to happen in the shader, and generally this will be a
+     * parameter that gets it's value from some other node */
+    typename parameter_mappings_t::value_type uninitialized(
+      const std::string& a
+    , const std::string& b)
+    {
+      return { a, { b, [](material_t::builder_t::scoped_t&, BL::NodeSocket&, const std::string&) {
+        // NOOP
+        return;
+      } } };
+    }
+
     typename parameter_mappings_t::value_type passthrough(
       const std::string& a
     , const std::string& b)
@@ -361,9 +374,9 @@ namespace blender {
           }
         case BL::NodeSocket::type_VECTOR:
           {
-            Imath::V3f c;
-            RNA_float_get_array(&i.ptr, "default_value", &c.x);
-            builder->parameter(mapped, c);
+            Imath::V3f v;
+            RNA_float_get_array(&i.ptr, "default_value", &v.x);
+            builder->parameter(mapped, v);
             break;
           }
         case BL::NodeSocket::type_STRING:
@@ -405,11 +418,11 @@ namespace blender {
           {},
           {
             passthrough("Fac", "fac"),
-            passthrough("Closure1", "A"),
-            passthrough("Closure2", "B"),
+            passthrough("Shader", "A"),
+            passthrough("Shader_001", "B"),
           },
-          { 
-            passthrough("Closure", "Cout")
+          {
+            passthrough("Shader", "Cout")
           }
         };
       }
@@ -424,6 +437,18 @@ namespace blender {
           },
           {
             passthrough("Color", "Cout")
+          }
+        };
+      }
+      else if (node.is_a(&RNA_ShaderNodeRGBToBW)) {
+        return {
+          "color_to_value",
+          {},
+          {
+            passthrough("Color", "Cs"),
+          },
+          {
+            passthrough("Val", "value")
           }
         };
       }
@@ -445,7 +470,7 @@ namespace blender {
           {},
           {
             passthrough("Color", "Cs"),
-            passthrough("Normal", "shadingNormal"),
+            uninitialized("Normal", "shadingNormal"),
           },
           {
             passthrough("BSDF", "Cout")
@@ -477,7 +502,8 @@ namespace blender {
               }
             },
             passthrough("Color", "Cs"),
-            passthrough("Normal", "shadingNormal"),
+            uninitialized("Normal", "shadingNormal"),
+            passthrough("Roughness", "roughness"),
           },
           {
             passthrough("BSDF", "Cout")
@@ -491,7 +517,7 @@ namespace blender {
           {
             passthrough("Color", "Cs"),
             passthrough("Sigma", "roughness"),
-            passthrough("Normal", "shadingNormal"),
+            uninitialized("Normal", "shadingNormal"),
           },
           {
             passthrough("BSDF", "Cout")
@@ -507,7 +533,7 @@ namespace blender {
             passthrough("Strength", "power"),
           },
           {
-            passthrough("Background", "Cout")
+            passthrough("Background", "Cout"),
           }
         };
       }
@@ -794,7 +820,7 @@ namespace blender {
 
         auto from_name = std::get<0>(from_mapping);
         auto to_name = std::get<0>(to_mapping);
-
+        std::cout << "connect: (" << from.name() <<  " - " << to.name() << ")" << from_name << "(" << from.identifier() << ")" << " -> " << to_name << std::endl;
         builder->connect(
           from_name, to_name,
           from.node().name(), to.node().name()
