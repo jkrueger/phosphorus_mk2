@@ -211,7 +211,7 @@ void mesh_t::shading_parameters(
 
       const auto t = (w*t0+u*t1+v*t2).normalize();
 
-      base = invertible_base_t(n, t);
+      base = invertible_base_t(t, n);
     }
     else {
       std::cout 

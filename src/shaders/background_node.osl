@@ -1,5 +1,5 @@
 
-surface background_node
+shader background_node
   [[ string help = "Background emitter node" ]]
 (
   color Cs = 0
@@ -7,7 +7,9 @@ surface background_node
 
   float power = 1
     [[ string help = "Power of the emitted background light" ]],
+
+  output closure color Cout = 0
 )
 {
-  Ci = Cs * power * background() + diffuse(N);
+  Cout = Cs * power * background() + diffuse(N);
 }

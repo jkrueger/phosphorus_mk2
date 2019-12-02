@@ -206,6 +206,7 @@ struct interaction_t {
     s[to] = o->s[from];
     t[to] = o->t[from];
     bsdf[to] = o->bsdf[from];
+    xform[to] = o->xform[from];
   }
 
   inline bool is_hit(uint32_t i) const {

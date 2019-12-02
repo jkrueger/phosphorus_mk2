@@ -18,7 +18,7 @@ diffuse_bsdf_node
 )
 {
   if (roughness == 0) {
-    Cout = Cs * diffuse(N);
+    Cout = Cs * diffuse(shadingNormal);
   }
   else {
     Cout = Cs * oren_nayar(shadingNormal, roughness);

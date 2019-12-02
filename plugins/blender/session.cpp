@@ -65,6 +65,7 @@ namespace blender {
     {}
 
     void render(const std::string& view, const std::string& layer) {
+      std::cout << "Rendering" << std::endl;
       const auto w = render_width();
       const auto h = render_height();
 

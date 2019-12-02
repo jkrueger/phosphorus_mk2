@@ -17,5 +17,5 @@ mix_node
     [[ string help = "Output color" ]]
 )
 {
-  Cout = A * fac + B * (1-fac);
+  Cout = A * (1-fac) + B * fac;
 }

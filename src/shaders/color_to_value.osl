@@ -1,0 +1,13 @@
+
+surface color_to_value
+  [[ string help = "Convert a color to a float value" ]]
+(
+  color Cs = 0
+    [[ string help = "Color value to convert" ]],
+
+  output float value = 0
+    [[ string help = "Output float value" ]]
+)
+{
+  value = Cs[0] * 0.2126 + Cs[1] * 0.7152 + Cs[2] * 0.0722;
+}

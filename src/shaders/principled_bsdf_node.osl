@@ -1,0 +1,8 @@
+
+shader principled-bsdf_node
+  [[ string help = "Disney Principled BSDF shader" ]]
+(
+  float Metalli8c 
+)
+{
+}
