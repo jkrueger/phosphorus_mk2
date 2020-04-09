@@ -42,6 +42,10 @@ struct builder_impl_t : public mesh_t::builder_t {
     mesh->details->normals.push_back(n);
   }
 
+  void set_normal(uint32_t i, const Imath::V3f& n) {
+    mesh->details->normals[i] = n;
+  }
+
   void add_tangent(const Imath::V3f& t) {
     mesh->details->tangents.push_back(t);
   }
@@ -192,7 +196,7 @@ void mesh_t::shading_parameters(
     const auto& n1 = normals[nb];
     const auto& n2 = normals[nc];
 
-    n = (w*n0+u*n1+v*n2).normalize();
+    n = (w*n2+u*n0+v*n1).normalize();
   }
   else {
     const auto v0 = vertices[a];
@@ -242,6 +246,15 @@ void mesh_t::shading_parameters(
 
     st = w*uv0+u*uv1+v*uv2;
   }
+}
+
+float mesh_t::area(uint32_t face) const {
+  const auto ab = vertices[faces[face+1]] - vertices[faces[face]];
+  const auto ac = vertices[faces[face+2]] - vertices[faces[face]];
+
+  const auto z = ab.cross(ac);
+
+  return 0.5f * z.length();
 }
 
 triangle_t::triangle_t(const mesh_t* m, uint32_t set, uint32_t face)
