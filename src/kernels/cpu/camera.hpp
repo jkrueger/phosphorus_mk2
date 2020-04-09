@@ -58,7 +58,7 @@ struct camera_kernel_t {
     auto half   = simd::load(0.5f);
     auto nhalf  = simd::load(-0.5f);
 
-    auto zoom = simd::load(std::tan(camera.fov * 0.5f));
+    auto zoom = simd::load(1.12f * std::tan(camera.fov * 0.5f));
 
     auto px = simd::add(simd::load((float) tile.x), simd::load(seqv));
     auto py = simd::load((float) tile.y);

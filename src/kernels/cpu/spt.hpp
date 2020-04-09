@@ -213,9 +213,11 @@ namespace spt {
       const auto wi   = samples->wi.at(to);
       const auto wo   = hits->wi.at(to);
       const auto n    = hits->n.at(to);
+      
+      auto pdf  = state->pdf[to];
 
       const auto f = bsdf->f(wi, wo);
-      const auto s = f * (std::fabs(n.dot(wi)) / state->pdf[to]);
+      const auto s = f * std::fabs(n.dot(wi));
 
       const auto mesh = state->scene->mesh(samples->meshid(to));
       const auto material = state->scene->material(samples->matid(to));
@@ -229,9 +231,11 @@ namespace spt {
         invertible_base_t _base;
         mesh->shading_parameters(samples, n, st, _base, to);
         material->evaluate(samples->p.at(to), wi, n, st, light);
+
+        // pdf /= (-wi).dot(n);
       }
 
-      return light.e * s;
+      return light.e * s * (1.0f / mesh->area(samples->face[to])) / pdf;
     }
 
     bool sample_bsdf(

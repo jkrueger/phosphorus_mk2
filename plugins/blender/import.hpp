@@ -142,8 +142,17 @@ namespace blender {
 
   namespace import {
     mesh_t* mesh(BL::Depsgraph& graph, BL::BlendData& data, BL::Object& object, const scene_t& scene) {
-      auto blender_mesh =
-        data.meshes.new_from_object(object, false, graph);
+      BL::Mesh blender_mesh = BL::Mesh(object.data());
+      if (blender_mesh.use_auto_smooth()) {
+        BL::Depsgraph depsgraph(PointerRNA_NULL);
+        blender_mesh = object.to_mesh(false, depsgraph);
+      }
+
+      std::cout << "Importing mesh: " << blender_mesh.name() << std::endl;
+
+      if (blender_mesh.use_auto_smooth()) {
+        blender_mesh.split_faces(false);
+      }
 
       blender_mesh.calc_loop_triangles();
 
@@ -173,7 +182,7 @@ namespace blender {
         builder->set_normals_per_vertex_per_face();
         builder->set_uvs_per_vertex_per_face();
 
-        blender_mesh.calc_normals_split();
+        // blender_mesh.calc_normals_split();
       }
       else {
         std::cout << "Use vertex normals" << std::endl;
@@ -186,12 +195,12 @@ namespace blender {
         const auto& a = v->co();
         builder->add_vertex(Imath::V3f(a[0], a[1], a[2]) * transform);
 
-        if (!use_loop_normals) {
+        //if (!use_loop_normals) {
           const auto& n = v->normal();
-          builder->add_normal(Imath::V3f(n[0], n[1], n[2]) * normal_transform);
+          builder->add_normal((Imath::V3f(n[0], n[1], n[2]) * normal_transform).normalize());
 
           num_normals++;
-        }
+        //}
       }
 
       std::unordered_map<std::string, std::vector<uint32_t>> sets;
@@ -208,17 +217,21 @@ namespace blender {
         builder->add_face(indices[0], indices[1], indices[2], smooth);
 
         auto material = blender_mesh.materials[p.material_index()];
+
         sets[material.name()].push_back(id);
 
         if (use_loop_normals) {
           const auto ns = f->split_normals();
           for (auto i=0; i<3; ++i) {
-            auto n = Imath::V3f(ns[i*3], ns[i*3+1], ns[i*3+2]) *
-              normal_transform;
+            auto n = (Imath::V3f(ns[i*3], ns[i*3+1], ns[i*3+2]) *
+              normal_transform).normalize();
 
-            builder->add_normal(n);
-            num_normals++;
+            builder->set_normal(indices[i], n);
+            //num_normals++;
           }
+        }
+        else {
+          std::cout << "FACE AREA: " << f->area() << std::endl;
         }
 
         num_indices +=3;
@@ -284,8 +297,8 @@ namespace blender {
       std::cout << "Generate tangents" << std::endl;
 
       if (generate_tangents) {
-        mesh->allocate_tangents();
-        mikk::generate_tangents(mesh);
+        //mesh->allocate_tangents();
+        //mikk::generate_tangents(mesh);
       }
 
       return mesh;
@@ -820,7 +833,7 @@ namespace blender {
 
         auto from_name = std::get<0>(from_mapping);
         auto to_name = std::get<0>(to_mapping);
-        std::cout << "connect: (" << from.name() <<  " - " << to.name() << ")" << from_name << "(" << from.identifier() << ")" << " -> " << to_name << std::endl;
+        
         builder->connect(
           from_name, to_name,
           from.node().name(), to.node().name()
@@ -836,6 +849,7 @@ namespace blender {
     , scene_t& scene)
     {
       if (is_mesh(object)) {
+        std::cout << "Importing: " << object.name() << std::endl;
         if(auto m = mesh(graph, data, object, scene)) {
           scene.add(m);
         }

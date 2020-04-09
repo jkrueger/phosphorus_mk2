@@ -51,6 +51,7 @@ struct mesh_t {
 
     virtual void add_vertex(const Imath::V3f& v) = 0;
     virtual void add_normal(const Imath::V3f& n) = 0;
+    virtual void set_normal(uint32_t i, const Imath::V3f& n) = 0;
     virtual void add_tangent(const Imath::V3f& t) = 0;
     virtual void add_uv(const Imath::V2f& uv) = 0;
     virtual void add_face(uint32_t a, uint32_t b, uint32_t c, bool smooth = true) = 0;
@@ -98,6 +99,9 @@ struct mesh_t {
 
   /* get a list of triangles that share the same material */
   void triangles(uint32_t set, std::vector<triangle_t>& triangle) const;
+
+  /* get the area of a specific triangle of the mesh */
+  float area(uint32_t face) const;
 
   simd::vector3v_t barycentrics_to_point(
     uint32_t setid
