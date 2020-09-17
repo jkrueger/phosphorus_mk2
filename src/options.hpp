@@ -18,6 +18,8 @@ struct parsed_options_t {
   // render in progressive mode, rather than tiled
   // (i.e. send full frame tiles, representing one sample each, into the pipeline)
   bool progressive;
+  // render a separate output for normals
+  bool render_normals;
   // print statistics while rendering
   bool verbose;
   // number of pixel samples.
@@ -32,6 +34,7 @@ struct parsed_options_t {
     : output("out.exr")
     , single_threaded(false)
     , progressive(false)
+    , render_normals(false)
     , verbose(false)
     , samples_per_pixel(DEFAULT_SAMPLES_PER_PIXEL)
     , paths_per_sample(DEFAULT_PATHS_PER_SAMPLE)

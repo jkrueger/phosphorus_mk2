@@ -25,6 +25,7 @@ namespace sampling {
       uint32_t mesh;
       uint32_t face;
       float pdf;
+      float area;
     };
     
     template<int N>
@@ -93,6 +94,8 @@ struct sampler_t {
   }
 
   const light_samples_t& next_light_samples();
+
+  void fresh_light_samples(const scene_t* scene, light_samples_t& out);
 
   // const float* next_1d_samples(uint32_t id);
 

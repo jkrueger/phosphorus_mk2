@@ -42,8 +42,6 @@ struct area_light_t : public light_t::details_t {
     for (auto i=0; i<num; ++i) {
       cdf[i] /= area;
     }
-
-    std::cout << "AREA: " << area << std::endl;
   }
 
   void sample(const Imath::V2f& uv, sampler_t::light_sample_t& out) const {
@@ -66,9 +64,10 @@ struct area_light_t : public light_t::details_t {
 
     out.p    = triangle.barycentric_to_point(barycentric);
     out.uv   = barycentric;
-    out.pdf  = 1.0f / (num * triangle.area());
+    out.pdf  = 1.0f / area;
     out.mesh = triangle.meshid() | (triangle.matid() << 16);
     out.face = triangle.face;
+    out.area = area;
   }
 
   void sample(

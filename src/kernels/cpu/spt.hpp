@@ -12,6 +12,10 @@
  *
  * This integrator implemtns path tracing over a path over samples
  * in parallel. All paths are uni directional starting at the camera
+ *
+ * FIXME: path revival is broken at the moment. the color of the first
+ * intersection is not kept, and so additional paths will darken the image.
+ * this code could probably use a complete rewrite
  */
 namespace spt {
   /* This stores some state needed by the path integrator */
@@ -103,7 +107,9 @@ namespace spt {
       const auto masked = simd::int32v_t(MASKED | SHADOW);
       const auto shadow = simd::int32v_t(SHADOW);
 
-      const auto& light_samples = state->next_light_samples();
+      sampler_t::light_samples_t light_samples;
+
+      state->sampler->fresh_light_samples(state->scene, light_samples);
       const auto* samples = light_samples.samples;
 
       // iterate over alls paths, and generate shadow rays for them
@@ -161,22 +167,22 @@ namespace spt {
       const auto num = active.clear();
 
       for (auto i=0; i<num; ++i) {
-	const auto index = active.index[i];
+        const auto index = active.index[i];
 
         auto out = state->r.at(index);
         auto keep_alive = true;
 
-	if (hits->is_hit(i)) {
+        if (hits->is_hit(i)) {
           // add direct lighting to path vertex
           if (state->depth[index] == 0 || hits->is_specular(i)) {
             out += state->beta.at(index) * hits->e.at(i);
           }
 
-	  // compute direct light contribution at the current
-	  // path vertex. this gets modulated by the current path weight
-	  // and added to the path radiance
-	  if (!samples->is_occluded(i)) {
-	    out += state->beta.at(index) * li(state, samples, hits, index, i);
+          // compute direct light contribution at the current
+          // path vertex. this gets modulated by the current path weight
+          // and added to the path radiance
+          if (!samples->is_occluded(i)) {
+  	        out += state->beta.at(index) * li(state, samples, hits, i);
           }
 
           ++state->depth[index];
@@ -185,20 +191,20 @@ namespace spt {
           if (sample_bsdf(state, hits, samples, index, i, active.num)) {
             active.add(index);
           }
-          else if (state->path[index] < paths_per_sample) {
+          else if ((state->path[index]+1) < paths_per_sample) {
             state->mark_for_revive(index);
           }
         }
-	else {
+        else {
           // add environment lighting
           out += state->beta.at(index) * hits->e.at(i);
 
-          if (state->path[index] < paths_per_sample) {
+          if ((state->path[index]+1) < paths_per_sample) {
             state->mark_for_revive(index);
           }
-	}
+        }
 
-	state->r.from(index, out);
+        state->r.from(index, out);
       }
     }
 
@@ -206,15 +212,14 @@ namespace spt {
       state_t<>* state 
     , ray_t<>* samples
     , interaction_t<>* hits
-    , uint32_t index
     , uint32_t to) const
     {
       const auto bsdf = hits->bsdf[to]; 
+      const auto p    = samples->p.at(to);
       const auto wi   = samples->wi.at(to);
       const auto wo   = hits->wi.at(to);
       const auto n    = hits->n.at(to);
-      
-      auto pdf  = state->pdf[to];
+      const auto d    = samples->d[to];
 
       const auto f = bsdf->f(wi, wo);
       const auto s = f * std::fabs(n.dot(wi));
@@ -223,19 +228,20 @@ namespace spt {
       const auto material = state->scene->material(samples->matid(to));
 
       assert(material->is_emitter());
- 
+
+      Imath::V3f light_n;
+      Imath::V2f light_st;
+      invertible_base_t _base;
+
       shading_result_t light;
       {
-        Imath::V3f n;
-        Imath::V2f st;
-        invertible_base_t _base;
-        mesh->shading_parameters(samples, n, st, _base, to);
-        material->evaluate(samples->p.at(to), wi, n, st, light);
-
-        // pdf /= (-wi).dot(n);
+        mesh->shading_parameters(samples, light_n, light_st, _base, to);
+        material->evaluate(p, wi, light_n, light_st, light);
       }
 
-      return light.e * s * (1.0f / mesh->area(samples->face[to])) / pdf;
+      const auto pdf = state->pdf[to] * d * d / std::fabs(light_n.dot(-wi));
+
+      return (light.e * 4) * s * (1.0f / pdf);
     }
 
     bool sample_bsdf(
@@ -275,7 +281,7 @@ namespace spt {
       const auto f = bsdf->sample(sample, wi, sampled, pdf, flags);
 
       if (color::is_black(f) || pdf == 0.0f) {
-	return false;
+        return false;
       }
 
       const auto weight = n.dot(sampled);

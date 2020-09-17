@@ -45,11 +45,11 @@ namespace sample {
     for (auto i=0; i<num; ++i, dy += step) {
       float_t dx = 0.0;
       for (auto j=0; j<num; ++j, dx += step) {
-	out[j * num + i] = {
-	  dx + rng() * step,
-	  dy + rng() * step
-	};
-      }
-    }
-  }
+       out[j * num + i] = {
+         dx + rng() * step,
+         dy + rng() * step
+       };
+     }
+   }
+ }
 }

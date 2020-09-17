@@ -165,7 +165,7 @@ namespace blender {
       }
 
       auto bm = object.matrix_world();
-      
+
       Imath::M44f transform;
       memcpy(&transform, &bm, sizeof(float)*16);
 
@@ -178,7 +178,7 @@ namespace blender {
 
       if (use_loop_normals) {
         std::cout << "Use loop normals" << std::endl;
-        
+
         builder->set_normals_per_vertex_per_face();
         builder->set_uvs_per_vertex_per_face();
 

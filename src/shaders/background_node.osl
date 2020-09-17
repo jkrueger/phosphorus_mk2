@@ -11,5 +11,5 @@ shader background_node
   output closure color Cout = 0
 )
 {
-  Cout = Cs * power * background() + diffuse(N);
+  Cout = Cs * power * background() /* + diffuse(N) */;
 }

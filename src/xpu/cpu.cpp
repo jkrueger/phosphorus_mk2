@@ -1,4 +1,6 @@
 #include "cpu.hpp"
+
+#include "buffer.hpp"
 #include "material.hpp"
 #include "options.hpp"
 #include "scene.hpp"
@@ -70,7 +72,14 @@ struct tile_renderer_t {
   interaction_t<>* primary;
   interaction_t<>* hits;
 
-  Imath::Color3f* splats;
+  // output buffer for the rendered tile
+  render_buffer_t buffer;
+
+  // output channels for this tile
+  struct {
+    render_buffer_t::channel_t* primary;
+    render_buffer_t::channel_t* normals;
+  } channels;
 
   inline tile_renderer_t(const cpu_t* cpu, const scene_t& scene, frame_state_t& frame)
     : spp(cpu->spp)
@@ -80,18 +89,27 @@ struct tile_renderer_t {
     , prepare_occlusion_queries(cpu->details->options)
     , integrate(cpu->details->options)
     , allocator(ALLOCATOR_SIZE)
+    , buffer(frame.tiles->format)
   {
     integrator_state = new(allocator) spt::state_t<>(&scene, frame.sampler);
+
+    channels.primary = buffer.channel(render_buffer_t::PRIMARY);
+    channels.normals = buffer.channel(render_buffer_t::NORMALS);
   }
 
-  /* allocate dynamic memory used to rener a tile */
+  /* allocate dynamic memory used to render a tile */
   inline void prepare_tile(const job::tiles_t::tile_t& tile) {
     rays = new(allocator) ray_t<>();
     primary = new(allocator) interaction_t<>();
     hits = new(allocator) interaction_t<>();
-    splats = new(allocator) Imath::Color3f[tile.num_pixels()];
 
-    memset(splats, 0, sizeof(Imath::Color3f) * tile.num_pixels());
+    // memset(primary, 0, sizeof(interaction_t<>));
+
+    // allocate memory based on the tiles render buffer format
+    // this will allocate memory for channels in the buffer, like 
+    // the primary rneder output, and additional information like
+    // normals, depth information for a pixel, and so on
+    buffer.allocate(allocator, tile.w, tile.h);
   }
 
   /* setup primary rays, and reset the integrator state */
@@ -103,6 +121,8 @@ struct tile_renderer_t {
     active.reset(0);
 
     integrator_state->reset();
+
+    // memset(hits, 0, sizeof(interaction_t<>));
 
     const auto& samples = frame.sampler->next_pixel_samples(sample);
     const auto& camera  = scene.camera;
@@ -152,16 +172,26 @@ struct tile_renderer_t {
 
       // FIXME: temporary code to copy radiance values into output buffer
       // this should run through a filter kernel instead
-      for (auto k=0; k<tile.num_pixels(); ++k) {
-        const auto r = integrator_state->r.at(k);
-        splats[k] += r * (1.0f / (spp * pps));
+      for (auto y=0; y<tile.h; ++y) {
+        for (auto x=0; x<tile.w; ++x) {
+          const auto k = y * tile.w + x;
+          const auto r = integrator_state->r.at(k);
+
+          if (channels.primary) {
+            channels.primary->add(x, y, r * (1.0f / (spp * pps)));
+          }
+
+          if (channels.normals && primary->is_hit(k)) {
+            channels.normals->set(x, y, primary->n.at(k));
+          }
+        }
       }
     }
 
     frame.film->add_tile(
       Imath::V2i(tile.x, tile.y)
     , Imath::V2i(tile.w, tile.h)
-    , splats);
+    , buffer);
   }
 };
 
@@ -184,15 +214,15 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
   for (auto i=0; i<concurrency; ++i) {
     details->threads.push_back(std::thread(
       [i, this](const scene_t& scene, frame_state_t& frame) {
-	// create per thread state in the shading system
-	material_t::attach();
+      	// create per thread state in the shading system
+      	material_t::attach();
 
         tile_renderer_t<stream_mbvh_kernel_t> renderer(this, scene, frame);
 
-	job::tiles_t::tile_t tile;
-	while (frame.tiles->next(tile)) {
+      	job::tiles_t::tile_t tile;
+      	while (frame.tiles->next(tile)) {
           renderer.render_tile(tile, scene);
-	}
+      	}
       }, std::cref(scene), std::ref(frame)));
   }
 }

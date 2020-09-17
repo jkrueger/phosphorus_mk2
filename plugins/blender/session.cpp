@@ -1,4 +1,6 @@
 #include "session.hpp"
+
+#include "buffer.hpp"
 #include "jobs/tiles.hpp"
 #include "options.hpp"
 #include "sink.hpp"
@@ -21,6 +23,9 @@ namespace blender {
     BL::Scene scene;
     BL::SpaceView3D v3d;
     BL::RegionView3D rv3d;
+
+    // specifies the requested channels in the renderer output
+    render_buffer_t::descriptor_t buffer_format;
 
     uint32_t width, height;
 
@@ -65,11 +70,10 @@ namespace blender {
     {}
 
     void render(const std::string& view, const std::string& layer) {
-      std::cout << "Rendering" << std::endl;
       const auto w = render_width();
       const auto h = render_height();
 
-      auto tiles = job::tiles_t::make(w, h, 32);
+      auto tiles = job::tiles_t::make(w, h, 32, buffer_format);
       auto sink = new sink_t(engine, view, layer, w, h);
       auto sampler = new sampler_t(renderer.options);
 
@@ -118,6 +122,27 @@ namespace blender {
 
       for(auto& device: renderer.devices) { 
         device->preprocess(renderer.scene);
+      }
+    }
+
+    /* determines the requested render passes (lifted from cycles) */
+    void determine_render_passes(BL::RenderResult& result) {
+      buffer_format.reset();
+
+      BL::RenderResult::layers_iterator first_render_layer;
+      result.layers.begin(first_render_layer);
+      BL::RenderLayer render_layer = *first_render_layer;
+
+      BL::RenderLayer::passes_iterator pi;
+      for (render_layer.passes.begin(pi); pi != render_layer.passes.end(); ++pi) {
+        BL::RenderPass pass(*pi);
+
+        if (pass.name() == "Combined") {
+          buffer_format.request(render_buffer_t::PRIMARY, 4);
+        }
+        else if (pass.name() == "Normal") {
+          buffer_format.request(render_buffer_t::NORMALS, 3);
+        }
       }
     }
 
@@ -183,11 +208,16 @@ namespace blender {
     }
 
     auto view_layer = depsgraph.view_layer_eval();
-    auto result = details->engine.begin_result(0, 0, 1, 1, view_layer.name().c_str(), NULL);
 
-    BL::RenderResult::views_iterator i;
-    for (result.views.begin(i); i!=result.views.end(); ++i) {
-      details->render(i->name(), view_layer.name());
+    auto result = details->engine.begin_result(0, 0, 1, 1, view_layer.name().c_str(), NULL);
+    details->determine_render_passes(result);
+
+    // render all views
+    BL::RenderResult::views_iterator vi;
+    for (result.views.begin(vi); vi!=result.views.end(); ++vi) {
+      details->render(vi->name(), view_layer.name());
     }
+
+    details->engine.end_result(result, false, false, false);
   }
 }

@@ -6,6 +6,7 @@ add_library(_phosphoros SHARED
   session.cpp
   sink.cpp
   ../../src/bsdf.cpp
+  ../../src/buffer.cpp
   ../../src/light.cpp
   ../../src/material.cpp
   ../../src/mesh.cpp
@@ -33,7 +34,7 @@ include_directories(
  ${BLENDER_PATH}/git/intern/guardedalloc
  ${BLENDER_PATH}/git/intern/mikktspace
  ${BLENDER_PATH}/git/source/blender/makesdna
- ${BLENDER_PATH}/lib/python-3.7/include/python3.7m)
+ ${BLENDER_PATH}/lib/darwin/python/include/python3.7m)
 
 target_link_directories(_phosphoros
   PUBLIC
@@ -46,6 +47,7 @@ target_link_libraries(_phosphoros
   m
   z
   IlmImf
+  Imath
   Half
   Iex
   OpenImageIO

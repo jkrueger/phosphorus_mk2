@@ -1,5 +1,7 @@
 #pragma once
 
+#include "buffer.hpp"
+
 #include <atomic>
 #include <iostream>
 
@@ -20,8 +22,13 @@ namespace job {
 
     std::atomic<uint32_t> tile;
 
-    inline tiles_t(uint32_t size)
-      : size(size), tile(0)
+    // format for the render output of each tile. this specifies which
+    // information gets exported from the renderer, like normals, depth 
+    // information, etc.
+    render_buffer_t::descriptor_t format;
+
+    inline tiles_t(uint32_t size, const render_buffer_t::descriptor_t& format)
+      : size(size), tile(0), format(format)
     {
       tiles = new tile_t[size];
     }
@@ -33,13 +40,18 @@ namespace job {
     const bool next(tile_t& out) {
       const auto t = tile++;
       if (t < size) {
-	out = tiles[t];
-	return true;
+      	out = tiles[t];
+      	return true;
       }
       return false;
     }
 
-    static tiles_t* make(uint32_t width, uint32_t height, uint32_t tile_size) {
+    static tiles_t* make(
+      uint32_t width, 
+      uint32_t height, 
+      uint32_t tile_size, 
+      const render_buffer_t::descriptor_t& format) 
+    {
       auto htiles = width / tile_size;
       auto vtiles = height / tile_size;
 
@@ -54,10 +66,10 @@ namespace job {
         htiles++;
       }
 
-      auto queue = new tiles_t(htiles*vtiles);
+      auto queue = new tiles_t(htiles*vtiles, format);
 
       for (auto y=0u; y<vtiles; ++y) {
-	for (auto x=0u; x<htiles; ++x) {
+	      for (auto x=0u; x<htiles; ++x) {
           auto tw = tile_size;
           auto th = tile_size;
 
@@ -69,8 +81,8 @@ namespace job {
             tw = rw;
           }
 
-	  queue->tiles[y * htiles + x] = { x*tile_size, y*tile_size, tw, th };
-	}
+	         queue->tiles[y * htiles + x] = { x*tile_size, y*tile_size, tw, th };
+        }
       }
 
       return queue;
