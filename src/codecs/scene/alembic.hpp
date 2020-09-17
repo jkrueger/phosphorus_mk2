@@ -7,7 +7,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-register"
 #include <Alembic/AbcCoreOgawa/All.h>
-#include <Alembic/AbcCoreHDF5/All.h>
+// #include <Alembic/AbcCoreHDF5/All.h>
 #include <Alembic/AbcGeom/All.h>
 #pragma clang diagnostic pop
 
@@ -303,10 +303,11 @@ namespace codec {
         }
         catch (const Abc::Exception& e) {
           try {
-            Geo::IArchive archive(Alembic::AbcCoreHDF5::ReadArchive(), path);
-            Geo::IObject  object(archive);
+            throw e;
+            // Geo::IArchive archive(Alembic::AbcCoreHDF5::ReadArchive(), path);
+            //Geo::IObject  object(archive);
 
-            import_object(object, scene, Abc::M44d());
+            //import_object(object, scene, Abc::M44d());
           }
           catch (const Abc::Exception& e) {
             std::cerr

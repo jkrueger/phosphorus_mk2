@@ -47,9 +47,9 @@ namespace codec {
       // import materials
       const auto materials = config["materials"];
       for (auto i=materials.begin(); i!=materials.end(); ++i) {
-	const auto name = i->first.as<std::string>();
-	std::cout << "Material: " << name << "(" << scene.num_materials() << ")" << std::endl;
-	scene.add(name, i->second.as<material_t*>());
+      	const auto name = i->first.as<std::string>();
+      	std::cout << "Material: " << name << "(" << scene.num_materials() << ")" << std::endl;
+      	scene.add(name, i->second.as<material_t*>());
       }
 
       std::cout << "Importing scene data" << std::endl;

@@ -5,6 +5,7 @@ SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 
 add_executable(phosphorus
   src/bsdf.cpp
+  src/buffer.cpp
   src/core.cpp
   src/light.cpp
   src/material.cpp
@@ -33,6 +34,7 @@ target_link_directories(phosphorus
 target_link_libraries(phosphorus
   pthread
   IlmImf
+  Imath
   Half
   Iex
   OpenImageIO

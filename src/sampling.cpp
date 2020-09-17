@@ -43,12 +43,15 @@ struct xoroshiro128plus_t {
 struct sampler_t::details_t {
   static const uint32_t NUM_LIGHT_SAMPLE_SETS = 64;
 
-  xoroshiro128plus_t gen;
+  // xoroshiro128plus_t gen;
+  std::mt19937 gen;
+  std::uniform_real_distribution<float> dis;
 
   std::atomic<uint32_t> light_sample;
 
   inline details_t()
     : light_sample(0)
+    , dis(0.0f, 1.0f)
   {}
 
   inline float to_float(uint32_t x) {
@@ -57,12 +60,14 @@ struct sampler_t::details_t {
   }
 
   inline float sample() {
-    return to_float((uint32_t) gen());
+    // return to_float((uint32_t) gen());
+    return dis(gen);
   }
 
   inline Imath::V2f sample2() {
-    uint64_t x = gen();
-    return { to_float((uint32_t) x), to_float((uint32_t) (x >> 32)) };
+    // uint64_t x = gen();
+    // return { to_float((uint32_t) x), to_float((uint32_t) (x >> 32)) };
+    return { dis(gen), dis(gen) };
   }
 
   inline uint32_t next_light_sample_set() {
@@ -98,8 +103,8 @@ void sampler_t::preprocess(const scene_t& scene) {
   for (auto i=0; i<spp; ++i) {
     for (auto j=0; j<128; ++j) {
       for (auto k=0; k<8; ++k) {
-	pixel_samples[i].v[j].x[k] = stratified[i].x;
-	pixel_samples[i].v[j].y[k] = stratified[i].y;
+      	pixel_samples[i].v[j].x[k] = stratified[i].x;
+      	pixel_samples[i].v[j].y[k] = stratified[i].y;
       }
     }
   }
@@ -113,7 +118,7 @@ void sampler_t::preprocess(const scene_t& scene) {
       for (auto k=0; k<light_samples_t::step; ++k) {
         const auto l = std::min((uint32_t) std::floor(sample() * nlights), nlights - 1);
         const auto light = scene.light(l);
-      
+
         stats[l]++;
 
         light_sample_t sample;
@@ -148,4 +153,26 @@ const sampler_t::light_samples_t& sampler_t::next_light_samples() {
   const auto& samples = light_samples[set];
 
   return samples;
+}
+
+void sampler_t::fresh_light_samples(const scene_t* scene, light_samples_t& out) {
+  const auto nlights = scene->num_lights();
+
+  for (auto j=0; j<light_samples_t::size/light_samples_t::step; ++j) {
+    for (auto k=0; k<light_samples_t::step; ++k) {
+      const auto l = std::min((uint32_t) std::floor(sample() * nlights), nlights - 1);
+      const auto light = scene->light(l);
+
+      light_sample_t sample;
+      light->sample(details->sample2(), sample);
+
+      auto& s = out.samples[j];
+      s.p.from(k, sample.p);
+      s.u[k] = sample.uv.x;
+      s.v[k] = sample.uv.y;
+      s.pdf[k] = sample.pdf / nlights;
+      s.mesh[k] = sample.mesh;
+      s.face[k] = sample.face;
+    }
+  }
 }

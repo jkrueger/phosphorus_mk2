@@ -1,5 +1,7 @@
 #include "sink.hpp"
 
+#include "buffer.hpp"
+
 #include <mutex>
 #include <string>
 #include <vector>
@@ -30,6 +32,9 @@ namespace blender {
     {}
 
     BL::RenderResult begin(const Imath::V2i& pos, const Imath::V2i& size) {
+      // the sink gets accessed by multiple threads, so lock it
+      lock();
+
       // blender's (0,0) is at the bottom of the screen, while our's
       // is at the top
       const auto inv_y = height - size.y - pos.y;
@@ -43,14 +48,38 @@ namespace blender {
       , view.c_str());
     }
 
-    void pass(BL::RenderResult& result, BL::RenderLayer& layer, float* pixels) {
-      auto combined_pass = layer.passes.find_by_name("Combined", view.c_str());
-      combined_pass.rect(pixels);
+    void pass(BL::RenderResult& result, BL::RenderPass& pass, const render_buffer_t::channel_t* channel) {
+      std::vector<float> pixels(channel->width() * channel->height() * channel->components);
+
+      for (int y=0; y<channel->height(); ++y) {
+        for (int x=0; x<channel->width(); ++x) {
+          const auto index = ((channel->height() - (y + 1)) * channel->width() + x) * channel->components;
+          channel->get(x, y, pixels.data() + index);
+          
+          // set alpha to one for now, as the renderer doesn't produce any 
+          // alpha output for now
+          if (channel->name == render_buffer_t::PRIMARY) {
+            pixels[index + 3] = 1.0f;
+          }
+        }
+      }
+
+      pass.rect(pixels.data());
       engine.update_result(result);
     }
 
     void send(BL::RenderResult result) {
       engine.end_result(result, 0, 0, true);
+      // don't forget to release lock after sending the data
+      unlock();
+    }
+
+    void lock() {
+      m.lock();
+    }
+
+    void unlock() {
+      m.unlock();
     }
   };
 
@@ -66,32 +95,21 @@ namespace blender {
   void sink_t::add_tile(
     const Imath::V2i& pos
   , const Imath::V2i& size
-  , const Imath::Color3f* splats)
+  , const render_buffer_t& buffer)
   {
-    std::vector<float> pixels(size.x*size.y*4);
-
-    auto i=0;
-
-    for (auto y=size.y-1; y>=0; --y) {
-      for (auto x=0; x<size.x; ++x, ++i) {
-	const auto index = (y * size.x + x) * 4;
-	pixels[index  ] = splats[i].x;
-	pixels[index+1] = splats[i].y;
-	pixels[index+2] = splats[i].z;
-	pixels[index+3] = 1.0f;
-      }
-    }
-
-    details->m.lock();
-
     auto result = details->begin(pos, size);
 
     BL::RenderResult::layers_iterator layer;
     result.layers.begin(layer);
 
-    details->pass(result, *layer, pixels.data());
-    details->send(result);
+    if (auto pass = layer->passes.find_by_name("Combined", details->view.c_str())) {
+      details->pass(result, pass, buffer.channel(render_buffer_t::PRIMARY));
+    }
 
-    details->m.unlock();
+    if (auto pass = layer->passes.find_by_name("Normal", details->view.c_str())) {
+      details->pass(result, pass, buffer.channel(render_buffer_t::NORMALS));
+    }
+
+    details->send(result);
   }
 }

@@ -179,8 +179,6 @@ struct interaction_t {
   static const uint32_t size = N;
   static const uint32_t step = SIMD_WIDTH;
 
-  uint32_t index[N];
-
   soa::vector3_t<N> p;
   soa::vector3_t<N> wi;
   soa::vector3_t<N> n;
@@ -207,6 +205,7 @@ struct interaction_t {
     t[to] = o->t[from];
     bsdf[to] = o->bsdf[from];
     xform[to] = o->xform[from];
+    // index[to] = o->index[from];
   }
 
   inline bool is_hit(uint32_t i) const {

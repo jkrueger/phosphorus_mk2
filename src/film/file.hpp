@@ -5,9 +5,8 @@
 
 namespace film {
   struct file_t : public film_t<> {
-    std::string path;
-    uint32_t width, height;
-    float* pixels;
+    struct details_t; 
+    std::unique_ptr<details_t> details;
 
     file_t(camera_t::film_t& config, const std::string& path);
     ~file_t();
@@ -15,7 +14,7 @@ namespace film {
     void add_tile(
       const Imath::V2i& pos
     , const Imath::V2i& size
-    , const Imath::Color3f* splats);
+    , const render_buffer_t& buffer);
 
     void finalize();
   };

@@ -8,7 +8,7 @@ diffuse_emitter_node
        float min = 0, float max = 1 ]],
 
   color Cs = 1
-    [[  string help = "Base color of the loght source",
+    [[  string help = "Base color of the light source",
         float min = 0, float max = 1 ]],
 
   output closure color Cout = 0

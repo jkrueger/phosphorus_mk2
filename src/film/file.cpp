@@ -1,18 +1,25 @@
 #include "file.hpp"
 
-#include <OpenImageIO/imageio.h>
+#include "buffer.hpp"
+
+#include <OpenImageIO/imagebuf.h>
 
 using namespace OIIO;
 
 namespace film {
+  struct file_t::details_t {
+    std::string path;
+    ImageBuf image;
+
+    inline details_t(const std::string& path, camera_t::film_t& config)
+     : path(path)
+     , image(ImageSpec(config.width, config.height, 4, TypeFloat))
+    {}
+  };
+
   file_t::file_t(camera_t::film_t& config, const std::string& path)
-    : path(path)
-    , width(config.width)
-    , height(config.height)
-    , pixels(new float[config.width*config.height*3])
-  {
-    memset(pixels, 0, width*height*sizeof(float)*3);
-  }
+    : details(new details_t(path, config))
+  {}
 
   file_t::~file_t() {
   }
@@ -20,29 +27,20 @@ namespace film {
   void file_t::add_tile(
     const Imath::V2i& pos
   , const Imath::V2i& size
-  , const Imath::Color3f* splats)
+  , const render_buffer_t& buffer)
   {
-    int i=0;
-
-    for (auto y=pos.y; y<pos.y+size.y; ++y) {
-      for (auto x=pos.x; x<pos.x+size.x; ++x, ++i) {
-	const auto index = (y * width + x) * 3;
-	pixels[index  ] = splats[i].x;
-	pixels[index+1] = splats[i].y;
-	pixels[index+2] = splats[i].z;
-      }
-    }
+    const auto channel = buffer.channel(0);
+    
+    details->image.set_pixels(
+      ROI(pos.x, pos.y, size.x, size.y),
+      TypeFloat,
+      channel->data(), 
+      channel->xstride(), 
+      channel->ystride()
+    );
   }
 
   void file_t::finalize() {
-    ImageOutput::unique_ptr out = ImageOutput::create(path.c_str());
-    if (!out) {
-      throw std::runtime_error("Unkown image format for output file: " + path);
-    }
-
-    ImageSpec spec(width, height, 3, TypeDesc::FLOAT);
-    out->open(path.c_str(), spec);
-    out->write_image(TypeDesc::FLOAT, pixels);
-    out->close();
+    details->image.write(details->path);
   }
 }

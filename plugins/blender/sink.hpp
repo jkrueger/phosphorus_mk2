@@ -7,6 +7,8 @@
 #include <RNA_blender_cpp.h>
 #include <RNA_types.h>
 
+struct render_buffer_t;
+
 namespace blender {
   struct sink_t : public film_t<> {
     struct details_t;
@@ -22,6 +24,6 @@ namespace blender {
     void add_tile(
       const Imath::V2i& pos
     , const Imath::V2i& size
-    , const Imath::Color3f* splats);
+    , const render_buffer_t& buffer);
   };
 }
