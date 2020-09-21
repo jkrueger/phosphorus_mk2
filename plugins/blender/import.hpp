@@ -13,11 +13,18 @@
 
 #include <mikktspace.h>
 
+#include <OpenImageIO/imagebufalgo.h>
+
+#include <filesystem>
 #include <functional>
+#include <iostream>
 #include <list>
 #include <map>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
+
+namespace fs = std::filesystem;
 
 extern "C" {
   void BKE_image_user_frame_calc(void *iuser, int cfra);
@@ -178,11 +185,7 @@ namespace blender {
 
       if (use_loop_normals) {
         std::cout << "Use loop normals" << std::endl;
-
-        builder->set_normals_per_vertex_per_face();
         builder->set_uvs_per_vertex_per_face();
-
-        // blender_mesh.calc_normals_split();
       }
       else {
         std::cout << "Use vertex normals" << std::endl;
@@ -195,12 +198,12 @@ namespace blender {
         const auto& a = v->co();
         builder->add_vertex(Imath::V3f(a[0], a[1], a[2]) * transform);
 
-        //if (!use_loop_normals) {
+        // if (!use_loop_normals) {
           const auto& n = v->normal();
           builder->add_normal((Imath::V3f(n[0], n[1], n[2]) * normal_transform).normalize());
 
           num_normals++;
-        //}
+        // }
       }
 
       std::unordered_map<std::string, std::vector<uint32_t>> sets;
@@ -211,10 +214,8 @@ namespace blender {
       blender_mesh.loop_triangles.begin(f);
       for (auto id=0; f!=blender_mesh.loop_triangles.end(); ++f, ++id) {
         auto p = blender_mesh.polygons[f->polygon_index()];
-        const auto& indices = f->vertices();
+        const auto indices = f->vertices();
         const auto smooth = p.use_smooth() || use_loop_normals;
-
-        builder->add_face(indices[0], indices[1], indices[2], smooth);
 
         auto material = blender_mesh.materials[p.material_index()];
 
@@ -227,19 +228,22 @@ namespace blender {
               normal_transform).normalize();
 
             builder->set_normal(indices[i], n);
-            //num_normals++;
+            // num_normals++;
           }
         }
-        else {
-          std::cout << "FACE AREA: " << f->area() << std::endl;
-        }
 
+        builder->add_face(indices[0], indices[1], indices[2], smooth);
         num_indices +=3;
       }
 
       if (use_loop_normals) {
         if (num_normals != num_indices) {
-          std::cout << "Expecting to have a normal per triangle index" << std::endl;
+          std::cout 
+            << "Expecting to have a normal per triangle index: " 
+            << num_normals
+            << " != "
+            << num_indices
+            << std::endl;
         }
       }
       else {
@@ -263,6 +267,7 @@ namespace blender {
       uint32_t num_uvs = 0;
 
       if (blender_mesh.uv_layers.length() != 0) {
+        std::cout << "Importing UV map coordinates" << std::endl;
         BL::Mesh::uv_layers_iterator l;
         blender_mesh.uv_layers.begin(l);
         //  TODO: allow multiple UV map layers
@@ -294,14 +299,27 @@ namespace blender {
         }
       }
 
-      std::cout << "Generate tangents" << std::endl;
-
       if (generate_tangents) {
-        //mesh->allocate_tangents();
-        //mikk::generate_tangents(mesh);
+        std::cout << "Generate tangents" << std::endl;
+        mesh->allocate_tangents();
+        mikk::generate_tangents(mesh);
       }
-
+/*
+      if (object.data().ptr.data != blender_mesh.ptr.data) {
+        object.to_mesh_clear();
+      }
+*/
       return mesh;
+    }
+
+    inline std::string get_enum_identifier(PointerRNA &ptr, const char *name) {
+      PropertyRNA *prop = RNA_struct_find_property(&ptr, name);
+      const char *identifier = "";
+      int value = RNA_property_enum_get(&ptr, prop);
+
+      RNA_property_enum_identifier(NULL, &ptr, prop, value, &identifier);
+
+      return std::string(identifier);
     }
 
     std::string image_file_path(
@@ -326,6 +344,37 @@ namespace blender {
       BKE_image_user_file_path(user.ptr.data, image.ptr.data, filepath);
 
       return std::string(filepath);
+    }
+
+    /* adds a texture from a file to the material system. this will create a temporary file
+     * on disk, that is optimized for lookup, and colorspace converted. returns the file system path
+     * to the texture */
+    std::string make_texture(const std::string& path, const std::string& colorspace) {
+      const auto output = fs::temp_directory_path() / fs::path(colorspace + "_" + path).filename();
+
+      std::cout << "Storing texture at: " << output << std::endl;
+
+      OIIO::ImageBuf image(path);
+      OIIO::ImageSpec config;
+      config.attribute("maketx:incolorspace", colorspace);
+      config.attribute("maketx:outcolorspace", "scene_linear");
+      config.attribute("maketx:filtername", "lanczos3");
+      config.attribute("maketx:colorconfig", session_t::resources + "/2.90/datafiles/colormanagement/config.ocio");
+
+      std::stringstream ss;
+
+      if (!OIIO::ImageBufAlgo::make_texture(OIIO::ImageBufAlgo::MakeTxTexture, image, output.string(), config, &ss)) {
+        throw std::runtime_error("Failed to make texture: " + ss.str());
+      }
+
+      return output.string();
+    }
+
+    /* adds a texture from a buffer to the material system. this will create a temporary file
+     * on disk, that is optimized for lookup, and colorspace converted. returns the file system path
+     * of the texture */
+    std::string make_texture(const std::string& path, void* pixels, const std::string& colorspace) {
+      throw std::runtime_error("Adding texture from buffer not implemented yet");
     }
 
     typedef std::tuple<
@@ -578,8 +627,6 @@ namespace blender {
                       , BL::NodeSocket&
                       , const std::string& parameter)
                       {
-                        std::cout << "Texture" << std::endl;
-                        
                         BL::ShaderNodeTexImage tex(node.ptr);
                         BL::Image image(tex.image());
                         BL::ImageUser image_user(tex.image_user());
@@ -588,11 +635,27 @@ namespace blender {
                           const auto frame = const_cast<BL::Scene&>(scene).frame_current();
                           const auto path = image_file_path(image_user, image, frame);
 
-                          builder->parameter(parameter, path);
+                          PointerRNA colorspace_ptr = image.colorspace_settings().ptr;
+                          const auto colorspace = get_enum_identifier(colorspace_ptr, "name");
 
+                          std::string texture_path = "";
+
+                          // we add a texture to the renderer from either a pixel buffer 
+                          // (i.e. a texture comnig out of blender), or a texture file. in both cases
+                          // a color space transformation will be applied to the texture, if requested
+                          // by blender
                           if (image.packed_file()) {
-                            material_t::add_image(path, image.ptr.data);
+                            texture_path = make_texture(path, image.ptr.data, colorspace);
                           }
+                          else {
+                            std::cout << "COLORSPACE: " << colorspace << std::endl;
+                            texture_path = make_texture(path, colorspace);
+                          }
+
+                          // TODO: this would throw, and crash blender, if the texture file could 
+                          // not be generated. handle this case by inserting some placeholder
+                          // texture
+                          builder->parameter(parameter, texture_path);
                         }
                         else {
                           std::cout << "Can't find image!" << std::endl;

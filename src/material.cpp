@@ -62,6 +62,7 @@ struct service_t : public RendererServices {
     }
   }
 */
+
   bool get_attribute(
     ShaderGlobals* sg
   , bool derivatives
@@ -70,8 +71,6 @@ struct service_t : public RendererServices {
   , ustring name
   , void* val)
   {
-    // std::cout << "getattr: " << name << std::endl;
-
     if (sg && sg->objdata) {
       object_t* o = (object_t*) sg->objdata;
       if (name == tangent) {
@@ -127,6 +126,7 @@ struct material_t::details_t {
 
     system->attribute("searchpath:shader", path + "/shaders");
     system->texturesys()->attribute("max_memory_MB", 16384);
+    system->texturesys()->attribute("autotile", 64);
 
     ClosureParam params[][32] = {
       {
@@ -487,8 +487,4 @@ void material_t::boot(const parsed_options_t& options, const std::string& path) 
 
 void material_t::attach() {
   details_t::attach();
-}
-
-void material_t::add_image(const std::string path, void* data) {
-  details_t::add_image(path, data);
 }

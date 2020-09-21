@@ -196,7 +196,7 @@ void mesh_t::shading_parameters(
     const auto& n1 = normals[nb];
     const auto& n2 = normals[nc];
 
-    n = (w*n2+u*n0+v*n1).normalize();
+    n = (w*n0+u*n1+v*n2).normalize();
   }
   else {
     const auto v0 = vertices[a];

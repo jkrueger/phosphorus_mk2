@@ -26,13 +26,14 @@ void python_thread_state_restore(void** python_thread_state) {
 }
 
 PyObject* init_func(PyObject* /*self*/, PyObject* args) {
-  PyObject *path, *user_path;
+  PyObject *path, *resource_path, *user_path;
   int headless;
 
-  if(!PyArg_ParseTuple(args, "OOi", &path, &user_path, &headless)) {
+  if(!PyArg_ParseTuple(args, "OOOi", &path, &resource_path, &user_path, &headless)) {
     return NULL;
   }
 
+  blender::session_t::resources = _PyUnicode_AsString(resource_path);
   blender::session_t::path = _PyUnicode_AsString(path);
 
   Py_RETURN_NONE;
@@ -43,8 +44,6 @@ PyObject* exit_func(PyObject* /*self*/, PyObject* /*args*/) {
 }
 
 PyObject* create_func(PyObject* /*self*/, PyObject* args) {
-  printf("CREATE\n");
-
   PyObject *pyengine, *pyuserpref, *pydata, *pyregion, *pyv3d, *pyrv3d;
   int preview_osl;
 

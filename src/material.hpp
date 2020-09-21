@@ -83,7 +83,4 @@ struct material_t {
    * an optional shader search path. will look for shaders in the binary directory by 
    * default */
   static void boot(const parsed_options_t& options, const std::string& path = ".");
-
-  /* add image data under a virtual path */
-  static void add_image(const std::string path, void* data);
 };

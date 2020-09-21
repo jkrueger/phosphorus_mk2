@@ -10,6 +10,7 @@ namespace blender {
     struct details_t;
     details_t* details;
 
+    static std::string resources;
     static std::string path;
 
     void *python_thread_state;

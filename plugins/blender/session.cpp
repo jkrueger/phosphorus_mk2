@@ -13,6 +13,7 @@
 #include <unistd.h>
 
 namespace blender {
+  std::string session_t::resources = "";
   std::string session_t::path = "";
 
   struct session_t::details_t {
@@ -112,6 +113,10 @@ namespace blender {
       renderer.options.path_depth = RNA_int_get(&pscene, "max_path_depth");
     }
 
+    void init_sub_systems(const std::string& path) {
+      material_t::boot(renderer.options, path);
+    }
+
     void prepare_devices() {
       for(auto& device: renderer.devices) { 
         delete device;
@@ -138,9 +143,11 @@ namespace blender {
         BL::RenderPass pass(*pi);
 
         if (pass.name() == "Combined") {
+          std::cout << "Adding primary channel" << std::endl;
           buffer_format.request(render_buffer_t::PRIMARY, 4);
         }
         else if (pass.name() == "Normal") {
+          std::cout << "Adding normal channel" << std::endl;
           buffer_format.request(render_buffer_t::NORMALS, 3);
         }
       }
@@ -182,10 +189,11 @@ namespace blender {
 
   void session_t::reset(BL::BlendData& data, BL::Depsgraph& depsgraph)
   {
-    material_t::boot(details->renderer.options, path);
-    
     details->depsgraph = depsgraph;
     details->scene = depsgraph.scene_eval();
+    
+    details->render_options();
+    details->init_sub_systems(path);
     
     if (details->rv3d) {
       auto settings = details->scene.render();
@@ -196,7 +204,6 @@ namespace blender {
       details->build_scene(settings);
     }
 
-    details->render_options();
     details->prepare_devices();
   }
 

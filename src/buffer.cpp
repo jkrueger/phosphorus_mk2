@@ -65,7 +65,7 @@ render_buffer_t::channel_t* render_buffer_t::channel(const OIIO::ustring& name) 
   });
 
   if (guard == channels.end()) {
-    throw std::runtime_error("Render buffer has no channel");
+    return nullptr;
   }
 
   return &(*guard);
@@ -77,7 +77,7 @@ const render_buffer_t::channel_t* render_buffer_t::channel(const OIIO::ustring& 
   });
 
   if (guard == channels.end()) {
-    throw std::runtime_error("Render buffer has no channel");
+    return nullptr;
   }
 
   return &(*guard);
