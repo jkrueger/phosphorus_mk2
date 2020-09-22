@@ -15,7 +15,15 @@
 
 namespace ct = microfacet::cook_torrance;
 
-const OIIO_NAMESPACE::ustring bsdf::lobes::microfacet_t::GGX("ggx");
+const OIIO::ustring bsdf::lobes::microfacet_t::GGX("ggx");
+
+/* the incoming light depends on the normal. the final shading normal is only available
+ * after shading, and exists, at least technically, per lobe of the bsdf. hence we need to 
+ * modulate the incoming light per lobe, inside the bsdf, instead of somewhere further up
+ * in the renderer logic */
+inline float angle_to_light(const bsdf_t::param_t& param, const Imath::V3f& wi) {
+  ((const bsdf::lobe_t*) &param)->n.dot(wi);
+}
 
 Imath::Color3f eval(
   bsdf_t::type_t type
@@ -81,7 +89,7 @@ Imath::Color3f eval(
     break;
   }
 
-  return result;
+  return result * angle_to_light(param, wi);
 }
 
 bsdf_t::bsdf_t()

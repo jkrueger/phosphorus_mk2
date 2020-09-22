@@ -15,20 +15,21 @@ namespace bsdf {
   static const uint32_t REFLECT = 8;
   static const uint32_t TRANSMIT = 16;
 
+  struct lobe_t {
+    Imath::V3f n;
+  };
+
   namespace lobes {
-    struct diffuse_t {
+    struct diffuse_t : public lobe_t {
       static const uint32_t flags = REFLECT | DIFFUSE;
       
-      Imath::V3f n;
-
       inline void precompute() {
       }
     };
 
-    struct oren_nayar_t {
+    struct oren_nayar_t : public lobe_t {
       static const uint32_t flags = REFLECT | DIFFUSE;
 
-      Imath::V3f n;
       float alpha;
       float a, b;
 
@@ -40,27 +41,25 @@ namespace bsdf {
       }
     };
 
-    struct reflect_t {
+    struct reflect_t : public lobe_t {
       static const uint32_t flags = REFLECT | SPECULAR;
 
-      Imath::V3f n;
-      float      eta;
+      float eta;
 
       inline void precompute() {
       }
     };
 
-    struct refract_t {
+    struct refract_t : public lobe_t {
       static const uint32_t flags = TRANSMIT | SPECULAR;
 
-      Imath::V3f n;
-      float      eta;
+      float eta;
 
       inline void precompute() {
       }
     };
 
-    struct microfacet_t {
+    struct microfacet_t : public lobe_t {
       static const uint32_t flags = REFLECT | GLOSSY;
 
       static const OIIO_NAMESPACE::ustring GGX;
@@ -68,7 +67,6 @@ namespace bsdf {
       // distribution name
       OIIO_NAMESPACE::ustring distribution;
 
-      Imath::V3f n;       // shading normal
       Imath::V3f u;       // unused parameter, appearing in the OSL docs
       float      xalpha;  // horizontal roughness
       float      yalpha;  // vertical roughness
@@ -95,10 +93,9 @@ namespace bsdf {
       }
     };
 
-    struct sheen_t {
+    struct sheen_t : public lobe_t  {
       static const uint32_t flags = REFLECT | GLOSSY;
 
-      Imath::V3f n; // shading normal
       float      r; // roughness term
 
       inline void precompute() {

@@ -122,8 +122,6 @@ namespace blender {
     }
 
     void generate_tangents(mesh_t* mesh) {
-      std::cout << "start generate tangents" << std::endl;
-
 	    user_data_t userdata(mesh);
 
       SMikkTSpaceInterface sm_interface;
@@ -142,8 +140,6 @@ namespace blender {
       context.m_pInterface = &sm_interface;
       
       genTangSpaceDefault(&context);
-
-      std::cout << "end generate tangents" << std::endl;
     }
   }
 
@@ -184,11 +180,7 @@ namespace blender {
       mesh_t::builder_t::scoped_t builder(mesh->builder());
 
       if (use_loop_normals) {
-        std::cout << "Use loop normals" << std::endl;
         builder->set_uvs_per_vertex_per_face();
-      }
-      else {
-        std::cout << "Use vertex normals" << std::endl;
       }
 
       uint32_t num_normals = 0;
@@ -327,13 +319,9 @@ namespace blender {
     , BL::Image& image
     , int frame)
     {
-      std::cout << image.name() << std::endl;
-
       if (!user) {
         std::cout << "No image user" << std::endl;
       }
-
-      std::cout << std::to_string(user.frame_current()) << std::endl;
 
       if (image.packed_file()) {
         return image.name() + "@" + std::to_string(frame);
@@ -351,8 +339,6 @@ namespace blender {
      * to the texture */
     std::string make_texture(const std::string& path, const std::string& colorspace) {
       const auto output = fs::temp_directory_path() / fs::path(colorspace + "_" + path).filename();
-
-      std::cout << "Storing texture at: " << output << std::endl;
 
       OIIO::ImageBuf image(path);
       OIIO::ImageSpec config;
@@ -648,7 +634,6 @@ namespace blender {
                             texture_path = make_texture(path, image.ptr.data, colorspace);
                           }
                           else {
-                            std::cout << "COLORSPACE: " << colorspace << std::endl;
                             texture_path = make_texture(path, colorspace);
                           }
 
@@ -864,7 +849,6 @@ namespace blender {
             set_parameters(desc, builder, node);
             builder->shader(std::get<0>(desc), node.name(), "surface");
             for (const auto& attribute : std::get<1>(desc)) {
-              std::cout << "attribute: " << attribute << std::endl;
               builder->add_attribute(attribute);
             }
             descriptors[node.name()] = desc;

@@ -222,7 +222,6 @@ namespace spt {
       const auto d    = samples->d[to];
 
       const auto f = bsdf->f(wi, wo);
-      const auto s = f * std::fabs(n.dot(wi));
 
       const auto mesh = state->scene->mesh(samples->meshid(to));
       const auto material = state->scene->material(samples->matid(to));
@@ -241,7 +240,7 @@ namespace spt {
 
       const auto pdf = state->pdf[to] * d * d / std::fabs(light_n.dot(-wi));
 
-      return (light.e * 4) * s * (1.0f / pdf);
+      return (light.e * 4) * f * (1.0f / pdf);
     }
 
     bool sample_bsdf(
