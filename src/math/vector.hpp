@@ -22,6 +22,10 @@ inline Imath::V3f offset(
 
 /* tagent space vector, and trigonometry functions */
 namespace ts {
+  inline bool in_same_hemisphere(const Imath::V3f& a, const Imath::V3f& b) {
+    return (a.y * b.y) >= 0.0f;
+  }
+  
   inline float cos2_theta(const Imath::V3f& v) {
     return v.y*v.y;
   }
@@ -48,7 +52,7 @@ namespace ts {
 
   inline float cos_phi(const Imath::V3f& v) {
     auto sin_t = sin_theta(v);
-    return (sin_t == 0) ? 1 : clamp(v.z / sin_t, -1.f, 1.f);  
+    return (sin_t == 0) ? 1 : clamp(v.x / sin_t, -1.f, 1.f);  
   }
 
   inline float cos2_phi(const Imath::V3f& v) {
@@ -58,7 +62,7 @@ namespace ts {
 
   inline float sin_phi(const Imath::V3f& v) {
     float sin_t = sin_theta(v);
-    return (sin_t == 0) ? 0 : clamp(v.x / sin_t, -1.f, 1.f);
+    return (sin_t == 0) ? 0 : clamp(v.z / sin_t, -1.f, 1.f);
   }
 
   inline float sin2_phi(const Imath::V3f& v) {

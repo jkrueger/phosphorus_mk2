@@ -259,9 +259,9 @@ namespace blender {
       uint32_t num_uvs = 0;
 
       if (blender_mesh.uv_layers.length() != 0) {
-        std::cout << "Importing UV map coordinates" << std::endl;
         BL::Mesh::uv_layers_iterator l;
         blender_mesh.uv_layers.begin(l);
+        std::cout << "Importing UV map coordinates: " << l->data.length() << std::endl;
         //  TODO: allow multiple UV map layers
         // for (l!=blender_mesh.uv_layers.end(); ++l) {
           BL::Mesh::loop_triangles_iterator f;

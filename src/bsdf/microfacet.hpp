@@ -7,9 +7,31 @@
 #include <ImathColor.h>
 
 namespace microfacet {
-  /* Cook-Torrance microfacet model
-   * Source: PBRT */
+
+  /* Cook-Torrance microfacet model, Source: PBRT */
   namespace cook_torrance {
+
+    namespace details {
+      /* compute shadowing term of the microfacet distribution. 'wi', and 'wo' 
+       * are expected to be in tangent space */
+      template<typename Params, typename Distribution>
+      float G(
+          const Params& params
+        , const Imath::V3f& wi
+        , const Imath::V3f& wo
+        , const Distribution& distribution) {
+        return 1.0f / (1.0f + distribution.Lambda(params, wi) + distribution.Lambda(params, wo));
+      }
+
+      template<typename Params, typename Distribution>
+      float G1(
+          const Params& params
+        , const Imath::V3f& v
+        , const Distribution& distribution) {
+        return 1.0f / (1.0f + distribution.Lambda(params, v));
+      }
+    }
+
     template<typename Params, typename Distribution>
     inline Imath::Color3f f(
       const Params& params
@@ -17,6 +39,8 @@ namespace microfacet {
     , const Imath::V3f& wo
     , const Distribution& distribution)
     {
+      using namespace details;
+
       invertible_base_t base(params.n);
 
       const auto li = base.to_local(wi);
@@ -34,13 +58,12 @@ namespace microfacet {
       if (wh.x == 0 || wh.y == 0 || wh.z == 0) {
         return Imath::Color3f(0.0f);
       }
-      
+
       wh.normalize();
 
-      const auto cos_h = li.dot(wh);
-      const auto cos_h2 = lo.dot(wh);
-      const auto g = 1.0f / (1.0f + distribution.G(params, li) + distribution.G(params, lo));
-      const auto c = distribution.D(params, wh) * g * (1.0f / (4.0f * cos_ti * cos_to));
+      const auto d = distribution.D(params, wh);
+      const auto g = G(params, li, lo, distribution);
+      const auto c = d * g * (1.0f / (4.0f * cos_ti * cos_to));
 
       return Imath::Color3f(c);
     }
@@ -52,11 +75,16 @@ namespace microfacet {
     , const Imath::V3f& wo
     , const Distribution& distribution)
     {
+      const invertible_base_t base(params.n);
+
+      const auto li = base.to_local(wi);
+      const auto lo = base.to_local(wo);
+
       if (!in_same_hemisphere(wo, wi)) return 0;
 
-      Imath::V3f wh = (wo + wi).normalize();
+      Imath::V3f wh = (li + lo).normalize();
 
-      return distribution.D(params, wh) / (4.0f * wo.dot(wh));
+      return (distribution.D(params, wh) * ts::cos_theta(wh)) / (4.0f * li.dot(wh));
     }
 
     template<typename Params, typename Distribution>
@@ -75,23 +103,36 @@ namespace microfacet {
       if (li.y == 0.0f) {
         return Imath::V3f(0.0f);
       }
-      
+
       float dpdf;
       const auto wh = distribution.sample(params, li, dpdf, sample);
-
-      wo  = base.to_world(-li + (2.0f * li.dot(wh)) * wh);
-      pdf = dpdf / (4.0f * li.dot(wh));
       
+      if (li.y * wh.y < 0.0f) {
+        return Imath::V3f(0.0f);
+      }
+
+      const auto lo  = -li + (2.0f * li.dot(wh)) * wh;
+
+      if (li.y * lo.y < 0.0f) {
+        return Imath::V3f(0.0f);
+      }
+
+      pdf = dpdf / (4.0f * li.dot(wh));
+      wo  = base.to_world(lo);
+
       return f(params, wi, wo, distribution);
     }
   }
 
+  /* GGX microfacet distribution implementation */
   struct ggx_t {
+    /* microfacet distriubtion function */
     inline float D(
       const bsdf::lobes::microfacet_t& params
     , const Imath::V3f& v) const
     {
       const auto tan2_theta = ts::tan2_theta(v);
+
       if (std::isinf(tan2_theta)) {
         return 0.0f;
       }
@@ -102,13 +143,13 @@ namespace microfacet {
       const auto cos2_theta = ts::cos2_theta(v);
       const auto cos4_theta = cos2_theta*cos2_theta;
 
-      const auto e = (ts::cos2_phi(v) / (ax*ax) +
-        ts::sin2_phi(v) / (ay*ay)) * tan2_theta;
+      const auto e = (ts::cos2_phi(v) / (ax*ax) + ts::sin2_phi(v) / (ay*ay)) * tan2_theta;
 
       return 1.0f/(M_PI*ax*ay*cos4_theta*(1+e)*(1+e));
     }
 
-    inline float G(
+    /* shadowing term function */
+    inline float Lambda(
       const bsdf::lobes::microfacet_t& params
     , const Imath::V3f& v) const
     {
@@ -124,8 +165,7 @@ namespace microfacet {
         ts::cos2_phi(v) * ax * ay +
         ts::sin2_phi(v) * ax * ay);
 
-      const auto alpha2_tan2_theta =
-        (alpha * abs_tan_theta) * (alpha * abs_tan_theta);
+      const auto alpha2_tan2_theta = (alpha * abs_tan_theta) * (alpha * abs_tan_theta);
 
       return (-1.0f + std::sqrt(1.0f + alpha2_tan2_theta)) * 0.5f;
     }
@@ -155,8 +195,7 @@ namespace microfacet {
       auto tmp = 1.0f / (A*A - 1.0f);
       if (tmp > 1e10) { tmp = 1e10; }
       const auto B = tan_theta;
-      const auto D =
-        std::sqrt(std::max((float) B*B*tmp*tmp - (A*A-B*B) * tmp, 0.0f));
+      const auto D = std::sqrt(std::max((float) B*B*tmp*tmp - (A*A-B*B) * tmp, 0.0f));
       const auto slope_x1 = B*tmp-D;
       const auto slope_x2 = B*tmp+D;
 
@@ -209,7 +248,7 @@ namespace microfacet {
       Imath::V3f wh(-slope_x, 1.0f, -slope_y);
       wh.normalize();
 
-      pdf = D(params, wh) * ts::cos_theta(wh);
+      pdf = D(params, wh) * cook_torrance::details::G1(params, wi, *this) * std::abs(wi.dot(wh)) / std::abs(ts::cos_theta(wi));
 
       return wh;
     }

@@ -48,7 +48,7 @@ namespace microfacet {
       }
 
       /* shadowing term */
-      inline float G(
+      inline float Lambda(
         const bsdf::lobes::sheen_t& params
       , const Imath::V3f& v) const
       {

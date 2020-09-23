@@ -16,6 +16,7 @@ namespace bsdf {
   static const uint32_t TRANSMIT = 16;
 
   struct lobe_t {
+    // all lobes need to keep track of their shading normal at least
     Imath::V3f n;
   };
 
@@ -62,24 +63,26 @@ namespace bsdf {
     struct microfacet_t : public lobe_t {
       static const uint32_t flags = REFLECT | GLOSSY;
 
-      static const OIIO_NAMESPACE::ustring GGX;
+      static const OIIO::ustring GGX;
 
       // distribution name
-      OIIO_NAMESPACE::ustring distribution;
+      OIIO::ustring distribution;
 
       Imath::V3f u;       // unused parameter, appearing in the OSL docs
       float      xalpha;  // horizontal roughness
       float      yalpha;  // vertical roughness
       float      eta;     // index of refraction
-      int        refract;  //is this a refracting bsdf (like frosted glas)
+      int        refract; //is this a refracting bsdf (like frosted glas)
 
       inline bool is_ggx() const {
         return distribution == GGX;
       }
 
       inline void precompute() {
-        xalpha = roughness_to_alpha(xalpha);
-        yalpha = roughness_to_alpha(yalpha);
+        xalpha = xalpha * xalpha;
+        yalpha = yalpha * yalpha;
+        // xalpha = roughness_to_alpha(xalpha);
+        // yalpha = roughness_to_alpha(yalpha);
       }
 
       static inline float roughness_to_alpha(float roughness) {
@@ -96,7 +99,7 @@ namespace bsdf {
     struct sheen_t : public lobe_t  {
       static const uint32_t flags = REFLECT | GLOSSY;
 
-      float      r; // roughness term
+      float r; // roughness term
 
       inline void precompute() {
       }

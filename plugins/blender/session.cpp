@@ -194,7 +194,7 @@ namespace blender {
     
     details->render_options();
     details->init_sub_systems(path);
-    
+
     if (details->rv3d) {
       auto settings = details->scene.render();
       details->build_scene(settings);

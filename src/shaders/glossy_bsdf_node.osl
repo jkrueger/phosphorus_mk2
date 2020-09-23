@@ -27,8 +27,9 @@ glossy_bsdf_node
   
 )
 {
-  float r2 = roughness; // roughness * roughness;
-  
+  // float r2 = roughness * roughness;
+  float r2 = roughness;
+
   if (distribution == "sharp") {
     Cout = Cs * reflection(shadingNormal, eta);
   }

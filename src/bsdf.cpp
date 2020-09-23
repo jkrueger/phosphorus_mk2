@@ -22,7 +22,7 @@ const OIIO::ustring bsdf::lobes::microfacet_t::GGX("ggx");
  * modulate the incoming light per lobe, inside the bsdf, instead of somewhere further up
  * in the renderer logic */
 inline float angle_to_light(const bsdf_t::param_t& param, const Imath::V3f& wi) {
-  ((const bsdf::lobe_t*) &param)->n.dot(wi);
+  return ((const bsdf::lobe_t*) &param)->n.dot(wi);
 }
 
 Imath::Color3f eval(
