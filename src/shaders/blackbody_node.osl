@@ -1,0 +1,19 @@
+
+shader blackbody_node
+  [[ string help = "Blackbody radiation node. Can be used as input for lights" ]]
+(
+  float temperature = 1200
+    [[ string help = "Temperature in Kelvin" ]],
+
+  output color out = 0
+)
+{
+  color rgb = blackbody(temperature);
+
+  float l = luminance(rgb);
+  if (l != 0.0) {
+    rgb /= l;
+  }
+
+  out = rgb;
+}

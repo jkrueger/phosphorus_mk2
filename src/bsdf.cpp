@@ -89,7 +89,7 @@ Imath::Color3f eval(
     break;
   }
 
-  return result * angle_to_light(param, wi);
+  return result;
 }
 
 bsdf_t::bsdf_t()
@@ -103,7 +103,7 @@ Imath::Color3f bsdf_t::f(const Imath::V3f& wi, const Imath::V3f& wo) const {
   const auto p = (param_t*) params;
 
   for (auto i=0; i<lobes; ++i) {
-    out += eval(type[i], p[i], wi, wo, ignored) * weight[i];
+    out += eval(type[i], p[i], wi, wo, ignored) * weight[i] * angle_to_light(*p, wi);
   }
 
   return out;
@@ -144,6 +144,11 @@ Imath::Color3f bsdf_t::sample(
       , remapped
       , pdf
       , microfacet::ggx_t());
+/*
+      if (pdf > 1.0f || result.x > 10.0f || result.y > 10.0f || result.z > 10.0f) {
+        std::cout << "PDF > 1.0f: " << pdf << " " << result << std::endl;
+      }
+*/
     }
     else {
       std::cerr

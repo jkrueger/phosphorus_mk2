@@ -216,6 +216,10 @@ namespace microfacet {
         (v * (v * (v * 0.093073f + 0.309420f) - 1.0f) + 0.597999f);
 
       slope_y = S * z * std::sqrt(1.0f + slope_x * slope_x);
+
+      if (std::isinf(slope_y) || std::isnan(slope_y)) {
+        std::cout << "Nan/Inf" << slope_y << std::endl;
+      }
     }
 
     inline Imath::V3f sample(
