@@ -52,6 +52,10 @@ namespace simd {
     return _mm256_div_ps(l, r);
   }
 
+  inline __m256 abs(const __m256& v) {
+    return _mm256_andnot_ps(load(-0.0f), v);
+  }
+
   inline __m256 min(const __m256& l, const __m256& r) {
     return _mm256_min_ps(l, r);
   }
@@ -115,7 +119,15 @@ namespace simd {
   inline __m256 sqrt(const __m256& x) {
     return _mm256_sqrt_ps(x);
   }
+/*
+  inline __m256 sin(const __m256& v) {
+    return _mm256_sin_ps(v);
+  }
 
+  inline __m256 cos(const __m256& v) {
+    return _mm256_cos_ps(v);
+  }
+*/
   template<int N>
   struct float_t
   {};
@@ -225,6 +237,11 @@ namespace simd {
   }
 
   template<int N>
+  inline float_t<N> abs(const float_t<N>& f) {
+    return float_t<N>(abs(f.v));
+  }
+
+  template<int N>
   inline float_t<N> min(const float_t<N>& l, const float_t<N>& r) {
     return float_t<N>(min(l.v, r.v));
   }
@@ -244,6 +261,22 @@ namespace simd {
     return float_t<N>(sqrt(f.v));
   }
 
+  template<int N>
+  inline float_t<N> rcp(const float_t<N>& f) {
+    return float_t<N>(rcp(f.v));
+  }
+  
+/*
+  template<int N>
+  inline size_t sin(const float_t<N>& f) {
+    return sin(f.v);
+  }
+
+  template<int N>
+  inline size_t cos(const float_t<N>& f) {
+    return cos(f.v);
+  }
+*/
   template<int N>
   inline size_t to_mask(const float_t<N>& f) {
     return movemask(f.v);

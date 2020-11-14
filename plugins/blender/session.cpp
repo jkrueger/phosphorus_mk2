@@ -108,6 +108,7 @@ namespace blender {
     void render_options() {
       PointerRNA pscene = RNA_pointer_get(&scene.ptr, "phosphoros");
       
+      renderer.options.single_threaded = false;
       renderer.options.samples_per_pixel = RNA_int_get(&pscene, "samples_per_pixel");
       renderer.options.paths_per_sample = RNA_int_get(&pscene, "paths_per_sample");
       renderer.options.path_depth = RNA_int_get(&pscene, "max_path_depth");

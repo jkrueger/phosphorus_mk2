@@ -107,6 +107,10 @@ struct ray_t {
     _v.store(v + i);
   }
 
+  inline simd::vector3_t<step> at(const simd::float_t<step>& t) const {
+    return p + wi * t;
+  }
+
   inline void miss(uint32_t i) {
     flags[i] &= ~HIT;
   }

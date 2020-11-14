@@ -30,20 +30,20 @@ namespace bvh {
     Imath::Box3f centroid_bounds;
 
     inline geometry_t(const geometry_t& parent)
-      : primitives(parent.primitives)
-      , start(0)
-      , end(0)
+    : primitives(parent.primitives)
+    , start(0)
+    , end(0)
     {}
 
     inline geometry_t(
-        std::vector<primitive_t>& primitives
+      std::vector<primitive_t>& primitives
       , uint32_t start
       , uint32_t end)
-      : primitives(primitives), start(start), end(end)
+    : primitives(primitives), start(start), end(end)
     {
       for (auto i=start; i<end; ++i) {
-	bounds.extendBy(primitives[i].bounds);
-	centroid_bounds.extendBy(primitives[i].centroid);
+      	bounds.extendBy(primitives[i].bounds);
+      	centroid_bounds.extendBy(primitives[i].centroid);
       }
     }
 
@@ -80,7 +80,7 @@ namespace bvh {
     float    cost;
 
     inline split_t(uint32_t axis, uint32_t bin, float cost)
-      : axis(axis), bin(bin), cost(cost)
+    : axis(axis), bin(bin), cost(cost)
     {}
   };
 
@@ -89,7 +89,7 @@ namespace bvh {
     Imath::Box3f bounds;
 
     inline bin_t()
-      : count(0)
+    : count(0)
     {}
 
     inline void add(const primitive_t& p) {
@@ -149,134 +149,134 @@ namespace bvh {
       bins_t<NUM_SPLIT_BINS> bins;
 
       if (aabb::is_empty_on(geometry.centroid_bounds, axis)) {
-	continue;
-      }
+       continue;
+     }
 
-      for (auto i=0; i<geometry.count(); ++i) {
-	bins.add(geometry.centroid_bounds, geometry.primitive(i), axis);
-      }
+     for (auto i=0; i<geometry.count(); ++i) {
+       bins.add(geometry.centroid_bounds, geometry.primitive(i), axis);
+     }
 
-      auto split_cost = std::numeric_limits<float_t>::max();
-      auto split_bin  = 0;
+     auto split_cost = std::numeric_limits<float_t>::max();
+     auto split_bin  = 0;
 
-      for (auto i=0; i<NUM_SPLIT_BINS-1; ++i) {
-	Imath::Box3f a, b;
-	auto left = 0; auto right = 0;
-	for (auto j=0; j<=i; ++j) {
-	  a.extendBy(bins[j].bounds);
-	  left += bins[j].count;
-	}
+     for (auto i=0; i<NUM_SPLIT_BINS-1; ++i) {
+       Imath::Box3f a, b;
+       auto left = 0; auto right = 0;
+       for (auto j=0; j<=i; ++j) {
+         a.extendBy(bins[j].bounds);
+         left += bins[j].count;
+       }
 
-	for (auto j=i+1; j<NUM_SPLIT_BINS; ++j) {
-	  b.extendBy(bins[j].bounds);
-	  right += bins[j].count;
-	}
+       for (auto j=i+1; j<NUM_SPLIT_BINS; ++j) {
+         b.extendBy(bins[j].bounds);
+         right += bins[j].count;
+       }
 
-	auto cost = (left * aabb::area(a) + right * aabb::area(b)) / aabb::area(geometry.bounds);
-	if (cost < split_cost) {
-	  split_cost = cost;
-	  split_bin = i;
-	}
-      }
+       auto cost = (left * aabb::area(a) + right * aabb::area(b)) / aabb::area(geometry.bounds);
+       if (cost < split_cost) {
+         split_cost = cost;
+         split_bin = i;
+       }
+     }
 
-      if (split_cost < best_cost) {
-	best_axis = axis;
-	best_cost = split_cost;
-	best_bin  = split_bin;
-      }
-    }
-    return split_t(best_axis, best_bin, best_cost);
-  }
+     if (split_cost < best_cost) {
+       best_axis = axis;
+       best_cost = split_cost;
+       best_bin  = split_bin;
+     }
+   }
+   return split_t(best_axis, best_bin, best_cost);
+ }
 
-  void split(const split_t& split, geometry_t& parent, geometry_t& l, geometry_t& r) {
-    parent.partition([&](const primitive_t& p) {
-	auto bin = bins_t<NUM_SPLIT_BINS>::find(parent.centroid_bounds, p, split.axis);
-	return bin <= split.bin; 
-      }, l, r);
-  }
+ void split(const split_t& split, geometry_t& parent, geometry_t& l, geometry_t& r) {
+  parent.partition([&](const primitive_t& p) {
+   auto bin = bins_t<NUM_SPLIT_BINS>::find(parent.centroid_bounds, p, split.axis);
+   return bin <= split.bin; 
+ }, l, r);
+}
 
-  int32_t largest_node(const geometry_t* node, uint32_t n) {
-    int32_t out = -1;
-    float   a   = std::numeric_limits<float>::max(); 
-    for (auto i=0; i<n; ++i) {
-      if (node[i].count() < MAX_PRIMS_IN_NODE) {
-	continue;
-      }
+int32_t largest_node(const geometry_t* node, uint32_t n) {
+  int32_t out = -1;
+  float   a   = std::numeric_limits<float>::max(); 
+  for (auto i=0; i<n; ++i) {
+    if (node[i].count() < MAX_PRIMS_IN_NODE) {
+     continue;
+   }
 
-      auto node_area = aabb::area(node[i].bounds);
-      if (node_area < a) {
-	out = i;
-	a   = node_area;
-      }
-    }
-    return out;
-  }
+   auto node_area = aabb::area(node[i].bounds);
+   if (node_area < a) {
+     out = i;
+     a   = node_area;
+   }
+ }
+ return out;
+}
 
   template<typename Things, typename Builder>
-  uint32_t from(geometry_t& geometry, const Things& things, Builder& bvh) {
-    auto n = geometry.count();
-    auto s = find(geometry);
+uint32_t from(geometry_t& geometry, const Things& things, Builder& bvh) {
+  auto n = geometry.count();
+  auto s = find(geometry);
 
-    if (too_small_to_split(geometry) || leaf_cost(s, geometry) <= 1.0f + s.cost) {
-      return 0;
-    }
+  if (too_small_to_split(geometry) || leaf_cost(s, geometry) <= 1.0f + s.cost) {
+    return 0;
+  }
 
-    auto num_children = 2;
-    geometry_t children[8] = { [0 ... 7] = { geometry } };
+  auto num_children = 2;
+  geometry_t children[8] = { [0 ... 7] = { geometry } };
 
-    split(s, geometry, children[0], children[1]);
+  split(s, geometry, children[0], children[1]);
 
-    while (num_children < 8) {
-      auto split_child = largest_node(children, num_children);
-      if (split_child == -1) {
-	break;
-      }
-      auto s = find(children[split_child]);
+  while (num_children < 8) {
+    auto split_child = largest_node(children, num_children);
+    if (split_child == -1) {
+     break;
+   }
+   auto s = find(children[split_child]);
       // check sha heuristic?
-      geometry_t tmp(geometry);
-      split(s, children[split_child], tmp, children[num_children]);
-      children[split_child] = tmp;
+   geometry_t tmp(geometry);
+   split(s, children[split_child], tmp, children[num_children]);
+   children[split_child] = tmp;
 
-      ++num_children;
-    }
+   ++num_children;
+ }
 
     // make a new node in the BVH
-    auto node_index = bvh->make_node();
+ auto node_index = bvh->make_node();
 
-    int32_t child_indices[num_children];
-    for (int i=0; i<num_children; ++i) {
-      child_indices[i] = from(children[i], things, bvh);
-    }
+ int32_t child_indices[num_children];
+ for (int i=0; i<num_children; ++i) {
+  child_indices[i] = from(children[i], things, bvh);
+}
 
-    auto& node = bvh->resolve(node_index);
+auto& node = bvh->resolve(node_index);
 
-    for (int i=0; i<num_children; ++i) {
-      node.set_bounds(i, children[i].bounds);
+for (int i=0; i<num_children; ++i) {
+  node.set_bounds(i, children[i].bounds);
 
-      if (child_indices[i]) {
-	node.set_offset(i, child_indices[i]);
-      }
-      else {
-	auto index =
-	  bvh->add(
-	    children[i].start, children[i].end,
-	    geometry.primitives,
-	    things);
-	node.set_leaf(i, index, children[i].count());
-      }
-    }
+  if (child_indices[i]) {
+   node.set_offset(i, child_indices[i]);
+ }
+ else {
+   auto index =
+   bvh->add(
+     children[i].start, children[i].end,
+     geometry.primitives,
+     things);
+   node.set_leaf(i, index, children[i].count());
+ }
+}
 
-    return node_index;
-  }
+return node_index;
+}
 
   template<typename Things, typename Builder>
-  void from(Builder& bvh, const Things& things) {
-    std::vector<primitive_t> primitives(things.size());
-    for (uint32_t i=0; i<things.size(); ++i) {
-      primitives[i] = { i, things[i].bounds() };
-    }
-
-    geometry_t geometry(primitives, 0, primitives.size());
-    from(geometry, things, bvh);
+void from(Builder& bvh, const Things& things) {
+  std::vector<primitive_t> primitives(things.size());
+  for (uint32_t i=0; i<things.size(); ++i) {
+    primitives[i] = { i, things[i].bounds() };
   }
+
+  geometry_t geometry(primitives, 0, primitives.size());
+  from(geometry, things, bvh);
+}
 }

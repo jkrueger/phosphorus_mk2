@@ -15,6 +15,7 @@ namespace simd {
   typedef float_t<SIMD_WIDTH> floatv_t;
   typedef int32_t<SIMD_WIDTH> int32v_t;
 
+  typedef vector2_t<SIMD_WIDTH> vector2v_t;
   typedef vector3_t<SIMD_WIDTH> vector3v_t;
   typedef matrix44_t<SIMD_WIDTH> matrix44v_t;
 }

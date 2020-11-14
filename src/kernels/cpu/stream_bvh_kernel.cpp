@@ -17,9 +17,9 @@ struct stream_mbvh_kernel_t::details_t{
 template<typename Stream>
 void intersect(
   stream_mbvh_kernel_t::details_t* state
-, Stream* stream
-, const active_t<>& active
-, const accel::mbvh_t* bvh)
+  , Stream* stream
+  , const active_t<>& active
+  , const accel::mbvh_t* bvh)
 {
   typedef simd::float_t<accel::mbvh_t::width> float_t;
 
@@ -54,35 +54,35 @@ void intersect(
       auto length = zero;
       auto end    = todo + cur.num_rays;
       while (todo != end) {
-	float_t dist;
+        float_t dist;
 
-	const auto ray = *todo;
+        const auto ray = *todo;
 
-	if (stream->is_shadow(ray) && stream->is_hit(ray)) {
-	   ++todo;
-	   continue;
-	}
+        if (stream->is_shadow(ray) && stream->is_hit(ray)) {
+          ++todo;
+          continue;
+        }
 
-	auto hits =
-	  simd::intersect<accel::mbvh_t::width>(
-	    bounds
-	  , stream->p.v_at(ray)
-	  , stream->wi.v_at(ray).rcp()
-          , stream->d[ray]
-	  , dist);
+        auto hits =
+        simd::intersect<accel::mbvh_t::width>(
+          bounds
+        , stream->p.v_at(ray)
+        , stream->wi.v_at(ray).rcp()
+        , stream->d[ray]
+        , dist);
 
         num_active = num_active + (one & hits);
-	length = length + (dist & hits);
+        length = length + (dist & hits);
 
-	auto mask = simd::to_mask(hits);
+        auto mask = simd::to_mask(hits);
 
-	// push ray into lanes for intersected nodes
-	while(mask != 0) {
-	  auto x = __bscf(mask);
-	  push(lanes, x, *todo);
-	}
+	      // push ray into lanes for intersected nodes
+        while(mask != 0) {
+          auto x = __bscf(mask);
+          push(lanes, x, *todo);
+        }
 
-	++todo;
+        ++todo;
       }
 
       uint32_t ids[8];
@@ -92,30 +92,30 @@ void intersect(
 
       __aligned(32) float dists[8];
       length.store(dists);
-	
+
       // TODO: collect stats on lane utilization to see if efficiently sorting
       // for smaller 'n' makes sense
 
       auto n=0;
       for (auto i=0; i<8; ++i) {
-	auto num = num_rays[i];
-	if (num > 0) {
-	  auto d = dists[i];
-	  ids[n] = i;
-	  for(auto j=n; j>0; --j) {
-	    if (d < dists[ids[j]]) {
-	      auto& a = ids[j], &b = ids[j-1];
-	      a = a ^ b;
-	      b = a ^ b;
-	      a = a ^ b;
-	    }
-	  }
-	  ++n;
-	}
+        auto num = num_rays[i];
+        if (num > 0) {
+          auto d = dists[i];
+          ids[n] = i;
+          for(auto j=n; j>0; --j) {
+            if (d < dists[ids[j]]) {
+              auto& a = ids[j], &b = ids[j-1];
+              a = a ^ b;
+              b = a ^ b;
+              a = a ^ b;
+            }
+          }
+          ++n;
+        }
       }
 
       for (auto i=0; i<n; ++i) {
-	push(tasks, top, node, ids[i], num_rays[ids[i]]);
+        push(tasks, top, node, ids[i], num_rays[ids[i]]);
       }
     }
     else {
@@ -123,30 +123,32 @@ void intersect(
       auto begin = todo; 
       auto end   = todo + cur.num_rays;
       while (begin < end) {
-	auto index = cur.offset;
-	auto prims = 0;
-	const auto num = std::min(end - begin, (long) accel::mbvh_t::width);
+        auto index = cur.offset;
+        auto prims = 0;
+        const auto num = std::min(end - begin, (long) accel::mbvh_t::width);
 
-	do {
-          if (num < 8) {
-	    bvh->triangles[index].iterate_rays(stream, begin, num);
-	  }
-	  else {
-	    bvh->triangles[index].iterate_triangles(stream, begin, num);
-	  }
-	  prims += accel::mbvh_t::width;
-	  ++index;
-	} while(unlikely(prims < cur.prims));
+        do {
+          //if (num < 8) {
+          // bvh->triangles[index].iterate_rays(stream, begin, num);
+    	    //}
+    	    //else {
+    	    //bvh->triangles[index].iterate_triangles(stream, begin, num);
+    	    //}
+          bvh->triangles[index].baseline(stream, begin, num);
 
-	begin+=accel::mbvh_t::width;
+          prims += accel::mbvh_t::width;
+          ++index;
+        } while(unlikely(prims < cur.prims));
+
+        begin+=accel::mbvh_t::width;
       }
     }
   }
 }
 
 stream_mbvh_kernel_t::stream_mbvh_kernel_t(const accel::mbvh_t* bvh)
-  : details(new details_t())
-  , bvh(bvh)
+: details(new details_t())
+, bvh(bvh)
 {}
 
 stream_mbvh_kernel_t::~stream_mbvh_kernel_t() {

@@ -191,8 +191,12 @@ namespace blender {
         builder->add_vertex(Imath::V3f(a[0], a[1], a[2]) * transform);
 
         // if (!use_loop_normals) {
-          const auto& n = v->normal();
-          builder->add_normal((Imath::V3f(n[0], n[1], n[2]) * normal_transform).normalize());
+          const auto& blender_normal = v->normal();
+
+          Imath::V3f world_space_normal;
+          normal_transform.multDirMatrix(Imath::V3f(blender_normal[0], blender_normal[1], blender_normal[2]), world_space_normal);
+
+          builder->add_normal(world_space_normal.normalize());
 
           num_normals++;
         // }
@@ -216,10 +220,13 @@ namespace blender {
         if (use_loop_normals) {
           const auto ns = f->split_normals();
           for (auto i=0; i<3; ++i) {
-            auto n = (Imath::V3f(ns[i*3], ns[i*3+1], ns[i*3+2]) *
-              normal_transform).normalize();
+            Imath::V3f object_space_normal(ns[i*3], ns[i*3+1], ns[i*3+2]);
+            Imath::V3f world_space_normal;
 
-            builder->set_normal(indices[i], n);
+            normal_transform.multDirMatrix(object_space_normal, world_space_normal);
+            world_space_normal.normalize();
+
+            builder->set_normal(indices[i], world_space_normal);
             // num_normals++;
           }
         }
@@ -228,7 +235,12 @@ namespace blender {
         num_indices +=3;
       }
 
-      if (use_loop_normals) {
+      if (mesh->has_per_vertex_normals()) {
+        if (num_normals != num_vertices) {
+          std::cout << "Expecting to have a normal per vertex" << std::endl;
+        }
+      }
+      else {
         if (num_normals != num_indices) {
           std::cout 
             << "Expecting to have a normal per triangle index: " 
@@ -236,11 +248,6 @@ namespace blender {
             << " != "
             << num_indices
             << std::endl;
-        }
-      }
-      else {
-        if (num_normals != num_vertices) {
-          std::cout << "Expecting to have a normal per vertex" << std::endl;
         }
       }
 
@@ -275,19 +282,19 @@ namespace blender {
             }
           }
           // }
-      }
 
-      if (use_loop_normals) {
-        if (num_uvs != num_indices) {
-          std::cout << "Expecting to have a uv coordinate per triangle index" << std::endl;
+        if (mesh->has_per_vertex_uvs()) {
+          if (num_uvs != num_vertices) {
+            std::cout 
+              << "Expecting to have a uv coordinate per vertex: " 
+              << num_uvs << " != " << num_vertices 
+              << std::endl;
+          }
         }
-      }
-      else {
-        if (blender_mesh.uv_layers.length() != 0 && num_uvs != num_vertices) {
-          std::cout 
-          << "Expecting to have a uv coordinate per vertex: " 
-          << num_uvs << " != " << num_vertices 
-          << std::endl;
+        else {
+          if (num_uvs != num_indices) {
+            std::cout << "Expecting to have a uv coordinate per triangle index" << std::endl;
+          }
         }
       }
 
@@ -338,7 +345,7 @@ namespace blender {
      * on disk, that is optimized for lookup, and colorspace converted. returns the file system path
      * to the texture */
     std::string make_texture(const std::string& path, const std::string& colorspace) {
-      const auto output = fs::temp_directory_path() / fs::path(colorspace + "_" + path).filename();
+      const auto output = fs::temp_directory_path() / fs::path(colorspace + "_" + path).stem().replace_extension(".tiff");
 
       OIIO::ImageBuf image(path);
       OIIO::ImageSpec config;
@@ -490,13 +497,13 @@ namespace blender {
       }
       else if (node.is_a(&RNA_ShaderNodeRGBToBW)) {
         return {
-          "color_to_value",
+          "luminance_node",
           {},
           {
-            passthrough("Color", "Cs"),
+            passthrough("Color", "in"),
           },
           {
-            passthrough("Val", "value")
+            passthrough("Val", "out")
           }
         };
       }
@@ -683,7 +690,23 @@ namespace blender {
                         const auto frame = const_cast<BL::Scene&>(scene).frame_current();
                         const auto path = image_file_path(image_user, image, frame);
 
-                        builder->parameter(parameter, path);
+                        PointerRNA colorspace_ptr = image.colorspace_settings().ptr;
+                        const auto colorspace = get_enum_identifier(colorspace_ptr, "name");
+
+                        std::string texture_path = "";
+
+                        // we add a texture to the renderer from either a pixel buffer 
+                        // (i.e. a texture comnig out of blender), or a texture file. in both cases
+                        // a color space transformation will be applied to the texture, if requested
+                        // by blender
+                        if (image.packed_file()) {
+                          texture_path = make_texture(path, image.ptr.data, colorspace);
+                        }
+                        else {
+                          texture_path = make_texture(path, colorspace);
+                        }
+
+                        builder->parameter(parameter, texture_path);
                       }
                 }
             },
@@ -714,6 +737,18 @@ namespace blender {
           {
             passthrough("Normal", "Normal"),
           },
+        };
+      }
+      else if (node.is_a(&RNA_ShaderNodeBlackbody)) {
+        return {
+          "blackbody_node",
+          {},
+          {
+            passthrough("Temperature", "temperature")
+          },
+          {
+            passthrough("Color", "out")
+          }
         };
       }
       else if (node.is_a(&RNA_ShaderNodeOutputMaterial) ||
@@ -959,6 +994,34 @@ namespace blender {
       }
     }
 
+    inline Imath::V3f get_row(const Imath::M44f& m, int n) {
+      return Imath::V3f(m[n][0], m[n][1], m[n][2]);
+    }
+
+    inline float camera_focal_distance(
+      BL::RenderEngine &engine,
+      BL::Camera &camera,
+      scene_t& scene)
+    {
+      BL::Object dof_object = camera.dof().focus_object();
+
+      if (!dof_object) {
+        return camera.dof().focus_distance();
+      }
+
+      const auto bm = dof_object.matrix_world();
+
+      Imath::M44f dof_to_world;
+      memcpy(&dof_to_world, &bm, sizeof(float)*16);
+
+      Imath::V3f view_dir = get_row(scene.camera.to_world, 2);
+      view_dir.normalize();
+
+      Imath::V3f dof_dir = get_row(scene.camera.to_world, 3) - get_row(dof_to_world, 3);
+
+      return std::fabsf(view_dir.dot(dof_dir));
+    }
+
     void camera(
       BL::RenderSettings& settings
     , BL::RenderEngine& engine
@@ -973,18 +1036,20 @@ namespace blender {
 
       BL::Camera camera(object.data());
 
-      if (camera.dof()) {
-        // TODO: log unsupported config
-        std::cout << "DOF object unsupported" << std::endl;
-      }
-
       scene.camera.film.width = settings.resolution_x();
       scene.camera.film.height = settings.resolution_y();
-
       scene.camera.focal_length = camera.lens();
       scene.camera.fov = camera.angle();
       scene.camera.sensor_width = camera.sensor_width();
       scene.camera.sensor_height = camera.sensor_height();
+
+      if (camera.dof() && camera.dof().use_dof()) {
+        float fstop = camera.dof().aperture_fstop();
+        fstop = std::max(fstop, 1e-5f);
+
+        scene.camera.aperture_radius = (camera.lens() * 1e-3f) / (2.0f * fstop);
+        scene.camera.focal_distance = camera_focal_distance(engine, camera, scene);
+      }
     }
 
     void import(

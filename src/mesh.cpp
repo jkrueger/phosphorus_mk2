@@ -206,6 +206,14 @@ void mesh_t::shading_parameters(
     n = (v1 - v0).cross(v2 - v0).normalize();
   }
 
+/*
+  const auto backfacing = n.dot(-rays->wi.at(i)) < 0.0f;
+
+  if (backfacing) {
+    n = -n;
+  }
+*/
+  
   // compute base, depending on whether we have explicit tangents or not
   if (tangents) {
     if (details->smooth[face/3]) {
@@ -215,7 +223,8 @@ void mesh_t::shading_parameters(
 
       const auto t = (w*t0+u*t1+v*t2).normalize();
 
-      base = invertible_base_t(t, n);
+      // invert tangent as well if backfacing
+      base = invertible_base_t(n, t);
     }
     else {
       std::cout 

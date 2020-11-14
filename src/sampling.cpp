@@ -103,8 +103,10 @@ void sampler_t::preprocess(const scene_t& scene) {
   for (auto i=0; i<spp; ++i) {
     for (auto j=0; j<128; ++j) {
       for (auto k=0; k<8; ++k) {
-      	pixel_samples[i].v[j].x[k] = stratified[i].x;
-      	pixel_samples[i].v[j].y[k] = stratified[i].y;
+      	pixel_samples[i].film[j].x[k] = stratified[i].x;
+      	pixel_samples[i].film[j].y[k] = stratified[i].y;
+        pixel_samples[i].lens[j].x[k] = sample();
+        pixel_samples[i].lens[j].y[k] = sample();
       }
     }
   }

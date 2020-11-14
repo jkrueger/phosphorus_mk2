@@ -1,5 +1,7 @@
 #pragma once
 
+#include <OpenEXR/ImathVec.h>
+
 #include <cmath>
 
 namespace sample {
@@ -31,6 +33,27 @@ namespace sample {
  
       out = Imath::V3f(x, std::sqrt(std::max(0.0f, 1.0f - sample.x)), y);
       pdf = out.y * UNIFORM_DISC_PDF;
+    }
+  }
+
+  namespace disc {
+    inline Imath::V2f concentric(const Imath::V2f& sample) {
+      static const float pi_o_2 = 2.0f / M_PI;
+      static const float pi_o_4 = 4.0f / M_PI;
+
+      const auto offset = 2.0f * sample - Imath::V2f(1, 1);
+
+      float r, theta;
+      if (std::abs(sample.x) > std::abs(sample.y)) {
+        r = sample.x;
+        theta = pi_o_4 * (sample.y / sample.x);
+      }
+      else {
+        r = sample.y;
+        theta = pi_o_2 - pi_o_4 * (sample.x / sample.y);
+      }
+
+      return r * Imath::V2f(std::cos(theta), std::sin(theta));
     }
   }
 

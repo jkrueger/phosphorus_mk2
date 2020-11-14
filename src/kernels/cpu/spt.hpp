@@ -214,6 +214,8 @@ namespace spt {
     , interaction_t<>* hits
     , uint32_t to) const
     {
+      assert(state && samples && hits);
+
       const auto bsdf = hits->bsdf[to]; 
       const auto p    = samples->p.at(to);
       const auto wi   = samples->wi.at(to);
@@ -221,12 +223,14 @@ namespace spt {
       const auto n    = hits->n.at(to);
       const auto d    = samples->d[to];
 
+      assert(bsdf);
+
       const auto f = bsdf->f(wi, wo);
 
       const auto mesh = state->scene->mesh(samples->meshid(to));
       const auto material = state->scene->material(samples->matid(to));
 
-      assert(material->is_emitter());
+      assert(mesh && material && material->is_emitter());
 
       Imath::V3f light_n;
       Imath::V2f light_st;

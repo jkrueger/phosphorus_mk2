@@ -9,17 +9,19 @@ struct orthogonal_base_t {
   {}
 
   inline orthogonal_base_t(const Imath::V3f& n)
-    : a(n.cross(std::abs(n.z) < 0.5 ? Imath::V3f(0.0, 0.0, 1.0) : Imath::V3f(0.0, -1.0, 0.0))),
-      b(n),
-      c(a.cross(n))
+    : a(((n.x != n.y || n.x != n.z) ? Imath::V3f(n.z - n.y, n.x - n.z, n.y - n.x) : Imath::V3f(n.z - n.y, n.x + n.z, -n.y - n.x)).normalized())
+    //: a(n.cross(std::abs(n.z) < 0.5 ? Imath::V3f(0.0, 0.0, 1.0) : Imath::V3f(0.0, -1.0, 0.0))),
+    , b(n)
+    , c(a.cross(n).normalized())
   {
-    a.normalize();
-    c.normalize();
+    // a.normalize();
+    // c.normalize();
   }
- 
+
   inline orthogonal_base_t(const Imath::V3f& tangent, const Imath::V3f& n)
     : a(tangent.cross(n)), b(n), c(tangent)
   {
+    a.normalize();
     b.normalize();
   }
 

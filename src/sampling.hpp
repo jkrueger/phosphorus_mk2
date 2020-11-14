@@ -2,6 +2,7 @@
 
 #include "options.hpp"
 #include "math/config.hpp"
+#include "math/sampling.hpp"
 #include "math/soa.hpp"
 #include "math/simd.hpp"
 #include "utils/assert.hpp"
@@ -16,7 +17,8 @@ namespace sampling {
       static const uint32_t size=N;
       static const uint32_t step=SIMD_WIDTH;
 
-      soa::vector2_t<step> v[size/step];
+      soa::vector2_t<step> film[size/step];
+      soa::vector2_t<step> lens[size/step];
     };
 
     struct light_sample_t {

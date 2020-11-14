@@ -21,6 +21,10 @@ namespace soa {
       x[i] = v.x;
       y[i] = v.y;
     }
+
+    inline simd::vector2v_t stream() const {
+      return simd::vector2v_t(x, y);
+    }
   };
 
   template<int N>

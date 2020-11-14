@@ -80,4 +80,4 @@ SET( LIBRARIES "${LLVM_LIBRARIES} ${CLANG_LIBRARIES}" )
 SET( CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -std=c++17 -O3 -march=native -fno-rtti" )
 SET( CMAKE_SHARED_LINKER_FLAGS "${CMAKE_CXX_LDFLAGS} ${LIBRARY_PATHS} ${LIBRARIES} -flto -undefined dynamic_lookup" )
 
-set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${INCLUDE_PATHS} -g -std=c++14 -march=native -fno-rtti -D_DEBUG" )
+SET( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -g -std=c++17 -march=native -fno-rtti -D_DEBUG" )

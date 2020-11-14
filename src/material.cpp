@@ -432,7 +432,7 @@ void material_t::evaluate(
     sg.N = sg.Ng = hits->n.at(index);
     sg.u = hits->s[index];
     sg.v = hits->t[index];
-    sg.backfacing = sg.N.dot(sg.I) > 0;
+    sg.backfacing = sg.N.dot(sg.I) < 0;
     sg.objdata = &obj;
 
     details->execute(sg);
@@ -458,18 +458,21 @@ void material_t::evaluate(
 {
   ShaderGlobals sg;
   memset(&sg, 0, sizeof(ShaderGlobals));
+  sg.backfacing = n.dot(wi) < 0;
   sg.P = p;
   sg.I = wi;
   sg.N = sg.Ng = n;
   sg.u = st.x;
   sg.v = st.y;
-  sg.backfacing = sg.N.dot(sg.I) < 0;
 
   details->execute(sg);
   result.bsdf = nullptr;
 
   if (sg.Ci) {
     details->eval_closure(result, sg.Ci);
+  }
+  else {
+    std::cout << "No closure returned: " << id << ", " << is_emitter() << std::endl;
   }
 }
 

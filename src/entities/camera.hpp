@@ -12,8 +12,10 @@ struct camera_t {
 
   float fov;
   float focal_length;
+  float focal_distance;
   float sensor_width;
   float sensor_height;
+  float aperture_radius;
 
   struct film_t {
     uint32_t width;
@@ -29,5 +31,10 @@ struct camera_t {
     : focal_length(35.0f)
     , sensor_width(36.0f)
     , sensor_height(24.0f)
+    , aperture_radius(0.0f)
   {}
+
+  inline bool is_pinhole() const {
+    return aperture_radius == 0.0f;
+  }
 };

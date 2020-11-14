@@ -56,11 +56,11 @@ struct tile_renderer_t {
   frame_state_t& frame;
 
   // rendering kernel functions
-  camera_kernel_t           camera_rays;
-  Accel                     trace;
-  deferred_shading_kernel_t shade;
-  spt::light_sampler_t      prepare_occlusion_queries;
-  spt::integrator_t         integrate;
+  camera::perspective_kernel_t camera_rays;
+  Accel                        trace;
+  deferred_shading_kernel_t    shade;
+  spt::light_sampler_t         prepare_occlusion_queries;
+  spt::integrator_t            integrate;
 
   // renderer state
   integrator_state_t* integrator_state;
