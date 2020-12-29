@@ -5,6 +5,7 @@ add_library(_phosphoros SHARED
   blender.cpp
   session.cpp
   sink.cpp
+  ./blender/shader.cpp
   ../../src/bsdf.cpp
   ../../src/buffer.cpp
   ../../src/light.cpp

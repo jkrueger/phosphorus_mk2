@@ -2,9 +2,10 @@
 
 #include "entities/camera.hpp"
 #include "light.hpp"
-#include "material.hpp"
 #include "mesh.hpp"
 #include "scene.hpp"
+
+#include "blender/shader.hpp"
 
 #include <MEM_guardedalloc.h>
 #include <RNA_access.h>
@@ -13,9 +14,6 @@
 
 #include <mikktspace.h>
 
-#include <OpenImageIO/imagebufalgo.h>
-
-#include <filesystem>
 #include <functional>
 #include <iostream>
 #include <list>
@@ -23,13 +21,6 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
-
-namespace fs = std::filesystem;
-
-extern "C" {
-  void BKE_image_user_frame_calc(void *iuser, int cfra);
-  void BKE_image_user_file_path(void *iuser, void *ima, char *path);
-}
 
 namespace blender {
   bool is_mesh(BL::Object& object) {
@@ -311,510 +302,13 @@ namespace blender {
       return mesh;
     }
 
-    inline std::string get_enum_identifier(PointerRNA &ptr, const char *name) {
-      PropertyRNA *prop = RNA_struct_find_property(&ptr, name);
-      const char *identifier = "";
-      int value = RNA_property_enum_get(&ptr, prop);
-
-      RNA_property_enum_identifier(NULL, &ptr, prop, value, &identifier);
-
-      return std::string(identifier);
-    }
-
-    std::string image_file_path(
-      BL::ImageUser& user
-    , BL::Image& image
-    , int frame)
-    {
-      if (!user) {
-        std::cout << "No image user" << std::endl;
-      }
-
-      if (image.packed_file()) {
-        return image.name() + "@" + std::to_string(frame);
-      }
-
-      char filepath[1024];
-      // BKE_image_user_frame_calc(user.ptr.data, frame);
-      BKE_image_user_file_path(user.ptr.data, image.ptr.data, filepath);
-
-      return std::string(filepath);
-    }
-
-    /* adds a texture from a file to the material system. this will create a temporary file
-     * on disk, that is optimized for lookup, and colorspace converted. returns the file system path
-     * to the texture */
-    std::string make_texture(const std::string& path, const std::string& colorspace) {
-      const auto output = fs::temp_directory_path() / fs::path(colorspace + "_" + path).stem().replace_extension(".tiff");
-
-      OIIO::ImageBuf image(path);
-      OIIO::ImageSpec config;
-      config.attribute("maketx:incolorspace", colorspace);
-      config.attribute("maketx:outcolorspace", "scene_linear");
-      config.attribute("maketx:filtername", "lanczos3");
-      config.attribute("maketx:colorconfig", session_t::resources + "/2.90/datafiles/colormanagement/config.ocio");
-
-      std::stringstream ss;
-
-      if (!OIIO::ImageBufAlgo::make_texture(OIIO::ImageBufAlgo::MakeTxTexture, image, output.string(), config, &ss)) {
-        throw std::runtime_error("Failed to make texture: " + ss.str());
-      }
-
-      return output.string();
-    }
-
-    /* adds a texture from a buffer to the material system. this will create a temporary file
-     * on disk, that is optimized for lookup, and colorspace converted. returns the file system path
-     * of the texture */
-    std::string make_texture(const std::string& path, void* pixels, const std::string& colorspace) {
-      throw std::runtime_error("Adding texture from buffer not implemented yet");
-    }
-
-    typedef std::tuple<
-      std::string
-      , std::function<
-          void (material_t::builder_t::scoped_t&, BL::NodeSocket&, const std::string&)
-        >
-    > parameter_mapping_t;
-
-    typedef std::unordered_map<
-      std::string
-    , parameter_mapping_t
-    > parameter_mappings_t;
-
-    typedef std::tuple<
-      // name of the shader
-      std::string
-      // extra dependencies required by the shader, such as tangent vectors
-      // for normal maps, etc. that are computed on demand
-    , std::vector<std::string>
-      // mapping for input parameters
-    , parameter_mappings_t
-      // mapping for output parameters
-    , parameter_mappings_t
-    > node_descriptor_t;
-
-    /* for certain parameter we ignore the blender default value, since there is none
-     * initialization is expected to happen in the shader, and generally this will be a
-     * parameter that gets it's value from some other node */
-    typename parameter_mappings_t::value_type uninitialized(
-      const std::string& a
-    , const std::string& b)
-    {
-      return { a, { b, [](material_t::builder_t::scoped_t&, BL::NodeSocket&, const std::string&) {
-        // NOOP
-        return;
-      } } };
-    }
-
-    typename parameter_mappings_t::value_type passthrough(
-      const std::string& a
-    , const std::string& b)
-    {
-      return { a, { b, [](material_t::builder_t::scoped_t& builder, BL::NodeSocket& i, const std::string& mapped) {
-        const auto& type = i.type();
-        switch(type) {
-        case BL::NodeSocket::type_VALUE:
-          builder->parameter(mapped, RNA_float_get(&i.ptr, "default_value"));
-          break;
-        case BL::NodeSocket::type_INT:
-          builder->parameter(mapped, RNA_int_get(&i.ptr, "default_value"));
-          break;
-        case BL::NodeSocket::type_RGBA:
-          {
-            Imath::Color3f c;
-            RNA_float_get_array(&i.ptr, "default_value", &c.x);
-            builder->parameter(mapped, c);
-            break;
-          }
-        case BL::NodeSocket::type_VECTOR:
-          {
-            Imath::V3f v;
-            RNA_float_get_array(&i.ptr, "default_value", &v.x);
-            builder->parameter(mapped, v);
-            break;
-          }
-        case BL::NodeSocket::type_STRING:
-          {
-            char buf[1024];
-            char *str = RNA_string_get_alloc(
-              &i.ptr, "default_value", buf, sizeof(buf));
-            builder->parameter(mapped, std::string(str));
-            break;
-          }
-        default:
-          std::cout
-            << "Don't know how to set parameter " << mapped << " of type: "
-            << type
-            << std::endl;
-          break;
-        }
-      } } };
-    }
-
-    node_descriptor_t make_shader_node(BL::ShaderNode& node, BL::Scene& scene)
-    {
-      if (node.is_a(&RNA_ShaderNodeAddShader)) {
-        return {
-          "add_node",
-          {},
-          {
-            passthrough("Shader", "A"),
-            passthrough("Shader_001", "B"),
-          },
-          {
-            passthrough("Shader", "Cout")
-          }
-        };
-      }
-      else if (node.is_a(&RNA_ShaderNodeMixShader)) {
-        return {
-          "mix_node",
-          {},
-          {
-            passthrough("Fac", "fac"),
-            passthrough("Shader", "A"),
-            passthrough("Shader_001", "B"),
-          },
-          {
-            passthrough("Shader", "Cout")
-          }
-        };
-      }
-      else if (node.is_a(&RNA_ShaderNodeMixRGB)) {
-        return {
-          "color_op_node",
-          {},
-          {
-            passthrough("Fac", "fac"),
-            passthrough("Color1", "A"),
-            passthrough("Color2", "B"),
-          },
-          {
-            passthrough("Color", "Cout")
-          }
-        };
-      }
-      else if (node.is_a(&RNA_ShaderNodeRGBToBW)) {
-        return {
-          "luminance_node",
-          {},
-          {
-            passthrough("Color", "in"),
-          },
-          {
-            passthrough("Val", "out")
-          }
-        };
-      }
-      else if (node.is_a(&RNA_ShaderNodeFresnel)) {
-        return {
-          "fresnel_dielectric_node",
-          {},
-          {
-            passthrough("IOR", "IoR"),
-          },
-          {
-            passthrough("Fac", "Cout")
-          }
-        };
-      }
-      else if (node.is_a(&RNA_ShaderNodeBsdfDiffuse)) {
-        return {
-          "diffuse_bsdf_node",
-          {},
-          {
-            passthrough("Color", "Cs"),
-            uninitialized("Normal", "shadingNormal"),
-          },
-          {
-            passthrough("BSDF", "Cout")
-          }
-        };
-      }
-      else if (node.is_a(&RNA_ShaderNodeBsdfGlossy)) {
-        return {
-          "glossy_bsdf_node",
-          {},
-          {
-            { "distribution",
-              { "distribution", [=](material_t::builder_t::scoped_t& builder, BL::NodeSocket&, const std::string& parameter) {
-                  BL::ShaderNodeBsdfGlossy glossy_node(node.ptr);
-
-                  switch(glossy_node.distribution()) {
-                  case BL::ShaderNodeBsdfGlossy::distribution_SHARP:
-                    builder->parameter(parameter, "sharp");
-                    break;
-                  case BL::ShaderNodeBsdfGlossy::distribution_GGX:
-                    builder->parameter(parameter, "ggx");
-                    break;
-                  default:
-                    std::cout
-                      << "Unsupported microfacet distribution"
-                      << std::endl;
-                  }
-                }
-              }
-            },
-            passthrough("Color", "Cs"),
-            uninitialized("Normal", "shadingNormal"),
-            passthrough("Roughness", "roughness"),
-          },
-          {
-            passthrough("BSDF", "Cout")
-          }
-        };
-      }
-      else if(node.is_a(&RNA_ShaderNodeBsdfVelvet)) {
-        return {
-          "sheen_bsdf_node",
-          {},
-          {
-            passthrough("Color", "Cs"),
-            passthrough("Sigma", "roughness"),
-            uninitialized("Normal", "shadingNormal"),
-          },
-          {
-            passthrough("BSDF", "Cout")
-          }
-        };
-      }
-      else if(node.is_a(&RNA_ShaderNodeBackground)) {
-        return {
-          "background_node",
-          {},
-          {
-            passthrough("Color", "Cs"),
-            passthrough("Strength", "power"),
-          },
-          {
-            passthrough("Background", "Cout"),
-          }
-        };
-      }
-      else if(node.is_a(&RNA_ShaderNodeBsdfRefraction)) {
-      }
-      else if(node.is_a(&RNA_ShaderNodeBsdfTransparent)) {
-      }
-      else if(node.is_a(&RNA_ShaderNodeEmission)) {
-        return {
-          "diffuse_emitter_node",
-          {},
-          {
-            passthrough("Color", "Cs"),
-            passthrough("Strength", "power"),
-          },
-          {
-            passthrough("Emission", "Cout")
-          }
-        };
-      }
-      else if(node.is_a(&RNA_ShaderNodeTexImage)) {
-        return {
-          "texture_node",
-          {},
-          {
-            { "filename",
-                { "filename",
-                    [=](material_t::builder_t::scoped_t& builder
-                      , BL::NodeSocket&
-                      , const std::string& parameter)
-                      {
-                        BL::ShaderNodeTexImage tex(node.ptr);
-                        BL::Image image(tex.image());
-                        BL::ImageUser image_user(tex.image_user());
-
-                        if (image) {
-                          const auto frame = const_cast<BL::Scene&>(scene).frame_current();
-                          const auto path = image_file_path(image_user, image, frame);
-
-                          PointerRNA colorspace_ptr = image.colorspace_settings().ptr;
-                          const auto colorspace = get_enum_identifier(colorspace_ptr, "name");
-
-                          std::string texture_path = "";
-
-                          // we add a texture to the renderer from either a pixel buffer 
-                          // (i.e. a texture comnig out of blender), or a texture file. in both cases
-                          // a color space transformation will be applied to the texture, if requested
-                          // by blender
-                          if (image.packed_file()) {
-                            texture_path = make_texture(path, image.ptr.data, colorspace);
-                          }
-                          else {
-                            texture_path = make_texture(path, colorspace);
-                          }
-
-                          // TODO: this would throw, and crash blender, if the texture file could 
-                          // not be generated. handle this case by inserting some placeholder
-                          // texture
-                          builder->parameter(parameter, texture_path);
-                        }
-                        else {
-                          std::cout << "Can't find image!" << std::endl;
-                        }
-                      }
-                }
-            },
-            { "extension",
-                { "repeat",
-                    [=](material_t::builder_t::scoped_t& builder
-                      , BL::NodeSocket&
-                      , const std::string&)
-                      {
-                        // TODO: set s, and t wrap
-                      }
-                }
-            },
-          },
-          {
-            passthrough("Color", "Cout")
-          }
-        };
-      }
-      else if(node.is_a(&RNA_ShaderNodeTexEnvironment)) {
-        return {
-          "environment_node",
-          {},
-          {
-            { "filename",
-                { "filename",
-                    [=](material_t::builder_t::scoped_t& builder
-                      , BL::NodeSocket&
-                      , const std::string& parameter)
-                      {
-                        BL::ShaderNodeTexEnvironment env(node.ptr);
-
-                        BL::Image image(env.image());
-                        BL::ImageUser image_user(env.image_user());
-
-                        const auto frame = const_cast<BL::Scene&>(scene).frame_current();
-                        const auto path = image_file_path(image_user, image, frame);
-
-                        PointerRNA colorspace_ptr = image.colorspace_settings().ptr;
-                        const auto colorspace = get_enum_identifier(colorspace_ptr, "name");
-
-                        std::string texture_path = "";
-
-                        // we add a texture to the renderer from either a pixel buffer 
-                        // (i.e. a texture comnig out of blender), or a texture file. in both cases
-                        // a color space transformation will be applied to the texture, if requested
-                        // by blender
-                        if (image.packed_file()) {
-                          texture_path = make_texture(path, image.ptr.data, colorspace);
-                        }
-                        else {
-                          texture_path = make_texture(path, colorspace);
-                        }
-
-                        builder->parameter(parameter, texture_path);
-                      }
-                }
-            },
-            { "extension",
-                { "repeat",
-                    [=](material_t::builder_t::scoped_t& builder
-                      , BL::NodeSocket&
-                      , const std::string&)
-                      {
-                        // TODO: set s, and t wrap
-                      }
-                }
-            },
-          },
-          {
-            passthrough("Color", "Cout")
-          }
-        };
-      }
-      else if (node.is_a(&RNA_ShaderNodeNormalMap)) {
-        return {
-          "normal_map_node",
-          {"geom:tangent"},
-          {
-            passthrough("Color", "sample"),
-            passthrough("Strength", "strength")
-          },
-          {
-            passthrough("Normal", "Normal"),
-          },
-        };
-      }
-      else if (node.is_a(&RNA_ShaderNodeBlackbody)) {
-        return {
-          "blackbody_node",
-          {},
-          {
-            passthrough("Temperature", "temperature")
-          },
-          {
-            passthrough("Color", "out")
-          }
-        };
-      }
-      else if (node.is_a(&RNA_ShaderNodeOutputMaterial) ||
-               node.is_a(&RNA_ShaderNodeOutputWorld)) {
-        return {
-          "material_node",
-          {},
-          {
-            passthrough("Surface", "Cs")
-          },
-          {
-          }
-        };
-      }
-      else {
-        std::cout << "Unsupported node: " << node.name() << std::endl;
-      }
-
-      return {
-        "<unknown>", {}, {}, {}
-      };
-    }
-
-    void set_parameters(
-      const node_descriptor_t& desc
-    , material_t::builder_t::scoped_t& builder
-    , BL::ShaderNode& node)
-    {
-      const auto mappings = std::get<2>(desc);
-
-      BL::Node::inputs_iterator i;
-      for (node.inputs.begin(i); i!=node.inputs.end(); ++i) {
-        auto guard = mappings.find(i->identifier());
-        if (guard != mappings.end()) {
-          std::get<1>(guard->second)(builder, *i, std::get<0>(guard->second));
-        }
-        else {
-          // TODO: log skipped parameter
-        }
-      }
-
-      if(node.is_a(&RNA_ShaderNodeTexEnvironment) ||
-         node.is_a(&RNA_ShaderNodeTexImage)) {
-        auto guard = mappings.find("filename");
-        if (guard != mappings.end()) {
-          BL::NodeSocket dummy(PointerRNA_NULL);
-          std::get<1>(guard->second)(builder, dummy, std::get<0>(guard->second));
-        }
-      }
-      
-      if(node.is_a(&RNA_ShaderNodeBsdfGlossy)) {
-        auto guard = mappings.find("distribution");
-        if (guard != mappings.end()) {
-          BL::NodeSocket dummy(PointerRNA_NULL);
-          std::get<1>(guard->second)(builder, dummy, std::get<0>(guard->second));
-        }
-      }
-    }
-
     void shader_tree(
       BL::ShaderNodeTree& tree
     , BL::Depsgraph& graph
     , BL::Scene& scene
     , material_t::builder_t::scoped_t& builder)
     {
-      std::unordered_map<std::string, node_descriptor_t> descriptors;
+      std::unordered_map<std::string, const shader::compiler_t*> compilers;
 
       std::unordered_map<void*, std::list<PointerRNA>> in;
       std::unordered_map<void*, std::list<PointerRNA>> out;
@@ -879,23 +373,17 @@ namespace blender {
           // TODO: log not supported
         }
         else {
-          const auto desc = make_shader_node(node, scene);
-          if (std::get<0>(desc) != "<unknown>") {
-            set_parameters(desc, builder, node);
-            builder->shader(std::get<0>(desc), node.name(), "surface");
-            for (const auto& attribute : std::get<1>(desc)) {
-              builder->add_attribute(attribute);
-            }
-            descriptors[node.name()] = desc;
+          if (const auto compiler = shader::compiler_t::factory(node)) {
+            compiler->compile(node, builder, scene);
+            compilers.insert({node.name(), compiler});
           }
         }
       }
 
       if (auto output_node = tree.get_output_node(2)) {
-        const auto desc = make_shader_node(output_node, scene);
-        if (std::get<0>(desc) != "<unknown>") {
-          builder->shader(std::get<0>(desc), output_node.name(), "surface");
-          descriptors[output_node.name()] = desc;
+        if (const auto compiler = shader::compiler_t::factory(output_node)) {
+          compiler->compile(output_node, builder, scene);
+          compilers.insert({output_node.name(), compiler});
         }
       }
 
@@ -904,21 +392,47 @@ namespace blender {
           continue;
         }
 
-        auto from = link->from_socket();
-        auto to = link->to_socket();
+        auto from_socket = link->from_socket();
+        auto to_socket = link->to_socket();
 
-        auto from_desc = descriptors[from.node().name()];
-        auto to_desc = descriptors[to.node().name()];
+        auto from_compiler = compilers.find(from_socket.node().name());
+        auto to_compiler = compilers.find(to_socket.node().name());
 
-        auto from_mapping = std::get<3>(from_desc)[from.identifier()];
-        auto to_mapping = std::get<2>(to_desc)[to.identifier()];
+        if (from_compiler == compilers.end() || to_compiler == compilers.end()) {
+          std::cout 
+            << "Can't find compilers for nodes: (" 
+            << from_socket.node().name() << ", " 
+            << to_socket.node().name() << ")" 
+            << std::endl;
+          continue;
+        }
 
-        auto from_name = std::get<0>(from_mapping);
-        auto to_name = std::get<0>(to_mapping);
-        
+        const auto from = from_compiler->second->output_socket(from_socket);
+        const auto to = to_compiler->second->input_socket(to_socket);
+
+        if (!from) {
+          std::cout 
+            << "Can't find output socket \'" 
+            << from_socket.name() 
+            << "\' for shader: " 
+            << link->from_socket().node().name() 
+            << std::endl;
+          continue;
+        }
+
+        if (!to) {
+          std::cout 
+            << "Can't find input socket \'" 
+            << from_socket.name() 
+            << "\' for shader: " 
+            << link->to_socket().node().name() 
+            << std::endl;
+          continue;
+        }
+
         builder->connect(
-          from_name, to_name,
-          from.node().name(), to.node().name()
+          from.value().name(), to.value().name(),
+          from.value().node(), to.value().node()
         );
       }
     }

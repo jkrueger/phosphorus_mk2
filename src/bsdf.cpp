@@ -16,6 +16,7 @@
 namespace ct = microfacet::cook_torrance;
 
 const OIIO::ustring bsdf::lobes::microfacet_t::GGX("ggx");
+const OIIO::ustring bsdf::lobes::microfacet_t::BECKMANN("beckmann");
 
 /* the incoming light depends on the normal. the final shading normal is only available
  * after shading, and exists, at least technically, per lobe of the bsdf. hence we need to 
@@ -50,6 +51,15 @@ Imath::Color3f eval(
   case bsdf_t::Microfacet:
     {
       if (param.microfacet.is_ggx()) {
+        pdf = ct::pdf(param.microfacet, wi, wo, microfacet::ggx_t());
+        result = ct::f(
+          param.microfacet
+        , wi
+        , wo
+        , microfacet::ggx_t());
+      }
+      else if (param.microfacet.is_beckmann()) {
+        // TODO: default to GFX for now, until Beckman distribution is implemented
         pdf = ct::pdf(param.microfacet, wi, wo, microfacet::ggx_t());
         result = ct::f(
           param.microfacet
@@ -149,6 +159,16 @@ Imath::Color3f bsdf_t::sample(
         std::cout << "PDF > 1.0f: " << pdf << " " << result << std::endl;
       }
 */
+    }
+    else if (p.microfacet.is_beckmann()) {
+      // TODO: default to GFX for now, until Beckman distribution is implemented
+      result = ct::sample(
+        p.microfacet
+      , wi
+      , wo
+      , remapped
+      , pdf
+      , microfacet::ggx_t());
     }
     else {
       std::cerr

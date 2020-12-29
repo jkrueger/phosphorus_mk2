@@ -9,7 +9,7 @@ normal_map_node
   float strength = 0.5
     [[ string help = "Strength of the perturbation" ]],
 
-  output normal Normal= 0
+  output normal Normal = 0
     [[ string help = "Output color" ]]
 )
 {

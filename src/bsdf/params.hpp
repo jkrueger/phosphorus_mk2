@@ -64,6 +64,7 @@ namespace bsdf {
       static const uint32_t flags = REFLECT | GLOSSY;
 
       static const OIIO::ustring GGX;
+      static const OIIO::ustring BECKMANN;
 
       // distribution name
       OIIO::ustring distribution;
@@ -76,6 +77,10 @@ namespace bsdf {
 
       inline bool is_ggx() const {
         return distribution == GGX;
+      }
+
+      inline bool is_beckmann() const {
+        return distribution == BECKMANN;
       }
 
       inline void precompute() {

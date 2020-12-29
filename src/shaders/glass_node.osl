@@ -1,0 +1,8 @@
+
+shader glass_node
+  [[ help = "Glass node with fresnel, and microfacet" ]]
+(
+)
+{
+   
+}
