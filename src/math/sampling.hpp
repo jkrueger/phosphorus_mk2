@@ -1,6 +1,6 @@
 #pragma once
 
-#include <OpenEXR/ImathVec.h>
+#include <ImathVec.h>
 
 #include <cmath>
 

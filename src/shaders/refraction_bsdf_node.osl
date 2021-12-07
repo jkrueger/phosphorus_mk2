@@ -1,7 +1,7 @@
 
 shader
-glossy_bsdf_node
-  [[ string help = "Glossy BSDF material" ]]
+refraction_bsdf_node
+  [[ string help = "Refraction BSDF shader" ]]
 (
   string distribution = "ggx"
     [[ string help = "The microfacet distribution to use",
@@ -15,21 +15,26 @@ glossy_bsdf_node
   normal shadingNormal = N
     [[ string help = "The normal used for shading calculations" ]],
 
+  float IoR = 0.5
+    [[  string help = "Index of Refraction. used for transmissive glossy BSDFs" ]],
+
   float roughness = 0
-    [[  string help = "Roughness of the plastic",
+    [[  string help = "Roughness of the material, for glossy refraction",
         float min = 0, float max = 1 ]],
 
   output closure color Cout = 0
     [[ string help = "Output color" ]]
 )
 {
-  // float r2 = roughness * roughness;
-  float r2 = roughness;
+  // float r = roughness * roughness;
+  float r = roughness;
+  float f = max(IoR, 1e-5);
+  float eta = IoR; // backfacing() ? 1.0 / f : f;
 
   if (distribution == "sharp" || roughness == 0.0) {
-    Cout = Cs * reflection(shadingNormal, 0);
+    Cout = Cs * refraction(shadingNormal, eta);
   }
   else {
-    Cout = Cs * microfacet(distribution, shadingNormal, vector(0), r2, r2, 0, 0);
+    Cout = Cs * microfacet(distribution, shadingNormal, vector(0), r, r, eta, 1);
   }
 }

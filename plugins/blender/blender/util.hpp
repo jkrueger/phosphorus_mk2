@@ -12,5 +12,18 @@ namespace blender {
 
       return identifier;
     }
+
+    inline bool has_subdivision(BL::Object& o) {
+      for (auto i=0; i<o.modifiers.length(); ++i) {
+        BL::Modifier mod = o.modifiers[i];
+        // TODO: test for viewport rendering instead if preview render
+        bool enabled = mod.show_render();
+
+        if (enabled && mod.type() == BL::Modifier::type_SUBSURF) {
+          return true;
+        }
+      }
+      return false;
+    }
   }
 }

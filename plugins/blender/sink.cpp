@@ -97,19 +97,23 @@ namespace blender {
   , const Imath::V2i& size
   , const render_buffer_t& buffer)
   {
-    auto result = details->begin(pos, size);
+    if (auto result = details->begin(pos, size)) {
+      BL::RenderResult::layers_iterator layer;
+      result.layers.begin(layer);
 
-    BL::RenderResult::layers_iterator layer;
-    result.layers.begin(layer);
+      if (auto pass = layer->passes.find_by_name("Combined", details->view.c_str())) {
+        details->pass(result, pass, buffer.channel(render_buffer_t::PRIMARY));
+      }
 
-    if (auto pass = layer->passes.find_by_name("Combined", details->view.c_str())) {
-      details->pass(result, pass, buffer.channel(render_buffer_t::PRIMARY));
+      if (auto pass = layer->passes.find_by_name("Normal", details->view.c_str())) {
+        details->pass(result, pass, buffer.channel(render_buffer_t::NORMALS));
+      }
+
+      details->send(result);
     }
-
-    if (auto pass = layer->passes.find_by_name("Normal", details->view.c_str())) {
-      details->pass(result, pass, buffer.channel(render_buffer_t::NORMALS));
+    else {
+      details->unlock();
+      return;
     }
-
-    details->send(result);
   }
 }

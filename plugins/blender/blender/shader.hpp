@@ -26,15 +26,21 @@ namespace blender {
 
     struct generic_node_t;
     struct glossy_node_t;
+    struct refraction_node_t;
     struct glass_node_t;
+    struct mix_rgb_node_t;
 
-    template<typename T>
-    struct texture_file_node_t;
+    struct image_texture_node_t;
+    struct env_texture_node_t;
 
     /* represents a shader node/parameter name pair, that is used
      * to link up shader nodes */
     struct socket_t {
       std::pair<std::string, std::string> socket;
+
+      inline socket_t(const std::string& node, const std::string& parameter) 
+       : socket(node, parameter)
+      {}
 
       inline std::string node() const {
         return socket.first;
@@ -45,13 +51,46 @@ namespace blender {
       }
     };
 
+    typedef std::vector<socket_t> sockets_t;
+
+    namespace details {
+      inline std::string from_blender_distribution(int bd) {
+        switch(bd) {
+        case BL::ShaderNodeBsdfGlossy::distribution_SHARP:
+          return "sharp";
+        case BL::ShaderNodeBsdfGlossy::distribution_GGX:
+          return "ggx";
+        case BL::ShaderNodeBsdfGlossy::distribution_BECKMANN:
+          return "beckmann";
+        default:
+          std::cout << "Unsupported microfacet distribution. Defaulting to sharp" << std::endl;
+          return "sharp";
+        }
+      }
+
+      inline std::string from_blender_blend_type(int bd) {
+        switch(bd) {
+        case BL::ShaderNodeMixRGB::blend_type_MULTIPLY:
+          return "mul";
+        case BL::ShaderNodeMixRGB::blend_type_ADD:
+          return "add";
+        default:
+          std::cout << "Unsupported blend type. Defaulting to mul" << std::endl;
+          return "mul";
+        }
+      }
+    }
+
     /* Compiles a shader node into a part of a material */
     struct compiler_t {
       /* Add a blender node to a material */
       virtual void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const = 0;
 
-      /* Get a shader node name, and parameter pair, to link up two blender node sockets */
-      virtual std::optional<socket_t> input_socket(BL::NodeSocket& socket) const = 0;
+      /* Get a vector of shader node name, and parameter pairs, for a given blender socket.
+       * This is so we can potantially link up one blender node sockets with multiple shader node inputs */
+      virtual sockets_t input_socket(BL::NodeSocket& socket) const = 0;
+
+      /* Get a shader node name, and parameter pair, that represent a shader node output */
       virtual std::optional<socket_t> output_socket(BL::NodeSocket& socket) const = 0;
 
       /* Set a parameter from the default vlaue of a blender node socket. this will be the
@@ -114,18 +153,19 @@ namespace blender {
 
       static const generic_node_t add_shader;
       static const generic_node_t mix_shader;
-      static const generic_node_t mix_rgb;
+      static const mix_rgb_node_t mix_rgb;
       static const generic_node_t luminance;
       static const generic_node_t fresnel;
       static const generic_node_t diffuse_bsdf;
       static const glossy_node_t glossy_bsdf;
+      static const glass_node_t glass_bsdf;
       static const generic_node_t sheen_bsdf;
       static const generic_node_t transparent_bsdf;
-      static const generic_node_t refraction_bsdf;
+      static const refraction_node_t refraction_bsdf;
       static const generic_node_t emission_bsdf;
       static const generic_node_t background;
-      static const texture_file_node_t<BL::ShaderNodeTexImage> image_texture;
-      static const texture_file_node_t<BL::ShaderNodeTexEnvironment> env_texture;
+      static const image_texture_node_t image_texture;
+      static const env_texture_node_t env_texture;
       static const generic_node_t normal_map;
       static const generic_node_t blackbody;
       static const generic_node_t material;
@@ -135,7 +175,23 @@ namespace blender {
      * with a mapping from blender names to internal names. this is used for shader nodes
      * that have a more or less 1-to-1 mapping to our OSL shaders */
     struct generic_node_t : public compiler_t {
-      typedef std::pair<std::string, std::string> mapping_t;
+      struct mapping_t {
+        std::string from;
+        std::string to;
+        bool uninitialized;
+
+        inline mapping_t(const std::string& from, const std::string& to) 
+         : from(from)
+         , to(to)
+         , uninitialized(false)
+        {}
+
+        inline mapping_t(const std::string& from, const std::string& to, bool uninitialized) 
+         : from(from)
+         , to(to)
+         , uninitialized(uninitialized)
+        {}
+      };
 
       std::string shader;
       std::vector<mapping_t> inputs;
@@ -158,7 +214,9 @@ namespace blender {
 
       virtual void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
         for (auto i=inputs.begin(); i!=inputs.end(); ++i) {
-          set_default_from(node, i->first, i->second, builder);
+          if (!i->uninitialized) {
+            set_default_from(node, i->from, i->to, builder);
+          }
         }
 
         for (const auto& attribute : attributes) {
@@ -168,8 +226,9 @@ namespace blender {
         builder->shader(shader, node.name(), "surface");
       }
 
-      virtual std::optional<socket_t> input_socket(BL::NodeSocket& socket) const {
-        return find_socket(inputs, socket);
+      virtual sockets_t input_socket(BL::NodeSocket& socket) const {
+        const auto out = find_socket(inputs, socket);
+        return out ? sockets_t({ out.value() }) : sockets_t();
       }
 
       virtual std::optional<socket_t> output_socket(BL::NodeSocket& socket) const {
@@ -179,62 +238,129 @@ namespace blender {
       private:
         std::optional<socket_t> find_socket(const std::vector<mapping_t>& sockets, BL::NodeSocket& socket) const {
           const auto guard = std::find_if(sockets.begin(), sockets.end(), [&](const mapping_t& mapping) {
-            return mapping.first == socket.identifier();
+            return mapping.from == socket.identifier();
           });
 
           if (guard != sockets.end()) {
-            return socket_t{{ socket.node().name(), guard->second }};
+            return socket_t{ socket.node().name(), guard->to };
           }
 
           return {};
         }
     };
 
+    struct mix_rgb_node_t : public generic_node_t {
+      mix_rgb_node_t()
+       : generic_node_t("mix_color_node", {{ "Fac", "fac" }, { "Color1", "A" }, { "Color2", "B" }}, {{ "Color", "Cout" }})
+      {}
+
+      void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
+        BL::ShaderNodeMixRGB mix_node(node.ptr);
+
+        builder->parameter("operation", details::from_blender_blend_type(mix_node.blend_type()));
+        generic_node_t::compile(node, builder, scene);
+      }
+    };
+
     struct glossy_node_t : public generic_node_t {
       glossy_node_t()
-       : generic_node_t("glossy_bsdf_node", {{"Color", "Cs"}, {"Roughness", "roughness"}}, {{"BSDF", "Cout"}})
+       : generic_node_t("glossy_bsdf_node", {
+             {"Color", "Cs"}, 
+             {"Roughness", "roughness"}, 
+             {"Normal", "shadingNormal", true}
+           }, 
+           {{"BSDF", "Cout"}})
       {}
 
       void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
         BL::ShaderNodeBsdfGlossy glossy_node(node.ptr);
 
-        switch(glossy_node.distribution()) {
-        case BL::ShaderNodeBsdfGlossy::distribution_SHARP:
-          builder->parameter("distribution", "sharp");
-          break;
-        case BL::ShaderNodeBsdfGlossy::distribution_GGX:
-          builder->parameter("distribution", "ggx");
-          break;
-        case BL::ShaderNodeBsdfGlossy::distribution_BECKMANN:
-          builder->parameter("distribution", "beckmann");
-          break;
-        default:
-          std::cout << "Unsupported microfacet distribution. Defaulting to sharp" << std::endl;
-          builder->parameter("distribution", "sharp");
-        }
-
+        builder->parameter("distribution", details::from_blender_distribution(glossy_node.distribution()));
         generic_node_t::compile(node, builder, scene);
       }
     };
 
-    /* compiles a blender glass node into a osl node group */
+    struct refraction_node_t : public generic_node_t {
+      refraction_node_t()
+       : generic_node_t("refraction_bsdf_node", {
+             {"Color", "Cs"}, 
+             {"Roughness", "roughness"}, 
+             {"Normal", "shadingNormal", true},
+             {"IoR", "IoR"}
+           },
+           {{"BSDF", "Cout"}})
+      {}
+
+      void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
+        BL::ShaderNodeBsdfRefraction refraction_node(node.ptr);
+
+        builder->parameter("distribution", details::from_blender_distribution(refraction_node.distribution()));
+        generic_node_t::compile(node, builder, scene);
+      }
+    };
+
+    /* compiles a blender glass node into an osl node group */
     struct glass_node_t : public compiler_t {
       void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
-      }
+        BL::ShaderNodeBsdfGlass glass_node(node.ptr);
 
-      std::optional<socket_t> input_socket(BL::NodeSocket& socket) const {
+        const auto distribution = details::from_blender_distribution(glass_node.distribution());
+
+        const std::string reflection = node.name() + ".reflection";
+        const std::string refraction = node.name() + ".refraction";
+        const std::string fresnel = node.name() + ".fresnel";
+        const std::string output = node.name() + ".output";
+
+        // reflection
+        set_default_from(node, "Roughness", "roughness", builder);
+        builder->parameter("distribution", distribution);
+        builder->shader("glossy_bsdf_node", reflection, "surface");
+
+        // refraction
+        set_default_from(node, "Roughness", "roughness", builder);
+        set_default_from(node, "IOR", "IoR", builder);
+        builder->parameter("distribution", distribution);
+        builder->shader("refraction_bsdf_node", refraction, "surface");
+
+        // fresnel blend
+        set_default_from(node, "IOR", "IoR", builder);
+        builder->shader("fresnel_dielectric_node", fresnel, "surface");
+
+        // mix node
+        builder->shader("mix_closure_node", output, "surface");
+
+        builder->connect("out", "fac", fresnel, output);
+        builder->connect("Cout", "A", refraction, output);
+        builder->connect("Cout", "B", reflection, output);
+      }
+ 
+      sockets_t input_socket(BL::NodeSocket& socket) const {
+        if (socket.name() == "Roughness") {
+          return {
+            { socket.node().name() + ".reflection" , "roughness"},
+            { socket.node().name() + ".refraction" , "roughness"},
+          };
+        } else if (socket.name() == "Color") {
+          return {
+            { socket.node().name() + ".reflection" , "Cs"},
+            { socket.node().name() + ".refraction" , "Cs"},
+          };
+        } else if (socket.name() == "IOR") {
+          return { { socket.node().name() + ".fresnel", "IoR" } };
+        }
+
         return {};
       }
 
       std::optional<socket_t> output_socket(BL::NodeSocket& socket) const {
-        return {};
+        return socket_t{ socket.node().name() + ".output", "Cout" };
       }
     };
 
     /* compiles a texture that's backed by a file */
     template<typename T>
     struct texture_file_node_t : public generic_node_t {
-      
+
       template<typename X>
       struct node_t {};
 
@@ -250,6 +376,10 @@ namespace blender {
 
       texture_file_node_t()
        : generic_node_t(node_t<T>::value, {}, {{ "Color", "Cout"}})
+      {}
+
+      texture_file_node_t(const std::vector<std::string>& attributes)
+       : generic_node_t(node_t<T>::value, {}, {{ "Color", "Cout"}}, attributes)
       {}
 
       void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
@@ -297,5 +427,14 @@ namespace blender {
         generic_node_t::compile(node, builder, scene);
       }
     };
+
+    struct image_texture_node_t : texture_file_node_t<BL::ShaderNodeTexImage> {
+      image_texture_node_t() 
+        : texture_file_node_t({ "geom:uv" })
+      {}
+    };
+
+    struct env_texture_node_t : texture_file_node_t<BL::ShaderNodeTexEnvironment> 
+    {};
   }
 }

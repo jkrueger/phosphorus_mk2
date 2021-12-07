@@ -161,6 +161,7 @@ namespace spt {
     inline void operator()(
       state_t<>* state
     , active_t<>& active
+    , interaction_t<>* primary
     , interaction_t<>* hits
     , ray_t<>* samples) const
     {
@@ -170,7 +171,6 @@ namespace spt {
         const auto index = active.index[i];
 
         auto out = state->r.at(index);
-        auto keep_alive = true;
 
         if (hits->is_hit(i)) {
           // add direct lighting to path vertex
@@ -191,17 +191,18 @@ namespace spt {
           if (sample_bsdf(state, hits, samples, index, i, active.num)) {
             active.add(index);
           }
-          else if ((state->path[index]+1) < paths_per_sample) {
-            state->mark_for_revive(index);
-          }
+
+          // else if ((state->path[index]+1) < paths_per_sample) {
+          //   state->mark_for_revive(index);
+          // }
         }
         else {
           // add environment lighting
           out += state->beta.at(index) * hits->e.at(i);
 
-          if ((state->path[index]+1) < paths_per_sample) {
-            state->mark_for_revive(index);
-          }
+          // if ((state->path[index]+1) < paths_per_sample) {
+          //   state->mark_for_revive(index);
+          // }
         }
 
         state->r.from(index, out);
@@ -224,6 +225,12 @@ namespace spt {
       const auto d    = samples->d[to];
 
       assert(bsdf);
+
+      // should never happen
+      if (!bsdf) {
+        throw std::runtime_error("NO BSDF!");
+        return Imath::Color3f(0.0f);
+      }
 
       const auto f = bsdf->f(wi, wo);
 

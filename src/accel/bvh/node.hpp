@@ -24,8 +24,8 @@ namespace mbvh {
 
     node_t() {
       for (int i=0; i<N*3; ++i) {
-	bounds[i]       = std::numeric_limits<float>::max();
-	bounds[i+(N*3)] = std::numeric_limits<float>::lowest();
+	      bounds[i]       = std::numeric_limits<float>::max();
+	      bounds[i+(N*3)] = std::numeric_limits<float>::lowest();
       }
 
       memset(offset, 0, N*sizeof(uint32_t));

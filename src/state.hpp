@@ -253,7 +253,7 @@ struct active_t {
   // number of rays active in the pipeline
   uint32_t num;
   // indices back to real pixels for each pipeline entry
-  uint32_t index[N];
+  alignas(32) uint32_t index[N];
 
   inline active_t()
     : num(0)

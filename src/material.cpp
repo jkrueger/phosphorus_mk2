@@ -13,6 +13,7 @@
 #include <OSL/oslclosure.h>
 #include <OSL/oslconfig.h>
 #include <OSL/oslexec.h>
+#include <OSL/rendererservices.h>
 #pragma clang diagnostic pop
 
 #include <OpenImageIO/sysutil.h>
@@ -81,7 +82,7 @@ struct service_t : public RendererServices {
 
     return false;
   }
-};  
+};
 
 const ustring service_t::tangent("geom:tangent");
 
@@ -445,6 +446,13 @@ void material_t::evaluate(
 
       hits->e.from(index, result.e);
       hits->bsdf[index] = result.bsdf;
+    } else {
+      hits->e.from(index, Imath::Color3f(0.0f));
+      hits->bsdf[index] = nullptr;
+
+      std::stringstream ss;
+      ss << "CAN'T EVALUATE MATERIAL: " << id << ", " << is_emitter() << std::endl;
+      std::cout << ss.str() << std::endl;
     }
   }
 }

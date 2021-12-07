@@ -95,7 +95,7 @@ void sampler_t::preprocess(const scene_t& scene) {
   posix_memalign((void**) &light_samples, 32, sizeof(light_samples_t) * details_t::NUM_LIGHT_SAMPLE_SETS);
 #endif
 
-  const auto spd = (uint32_t) std::sqrt(spp);
+  const auto spd = (uint32_t) std::lroundf(std::sqrt(spp));
 
   Imath::V2f stratified[spp];
   sample::stratified_2d([this]() { return details->sample(); }, stratified, spd);

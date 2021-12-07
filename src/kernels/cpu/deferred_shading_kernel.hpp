@@ -43,9 +43,6 @@ struct deferred_shading_kernel_t {
   , interaction_t<>* hits
   , deferred_t& deferred) const
   {
-    // TODO: with more materials a radix sort might be faster
-    // than bucket sort
-
     for (auto i=0; i<active.num; ++i) {
       hits->flags[i] = rays->flags[i];
 

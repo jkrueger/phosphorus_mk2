@@ -65,6 +65,8 @@ namespace blender {
      * on disk, that is optimized for lookup, and colorspace converted. returns the file system path
      * to the texture */
     static std::string make(const std::string& path, const std::string& colorspace) {
+      std::cout << "FROM FILE" << std::endl;
+
       const auto filename = fs::path(colorspace + "_" + path).stem().replace_extension(".tiff");
       const auto output = fs::temp_directory_path() / filename;
 
@@ -94,6 +96,8 @@ namespace blender {
       , OIIO::TypeDesc type
       , const std::string& colorspace) 
     {
+      std::cout << "FROM BUFFER" << std::endl;
+
       const auto filename = fs::path(colorspace + "_" + name).stem().replace_extension(".tiff");
       const auto output = fs::temp_directory_path() / filename;
 

@@ -73,7 +73,7 @@ namespace bsdf {
       float      xalpha;  // horizontal roughness
       float      yalpha;  // vertical roughness
       float      eta;     // index of refraction
-      int        refract; //is this a refracting bsdf (like frosted glas)
+      int        refract; // is this a refracting bsdf (like frosted glas)
 
       inline bool is_ggx() const {
         return distribution == GGX;

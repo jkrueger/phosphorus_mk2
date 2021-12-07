@@ -223,6 +223,8 @@ namespace blender {
     // render all views
     BL::RenderResult::views_iterator vi;
     for (result.views.begin(vi); vi!=result.views.end(); ++vi) {
+      details->engine.active_view_set(vi->name().c_str());
+      // TODO: sync view settings
       details->render(vi->name(), view_layer.name());
     }
 

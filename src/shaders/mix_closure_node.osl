@@ -1,6 +1,6 @@
 
 shader
-mix_node
+mix_closure_node
  [[ string help = "Mix two input colors" ]]
 (
   closure color A = 0

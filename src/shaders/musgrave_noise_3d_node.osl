@@ -1,0 +1,70 @@
+#include "noise.h"
+
+/** 
+ * 3D Musgrave fBm
+ *
+ * H: fractal increment parameter
+ *
+ * from "Texturing and Modelling: A procedural approach"
+ */
+float noise_musgrave_fBm_3d(
+  vector3 co, float H, float lacunarity, float octaves
+)
+{
+  vector3 p = co;
+  float value = 0.0;
+  float pwr = 1.0;
+  float pwHL = pow(lacunarity, -H);
+
+  for (int i = 0; i < (int)octaves; i++) {
+    value += safe_snoise(p) * pwr;
+    pwr *= pwHL;
+    p *= lacunarity;
+  }
+
+  float rmd = octaves - floor(octaves);
+  if (rmd != 0.0) {
+    value += rmd * safe_snoise(p) * pwr;
+  }
+
+  return value;
+}
+
+/**
+ * Implementation for a musgrave noise texture. We use this mostly to be 
+ * compatible with Blender. 
+ *
+ * TODO: Move this into the blender plugin implementation folder, and
+ * maintain it htere, if we don't end up using this anywhere else.
+ *
+ */
+shader
+musgrave_noise_3d_node
+  [[ string help = "Generate a 2-dimensional musgrave noise pattern" ]]
+(
+  point position = P
+    [[ string help = "Input vector for the noise texture. Defaults to hit position" ]],
+
+  float dimension = 2.0,
+
+  float scale = 5.0
+    [[ string help = "Scaling factor for the input position" ]],
+
+  float octaves = 2.0
+    [[ string help = "Number of frequencies in the fBm"]],
+
+  float lacunarity = 2.0
+    [[ string help = "Gap between successive frequencies"]],
+
+  output float out = 0
+    [[ string help = "Output noise value" ]]
+)
+{
+  float dimension_or_eta = max(dimension, 1e-5);
+  float lacunarity_or_eta = max(lacunarity, 1e-5);
+  float clamped_octaves = clamp(octaves, 0.0, 16.0);
+
+  vector3 p = position * scale;
+
+  out = noise_musgrave_fBm_3d(p, dimension_or_eta, lacunarity_or_eta, octaves);
+}

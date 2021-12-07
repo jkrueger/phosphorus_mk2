@@ -50,22 +50,25 @@ Imath::Color3f eval(
     }
   case bsdf_t::Microfacet:
     {
-      if (param.microfacet.is_ggx()) {
-        pdf = ct::pdf(param.microfacet, wi, wo, microfacet::ggx_t());
-        result = ct::f(
-          param.microfacet
-        , wi
-        , wo
-        , microfacet::ggx_t());
-      }
-      else if (param.microfacet.is_beckmann()) {
-        // TODO: default to GFX for now, until Beckman distribution is implemented
-        pdf = ct::pdf(param.microfacet, wi, wo, microfacet::ggx_t());
-        result = ct::f(
-          param.microfacet
-        , wi
-        , wo
-        , microfacet::ggx_t());
+      if (param.microfacet.is_ggx() || 
+          // NOTE: default to ggx as well, until we have a beckman implementation
+          param.microfacet.is_beckmann()) {
+        if (unlikely(param.microfacet.refract)) {
+          pdf = ct::refract::pdf(param.microfacet, wi, wo, microfacet::ggx_t());
+          result = ct::refract::f(
+            param.microfacet
+          , wi
+          , wo
+          , microfacet::ggx_t());
+        }
+        else {
+          pdf = ct::pdf(param.microfacet, wi, wo, microfacet::ggx_t());
+          result = ct::f(
+            param.microfacet
+          , wi
+          , wo
+          , microfacet::ggx_t());
+        }
       }
       else {
         std::cerr
@@ -83,6 +86,7 @@ Imath::Color3f eval(
       , wi
       , wo
       , microfacet::sheen::distribution_t());
+
       break;
     }
   case bsdf_t::Reflection:
@@ -113,7 +117,10 @@ Imath::Color3f bsdf_t::f(const Imath::V3f& wi, const Imath::V3f& wo) const {
   const auto p = (param_t*) params;
 
   for (auto i=0; i<lobes; ++i) {
-    out += eval(type[i], p[i], wi, wo, ignored) * weight[i] * angle_to_light(*p, wi);
+    const auto e   = eval(type[i], p[i], wi, wo, ignored);
+    const auto atl = angle_to_light(*p, wi);
+
+    out += e * weight[i] * atl;
   }
 
   return out;
@@ -146,29 +153,27 @@ Imath::Color3f bsdf_t::sample(
     result = oren_nayar::sample(p.oren_nayar, wi, wo, remapped, pdf);
     break;
   case Microfacet:
-    if (p.microfacet.is_ggx()) {
-      result = ct::sample(
-        p.microfacet
-      , wi
-      , wo
-      , remapped
-      , pdf
-      , microfacet::ggx_t());
-/*
-      if (pdf > 1.0f || result.x > 10.0f || result.y > 10.0f || result.z > 10.0f) {
-        std::cout << "PDF > 1.0f: " << pdf << " " << result << std::endl;
+    if (p.microfacet.is_ggx() ||
+        // NOTE: default to ggx as well, until we have a beckman implementation
+        p.microfacet.is_beckmann()) {
+      if (unlikely(p.microfacet.refract)) {
+        result = ct::refract::sample(
+          p.microfacet
+        , wi
+        , wo
+        , remapped
+        , pdf
+        , microfacet::ggx_t());
       }
-*/
-    }
-    else if (p.microfacet.is_beckmann()) {
-      // TODO: default to GFX for now, until Beckman distribution is implemented
-      result = ct::sample(
-        p.microfacet
-      , wi
-      , wo
-      , remapped
-      , pdf
-      , microfacet::ggx_t());
+      else {
+        result = ct::sample(
+          p.microfacet
+        , wi
+        , wo
+        , remapped
+        , pdf
+        , microfacet::ggx_t());
+      }
     }
     else {
       std::cerr
@@ -187,7 +192,8 @@ Imath::Color3f bsdf_t::sample(
     result = refraction::sample(p.refract, wi, wo, remapped, pdf);
     break;
   case Transparent:
-    wo = wi;
+    // wi points away from surface (i.e. the original ray direction, so reverse wi here)
+    wo = -wi;
     pdf = 1.0f;
     result = Imath::Color3f(1.0f);
     break;

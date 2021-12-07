@@ -150,7 +150,7 @@ struct tile_renderer_t {
     shade(allocator, scene, active, rays, out);
     prepare_occlusion_queries(integrator_state, active, primary, out, rays);
     trace(rays, active);
-    integrate(integrator_state, active, out, rays);
+    integrate(integrator_state, active, primary, out, rays);
   }
 
   inline void render_tile(const job::tiles_t::tile_t& tile, const scene_t& scene) {

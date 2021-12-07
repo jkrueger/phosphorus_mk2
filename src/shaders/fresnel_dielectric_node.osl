@@ -4,15 +4,18 @@ shader
 fresnel_dielectric_node
  [[ string help = "Output a fresnel factor for dielectric materials" ]]
 (
-  float IoR = 1.5
+  float IoR = 1.45
     [[ string help = "Index of refraction" ]],
 
-  output float Cout = 0
+  normal shadingNormal = N,
+
+  output float out = 0
     [[ string help = "Output fresnel term" ]]
 )
 {
-  float eta  = backfacing() ? 1.0 / IoR : IoR;
-  float cosi = dot(I, N);
+  float f = max(1.0e-5, IoR);
+  float eta = backfacing() ? 1.0 / f : f;
+  float cosi = dot(I, shadingNormal);
 
-  Cout = fresnel_dielectric(cosi, eta);
+  out = fresnel_dielectric(cosi, eta);
 }

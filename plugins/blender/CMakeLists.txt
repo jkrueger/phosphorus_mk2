@@ -28,6 +28,7 @@ include_directories(
  /usr/local/include
  /usr/include/OpenEXR
  /usr/local/include/OpenEXR
+ /usr/local/include/Imath
  ${BLENDER_PATH}/git/source/blender/render/extern/include
  ${BLENDER_PATH}/git/source/blender/makesrna
  ${BLENDER_PATH}/build/source/blender/makesrna/intern
@@ -39,17 +40,15 @@ include_directories(
 
 target_link_directories(_phosphoros
   PUBLIC
-  /usr/local/lib
-  /usr/local/lib/pugixml-1.8)
+  /usr/local/lib)
 
 target_link_libraries(_phosphoros
   xml2
+  pugixml
   curses
   m
   z
-  IlmImf
   Imath
-  Half
   Iex
   OpenImageIO
   OpenImageIO_Util

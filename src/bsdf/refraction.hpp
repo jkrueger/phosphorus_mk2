@@ -39,9 +39,7 @@ namespace refraction {
 
       wo = -wi * eta + n * nk;
 
-      const auto out = 1.0f - fresnel::dielectric(cos_theta, params.eta);
-
-      return Imath::Color3f(out);
+      return Imath::Color3f(1.0f);
     }
 
     return Imath::Color3f();

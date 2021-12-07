@@ -1,6 +1,6 @@
 #pragma once
 
-#include <OpenEXR/ImathColor.h>
+#include <Imath/ImathColor.h>
 #include <OpenImageIO/imageio.h>
 
 struct allocator_t;

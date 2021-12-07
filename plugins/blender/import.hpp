@@ -137,6 +137,12 @@ namespace blender {
   namespace import {
     mesh_t* mesh(BL::Depsgraph& graph, BL::BlendData& data, BL::Object& object, const scene_t& scene) {
       BL::Mesh blender_mesh = BL::Mesh(object.data());
+
+      if (util::has_subdivision(object)) {
+        std::cout << "Skipping mesh. Subdivision surfaces not supported" << std::endl;
+        return nullptr;
+      }
+
       if (blender_mesh.use_auto_smooth()) {
         BL::Depsgraph depsgraph(PointerRNA_NULL);
         blender_mesh = object.to_mesh(false, depsgraph);
@@ -242,6 +248,7 @@ namespace blender {
         }
       }
 
+      bool generate_uvs = false;
       bool generate_tangents = false;
 
       for (auto& set : sets) {
@@ -251,12 +258,16 @@ namespace blender {
           generate_tangents = true;
         }
 
+        if (material->has_attribute("geom:uv")) {
+          generate_uvs = true;
+        }
+
         builder->add_face_set(material, set.second);
       }
 
       uint32_t num_uvs = 0;
 
-      if (blender_mesh.uv_layers.length() != 0) {
+      if (generate_uvs && blender_mesh.uv_layers.length() != 0) {
         BL::Mesh::uv_layers_iterator l;
         blender_mesh.uv_layers.begin(l);
         std::cout << "Importing UV map coordinates: " << l->data.length() << std::endl;
@@ -272,7 +283,7 @@ namespace blender {
               ++num_uvs;
             }
           }
-          // }
+        // }
 
         if (mesh->has_per_vertex_uvs()) {
           if (num_uvs != num_vertices) {
@@ -406,34 +417,36 @@ namespace blender {
             << std::endl;
           continue;
         }
+        
+        const auto outputSocket = from_compiler->second->output_socket(from_socket);
+        const auto inputSockets = to_compiler->second->input_socket(to_socket);
 
-        const auto from = from_compiler->second->output_socket(from_socket);
-        const auto to = to_compiler->second->input_socket(to_socket);
-
-        if (!from) {
+        if (!outputSocket) {
           std::cout 
             << "Can't find output socket \'" 
-            << from_socket.name() 
+            << from_socket.identifier() 
             << "\' for shader: " 
             << link->from_socket().node().name() 
             << std::endl;
           continue;
         }
 
-        if (!to) {
+        if (inputSockets.empty()) {
           std::cout 
             << "Can't find input socket \'" 
-            << from_socket.name() 
+            << to_socket.identifier() 
             << "\' for shader: " 
             << link->to_socket().node().name() 
             << std::endl;
           continue;
         }
 
-        builder->connect(
-          from.value().name(), to.value().name(),
-          from.value().node(), to.value().node()
-        );
+        for (auto& socket : inputSockets) {
+          builder->connect(
+            outputSocket.value().name(), socket.name(),
+            outputSocket.value().node(), socket.node()
+          );
+        }
       }
     }
 

@@ -4,18 +4,15 @@ namespace blender {
   namespace shader {
     const generic_node_t compiler_t::add_shader(
       "add_node",
-      /* inputs */ {{ "Shader", "A" }, { "Shader_001", "B" }}, 
+      /* inputs */ {{ "Shader", "A" }, { "Shader.001", "B" }, { "Shader_001", "B" }}, 
       /* outputs */ {{ "Shader", "Cout" }});
+
+    const mix_rgb_node_t compiler_t::mix_rgb;
 
     const generic_node_t compiler_t::mix_shader(
       "mix_closure_node",
-      /* inputs */ {{ "Fac", "fac" }, { "Shader", "A" }, { "Shader_001", "B" }}, 
+      /* inputs */ {{ "Fac", "fac" }, { "Shader", "A" }, { "Shader.001", "B" }, { "Shader_001", "B" }}, 
       /* outputs */ {{ "Shader", "Cout" }});
-
-    const generic_node_t compiler_t::mix_rgb(
-      "mix_color_node",
-      /* inputs */ {{ "Fac", "fac" }, { "Color1", "A" }, { "Color2", "B" }}, 
-      /* outputs */ {{ "Color", "Cout" }});
 
     const generic_node_t compiler_t::luminance(
       "luminance_node",
@@ -24,7 +21,7 @@ namespace blender {
 
     const generic_node_t compiler_t::fresnel(
       "fresnel_dielectric_node",
-      /* inputs */ {{ "IOR", "IoR" }},
+      /* inputs */ {{ "IOR", "IoR" }, {"Normal", "shadingNormal", true}},
       /* outputs */ {{ "Fac", "out" }});
 
     const generic_node_t compiler_t::blackbody(
@@ -34,17 +31,19 @@ namespace blender {
 
     const generic_node_t compiler_t::diffuse_bsdf(
       "diffuse_bsdf_node",
-      /* inputs */ {{ "Color", "Cs" }},
+      /* inputs */ {{ "Color", "Cs" }, {"Normal", "shadingNormal", true}},
       /* outputs */ {{ "BSDF", "Cout" }});
 
     const glossy_node_t compiler_t::glossy_bsdf;
 
+    const glass_node_t compiler_t::glass_bsdf;
+
     const generic_node_t compiler_t::sheen_bsdf(
       "sheen_bsdf_node",
-      /* inputs */ {{ "Color", "Cs" }, {"Sigma", "roughness"}},
+      /* inputs */ {{ "Color", "Cs" }, {"Sigma", "roughness"}, {"Normal", "shadingNormal", true}},
       /* outputs */ {{ "BSDF", "Cout" }});
 
-    const generic_node_t compiler_t::refraction_bsdf;
+    const refraction_node_t compiler_t::refraction_bsdf;
 
     const generic_node_t compiler_t::transparent_bsdf(
       "transparent_bsdf_node",
@@ -61,9 +60,9 @@ namespace blender {
       /* inputs */ {{ "Color", "Cs" }, {"Strength", "power"}},
       /* outputs */ {{ "Background", "Cout" }});
 
-    const texture_file_node_t<BL::ShaderNodeTexImage> compiler_t::image_texture;
+    const image_texture_node_t compiler_t::image_texture;
 
-    const texture_file_node_t<BL::ShaderNodeTexEnvironment> compiler_t::env_texture;
+    const env_texture_node_t compiler_t::env_texture;
 
     const generic_node_t compiler_t::normal_map(
       "normal_map_node",
@@ -91,8 +90,9 @@ namespace blender {
       if (node.is_a(&RNA_ShaderNodeBsdfVelvet)) { return &sheen_bsdf; }
       if (node.is_a(&RNA_ShaderNodeBsdfRefraction)) { return &refraction_bsdf; }
       if (node.is_a(&RNA_ShaderNodeBsdfTransparent)) { return &transparent_bsdf; }
-      // if (node.is_a(&RNA_ShaderNodeBsdfGlass)) { return glass_bsdf; }
+      if (node.is_a(&RNA_ShaderNodeBsdfGlass)) { return &glass_bsdf; }
       if (node.is_a(&RNA_ShaderNodeEmission)) { return &emission_bsdf; }
+      
 
       if (node.is_a(&RNA_ShaderNodeBackground)) { return &background; }
 

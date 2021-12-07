@@ -1,12 +1,10 @@
 
 shader
-color_op_node
+mix_color_node
  [[ string help = "Binary operation node on two colors" ]]
 (
   string operation = "mul"
-    [[ string help = "Operation to perform on the operands",
-       string widget = "popup",
-       string options = "mul" ]],
+    [[ string help = "Operation to perform on the operands" ]],
 
   float fac = 1
     [[ string help = "Scalar control value" ]],
@@ -23,5 +21,9 @@ color_op_node
 {
   if (operation == "mul") {
     Cout = (1-fac) * A + fac * (A * B);
+  }
+
+  if (operation == "add") {
+    Cout = (1-fac) * A + fac * (A + B);
   }
 }

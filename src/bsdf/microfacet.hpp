@@ -32,6 +32,118 @@ namespace microfacet {
       }
     }
 
+    namespace refract {
+      template<typename Params, typename Distribution>
+      inline Imath::Color3f f(
+        const Params& params
+      , const Imath::V3f& wi
+      , const Imath::V3f& wo
+      , const Distribution& distribution) 
+      {
+        using namespace details;
+
+        invertible_base_t base(params.n);
+
+        const auto li = base.to_local(wi);
+        const auto lo = base.to_local(wo);
+
+        const auto eta = li.y > 0.0f ? params.eta : 1.0f / params.eta;
+
+        const auto cos_ti = ts::cos_theta(li);
+        const auto cos_to = ts::cos_theta(lo);
+
+        auto wh = (wi + wo * eta).normalize();
+
+        if (wh.y < 0) wh = -wh;
+
+        if (lo.dot(wh) * li.dot(wh) > 0) {
+          return Imath::Color3f(0.0f);
+        }
+
+        const auto sqrt_denom = li.dot(wh) + eta * lo.dot(wh);
+        const auto factor = 1.0f / eta;
+        const auto d = distribution.D(params, wh);
+        const auto g = G(params, li, lo, distribution);
+        const auto c = std::abs(
+            d * g * eta * eta
+          * std::abs(lo.dot(wh)) * std::abs(li.dot(wh))
+          * factor * factor 
+          / (cos_ti * cos_to * sqrt_denom * sqrt_denom));
+
+        return Imath::Color3f(c);
+      }
+
+      template<typename Params, typename Distribution>
+      float pdf(
+        const Params& params
+      , const Imath::V3f& wi
+      , const Imath::V3f& wo
+      , const Distribution& distribution)
+      {
+        const invertible_base_t base(params.n);
+
+        const auto li = base.to_local(wi);
+        const auto lo = base.to_local(wo);
+
+        const auto eta = li.y > 0.0f ? params.eta : 1.0f / params.eta;
+
+        if (!in_same_hemisphere(wo, wi)) return 0;
+
+        Imath::V3f wh = (li + lo * eta).normalize();
+
+        const auto sqrt_denom = li.dot(wh) + eta * lo.dot(wh);
+        const auto dwh_dwi = std::abs(eta * eta * lo.dot(wh)) / sqrt_denom * sqrt_denom;
+
+        return (distribution.D(params, wh) * ts::cos_theta(wh)) * dwh_dwi;
+      }
+
+      template<typename Params, typename Distribution>
+      Imath::Color3f sample(
+        const Params& params
+      , const Imath::V3f& wi
+      , Imath::V3f& wo
+      , const Imath::V2f& sample
+      , float& pdf
+      , const Distribution& distribution)
+      {
+        const invertible_base_t base(params.n);
+
+        const auto li = base.to_local(wi);
+
+        if (li.y == 0.0f) {
+          return Imath::V3f(0.0f);
+        }
+
+        float dpdf;
+        const auto wh = distribution.sample(params, li, dpdf, sample);
+        
+        if (li.y * wh.y < 0.0f) {
+          return Imath::V3f(0.0f);
+        }
+
+        const auto eta = li.y > 0.0f ? params.eta : 1.0f / params.eta;
+
+        const auto cos_ti = ts::cos_theta(li);
+        const auto sin2_ti = std::max(0.0f, 1.0f - cos_ti * cos_ti);
+        const auto sin2_tt = eta * eta * sin2_ti;
+
+        if (sin2_tt >= 1.0f) {
+          return Imath::Color3f(0.0f);
+        }
+
+        const auto cos_tt = std::sqrt(1.0f - sin2_tt);
+        const auto lo = eta * -li * (eta * cos_ti - cos_tt);
+      
+        const auto sqrt_denom = li.dot(wh) + eta * lo.dot(wh);
+        const auto dwh_dwi = std::abs(eta * eta * lo.dot(wh)) / sqrt_denom * sqrt_denom;
+
+        pdf = dpdf * dwh_dwi;
+        wo = base.to_world(lo);
+
+        return f(params, wi, wo, distribution);
+      }
+    }
+
     template<typename Params, typename Distribution>
     inline Imath::Color3f f(
       const Params& params
@@ -45,7 +157,7 @@ namespace microfacet {
 
       const auto li = base.to_local(wi);
       const auto lo = base.to_local(wo);
-      
+
       auto wh = li + lo;
 
       const auto cos_ti = std::abs(ts::cos_theta(li));
@@ -216,10 +328,6 @@ namespace microfacet {
         (v * (v * (v * 0.093073f + 0.309420f) - 1.0f) + 0.597999f);
 
       slope_y = S * z * std::sqrt(1.0f + slope_x * slope_x);
-
-      if (std::isinf(slope_y) || std::isnan(slope_y)) {
-        std::cout << "Nan/Inf" << slope_y << std::endl;
-      }
     }
 
     inline Imath::V3f sample(

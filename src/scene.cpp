@@ -83,6 +83,8 @@ void scene_t::add(mesh_t* mesh) {
 
 void scene_t::add(const std::string& name, material_t* material) {
   material->id = details->materials.size();
+
+  std::cout << "Adding material: " << name << ", with id: " << material->id << std::endl;
   details->materials.push_back(material);
   details->materials_by_name[name] = material;
 }
