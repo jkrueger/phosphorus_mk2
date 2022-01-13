@@ -66,6 +66,29 @@ struct bsdf_t {
     ++lobes;
   }
 
+  template<>
+  inline void add_lobe(type_t t, const Imath::Color3f& c, const bsdf::lobes::microfacet_t* p) {
+    type[lobes] = t;
+    flags[lobes] = p->refract ? bsdf::TRANSMIT : bsdf::REFLECT;
+    weight[lobes] = c;
+
+    const auto index = lobes*sizeof(param_t);
+    auto param = (bsdf::lobes::microfacet_t*) &params[index];
+
+    memcpy(param, p, sizeof(bsdf::lobes::microfacet_t));
+    param->precompute();
+
+    ++lobes;
+  }
+
+  bool is_reflective(uint32_t i) const {
+    return (flags[i] & bsdf::REFLECT) == bsdf::REFLECT;
+  }
+
+  bool is_transmissive(uint32_t i) const {
+    return (flags[i] & bsdf::TRANSMIT) == bsdf::TRANSMIT;
+  }
+
   static bool is_specular(uint32_t flags) {
     return (flags & bsdf::SPECULAR) == bsdf::SPECULAR;
   }

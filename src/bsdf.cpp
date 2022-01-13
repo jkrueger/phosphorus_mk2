@@ -114,13 +114,17 @@ Imath::Color3f bsdf_t::f(const Imath::V3f& wi, const Imath::V3f& wo) const {
   Imath::Color3f out(0.0f);
   float ignored;
 
-  const auto p = (param_t*) params;
+  param_t* p = ((param_t*) params);
 
   for (auto i=0; i<lobes; ++i) {
-    const auto e   = eval(type[i], p[i], wi, wo, ignored);
-    const auto atl = angle_to_light(*p, wi);
+    const auto e = eval(type[i], p[i], wi, wo, ignored);
 
-    out += e * weight[i] * atl;
+    const auto atl = angle_to_light(p[i], wi);
+    const auto reflect = atl * angle_to_light(p[i], wo) > 0.0f;
+
+    if ((reflect && is_reflective(i)) || (!reflect && is_transmissive(i))) {
+      out += e * weight[i] * atl;
+    }
   }
 
   return out;
@@ -202,17 +206,31 @@ Imath::Color3f bsdf_t::sample(
     break;
   }
 
+  if (pdf == 0.0f) {
+    return Imath::Color3f(0.0f);
+  }
+
   result *= weight[index];
 
+  auto matched_lobes = 1;
+
   for (auto i=0; i<lobes; ++i) {
-    if (i != index && (flags[index] & flags[i]) == flags[index]) {
-      float lobe_pdf;
-      result += eval(type[i], ((param_t*) params)[i], wi, wo, lobe_pdf) * weight[i];
-      pdf    += lobe_pdf;
+    if (i != index && ((flags[index] & flags[i]) == flags[i])) {
+      const auto reflect = 
+        angle_to_light(((param_t*) params)[i], wi) * 
+        angle_to_light(((param_t*) params)[i], wo) > 0.0f;
+      if ((reflect && is_reflective(i)) || (!reflect && is_transmissive(i))) {
+        auto lobe_pdf = 0.0f;
+
+        result += eval(type[i], ((param_t*) params)[i], wi, wo, lobe_pdf) * weight[i];
+        pdf    += lobe_pdf;
+
+        ++matched_lobes;
+      }
     }
   }
 
-  pdf /= lobes;
+  pdf /= matched_lobes;
   sample_flags = flags[index];
 
   return result;

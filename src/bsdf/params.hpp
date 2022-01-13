@@ -61,7 +61,7 @@ namespace bsdf {
     };
 
     struct microfacet_t : public lobe_t {
-      static const uint32_t flags = REFLECT | GLOSSY;
+      static const uint32_t flags = GLOSSY;
 
       static const OIIO::ustring GGX;
       static const OIIO::ustring BECKMANN;
@@ -84,14 +84,12 @@ namespace bsdf {
       }
 
       inline void precompute() {
-        xalpha = xalpha * xalpha;
-        yalpha = yalpha * yalpha;
-        // xalpha = roughness_to_alpha(xalpha);
-        // yalpha = roughness_to_alpha(yalpha);
+        xalpha = std::min(1.0f, std::max(0.0001f, roughness_to_alpha(xalpha)));
+        yalpha = std::min(1.0f, std::max(0.0001f, roughness_to_alpha(yalpha)));
       }
 
       static inline float roughness_to_alpha(float roughness) {
-        roughness = std::max(roughness, (float) 1e-3);
+        roughness = std::max(roughness, (float) 1e-5);
         float x = std::log(roughness);
         return 1.62142f
           + 0.819955f * x

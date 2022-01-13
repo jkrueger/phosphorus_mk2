@@ -178,6 +178,16 @@ struct tile_renderer_t {
           const auto r = integrator_state->r.at(k);
 
           if (channels.primary) {
+            // if (std::isnan(r.x) || std::isnan(r.y) || std::isnan(r.z)) {
+            //   std::cout << "Path is Nan" << std::endl;
+            // }
+            // if (std::isinf(r.x) || std::isinf(r.y) || std::isinf(r.z)) {
+            //   std::cout << "Path is Nan" << std::endl;
+            // }
+            // if (r.x > 1000.0f || r.y > 1000.0f || r.z > 1000.0f) {
+            //   std::cout << "Path is Firefly" << std::endl;
+            // }
+
             channels.primary->add(x, y, r * (1.0f / (spp * pps)));
           }
 

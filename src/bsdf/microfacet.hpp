@@ -1,6 +1,7 @@
 #pragma once
 
 #include "params.hpp"
+#include "math/fresnel.hpp"
 #include "math/orthogonal_base.hpp"
 #include "math/vector.hpp"
 
@@ -87,7 +88,7 @@ namespace microfacet {
 
         const auto eta = li.y > 0.0f ? params.eta : 1.0f / params.eta;
 
-        if (!in_same_hemisphere(wo, wi)) return 0;
+        if (in_same_hemisphere(wo, wi)) return 0;
 
         Imath::V3f wh = (li + lo * eta).normalize();
 
@@ -158,11 +159,15 @@ namespace microfacet {
       const auto li = base.to_local(wi);
       const auto lo = base.to_local(wo);
 
+      if (!ts::in_same_hemisphere(li, lo)) {
+        return Imath::Color3f(0.0f);
+      }
+
       auto wh = li + lo;
 
       const auto cos_ti = std::abs(ts::cos_theta(li));
       const auto cos_to = std::abs(ts::cos_theta(lo));
-      
+
       if (cos_ti == 0 || cos_to == 0) {
         return Imath::Color3f(0.0f);
       }
@@ -175,7 +180,19 @@ namespace microfacet {
 
       const auto d = distribution.D(params, wh);
       const auto g = G(params, li, lo, distribution);
-      const auto c = d * g * (1.0f / (4.0f * cos_ti * cos_to));
+      const auto f = fresnel::dielectric(lo.dot(wh.dot({0.0f, 1.0, 0.0}) < 0.0f ? -wh : wh), 0.5f);
+
+      // std::stringstream ss;
+      // ss << "F = " << f << " " << lo.dot(wh) << std::endl;
+      // std::cout << ss.str() << std::endl;
+
+      const auto c = d * g * f * (1.0f / (4.0f * cos_ti * cos_to));
+
+      // if (c > 1.0f) {
+      //   std::stringstream ss;
+      //   ss << "d = " << d << ", g = " << g << ", c =" << c << std::endl;
+      //   std::cout << ss.str(); 
+      // }
 
       return Imath::Color3f(c);
     }
@@ -192,11 +209,13 @@ namespace microfacet {
       const auto li = base.to_local(wi);
       const auto lo = base.to_local(wo);
 
-      if (!in_same_hemisphere(wo, wi)) return 0;
+      if (!ts::in_same_hemisphere(li, lo)) {
+        return 0;
+      }
 
       Imath::V3f wh = (li + lo).normalize();
 
-      return (distribution.D(params, wh) * ts::cos_theta(wh)) / (4.0f * li.dot(wh));
+      return (distribution.D(params, wh) * cook_torrance::details::G1(params, wi, distribution) * std::abs(li.dot(wh)) / std::abs(ts::cos_theta(li))) / (4.0f * li.dot(wh));
     }
 
     template<typename Params, typename Distribution>
@@ -205,7 +224,7 @@ namespace microfacet {
     , const Imath::V3f& wi
     , Imath::V3f& wo
     , const Imath::V2f& sample
-    , float& pdf
+    , float& opdf
     , const Distribution& distribution)
     {
       const invertible_base_t base(params.n);
@@ -219,22 +238,57 @@ namespace microfacet {
       float dpdf;
       const auto wh = distribution.sample(params, li, dpdf, sample);
       
-      if (li.y * wh.y < 0.0f) {
+      if (li.dot(wh) < 0.0f) {
         return Imath::V3f(0.0f);
       }
+
+      // if (li.y * wh.y < 0.0f) {
+      //   return Imath::V3f(0.0f);
+      // }
 
       const auto lo  = -li + (2.0f * li.dot(wh)) * wh;
 
-      if (li.y * lo.y < 0.0f) {
+      if (!ts::in_same_hemisphere(li, lo)) {
         return Imath::V3f(0.0f);
       }
 
-      pdf = dpdf / (4.0f * li.dot(wh));
-      wo  = base.to_world(lo);
+      opdf = dpdf / (4.0f * li.dot(wh));
+      wo   = base.to_world(lo);
+
+      // if (std::abs(opdf - microfacet::cook_torrance::pdf(params, wi, wo, distribution)) > 0.001) {
+      //   std::stringstream ss;
+      //   ss << "PDF function is broken: " << opdf << " != " << microfacet::cook_torrance::pdf(params, wi, wo, distribution) << std::endl;
+      //   std::cout << ss.str();
+      // }
 
       return f(params, wi, wo, distribution);
     }
   }
+
+  /* Beckman microfacet distribution implementation */
+  /*
+  struct beckman_t {
+    inline float D(
+      const bsdf::lobes::microfacet_t& params
+    , const Imath::V3f& v) const
+    {
+    }
+
+    inline float Lambda(
+      const bsdf::lobes::microfacet_t& params
+    , const Imath::V3f& v) const
+    {
+    }
+
+    inline Imath::V3f sample(
+      const bsdf::lobes::microfacet_t& params
+    , const Imath::V3f& wi
+    , float& pdf 
+    , const Imath::V2f& uv) const
+    {
+    }
+  };
+  */
 
   /* GGX microfacet distribution implementation */
   struct ggx_t {
@@ -360,7 +414,7 @@ namespace microfacet {
       Imath::V3f wh(-slope_x, 1.0f, -slope_y);
       wh.normalize();
 
-      pdf = D(params, wh) * cook_torrance::details::G1(params, wi, *this) * std::abs(wi.dot(wh)) / std::abs(ts::cos_theta(wi));
+      pdf = (D(params, wh) * cook_torrance::details::G1(params, wi, *this) * std::abs(wi.dot(wh)) / std::abs(ts::cos_theta(wi)));
 
       return wh;
     }
