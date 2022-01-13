@@ -84,10 +84,8 @@ namespace bsdf {
       }
 
       inline void precompute() {
-        xalpha = xalpha * xalpha;
-        yalpha = yalpha * yalpha;
-        // xalpha = roughness_to_alpha(xalpha);
-        // yalpha = roughness_to_alpha(yalpha);
+        xalpha = std::min(1.0f, std::max(0.001f, roughness_to_alpha(xalpha)));
+        yalpha = std::min(1.0f, std::max(0.001f, roughness_to_alpha(yalpha)));
       }
 
       static inline float roughness_to_alpha(float roughness) {

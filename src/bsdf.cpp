@@ -118,6 +118,33 @@ Imath::Color3f bsdf_t::f(const Imath::V3f& wi, const Imath::V3f& wo) const {
 
   for (auto i=0; i<lobes; ++i) {
     const auto e   = eval(type[i], p[i], wi, wo, ignored);
+
+    // if (e.x > 1.0f || e.y > 1.0f || e.z > 1.0f) {
+    //   std::stringstream ss;
+    //   ss
+    //     << "ENERGY CONSERVATION NOT PRESERVED: "
+    //     << e
+    //     << " " << type[i]
+    //     << " " << wi
+    //     << " " << wo;
+
+    //   if (type[i] == 16) {
+    //     invertible_base_t base(p[i].microfacet.n);
+
+    //     const auto li = base.to_local(wi);
+    //     const auto lo = base.to_local(wo);
+
+    //     ss << " " << p[i].microfacet.xalpha;
+    //     ss << " " << li;
+    //     ss << " " << lo;
+    //     ss << " " << (li + lo).normalize();
+    //   }
+
+    //   ss << std::endl;
+
+    //   std::cout << ss.str();
+    // }
+
     const auto atl = angle_to_light(*p, wi);
 
     out += e * weight[i] * atl;
@@ -208,7 +235,7 @@ Imath::Color3f bsdf_t::sample(
     if (i != index && (flags[index] & flags[i]) == flags[index]) {
       float lobe_pdf;
       result += eval(type[i], ((param_t*) params)[i], wi, wo, lobe_pdf) * weight[i];
-      pdf    += lobe_pdf;
+      pdf    += 1.0f; // lobe_pdf;
     }
   }
 

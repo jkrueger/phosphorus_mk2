@@ -1,6 +1,7 @@
 #pragma once
 
 #include "params.hpp"
+#include "math/fresnel.hpp"
 #include "math/orthogonal_base.hpp"
 #include "math/vector.hpp"
 
@@ -175,7 +176,19 @@ namespace microfacet {
 
       const auto d = distribution.D(params, wh);
       const auto g = G(params, li, lo, distribution);
-      const auto c = d * g * (1.0f / (4.0f * cos_ti * cos_to));
+      const auto f = fresnel::dielectric(lo.dot(wh.dot({0.0f, 1.0, 0.0}) < 0.0f ? -wh : wh), 0.5f);
+
+      // std::stringstream ss;
+      // ss << "F = " << f << " " << lo.dot(wh) << std::endl;
+      // std::cout << ss.str() << std::endl;
+
+      const auto c = d * g * f * (1.0f / (4.0f * cos_ti * cos_to));
+
+      // if (c > 1.0f) {
+      //   std::stringstream ss;
+      //   ss << "d = " << d << ", g = " << g << ", c =" << c << std::endl;
+      //   std::cout << ss.str(); 
+      // }
 
       return Imath::Color3f(c);
     }
@@ -196,7 +209,7 @@ namespace microfacet {
 
       Imath::V3f wh = (li + lo).normalize();
 
-      return (distribution.D(params, wh) * ts::cos_theta(wh)) / (4.0f * li.dot(wh));
+      return (distribution.D(params, wh) * std::abs(ts::cos_theta(wh))) / (4.0f * li.dot(wh));
     }
 
     template<typename Params, typename Distribution>
@@ -235,6 +248,31 @@ namespace microfacet {
       return f(params, wi, wo, distribution);
     }
   }
+
+  /* Beckman microfacet distribution implementation */
+  /*
+  struct beckman_t {
+    inline float D(
+      const bsdf::lobes::microfacet_t& params
+    , const Imath::V3f& v) const
+    {
+    }
+
+    inline float Lambda(
+      const bsdf::lobes::microfacet_t& params
+    , const Imath::V3f& v) const
+    {
+    }
+
+    inline Imath::V3f sample(
+      const bsdf::lobes::microfacet_t& params
+    , const Imath::V3f& wi
+    , float& pdf 
+    , const Imath::V2f& uv) const
+    {
+    }
+  };
+  */
 
   /* GGX microfacet distribution implementation */
   struct ggx_t {
