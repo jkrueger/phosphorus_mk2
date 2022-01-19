@@ -82,6 +82,14 @@ namespace blender {
                     {"Distortion", "distortion"}},
       /* outputs */ {{ "Fac", "fac" }, { "Color", "out" }});
 
+    const generic_node_t compiler_t::musgrave_noise_3d(
+      "musgrave_noise_3d_node",
+      /* inputs */ {{"Position", "position"}, 
+                    {"Scale", "scale"},
+                    {"Octaves", "octaves"}, 
+                    {"Lacunarity", "lacunarity"}},
+      /* outputs */ {{ "Color", "out" }});
+
     const generic_node_t compiler_t::normal_map(
       "normal_map_node",
       /* inputs */ {{ "Color", "sample" }, { "Strength", "strength" }},
