@@ -1,0 +1,59 @@
+#include "noise.h"
+
+vector random_vector3_offset(float seed)
+{
+  return vector(
+    100.0 + noise("hash", seed, 0.0) * 100.0,
+    100.0 + noise("hash", seed, 1.0) * 100.0,
+    100.0 + noise("hash", seed, 2.0) * 100.0);
+}
+
+float noise_3d(
+    vector co
+  , float detail
+  , float roughness
+  , float distortion
+  , output color Color)
+{
+  vector p = co;
+
+  if (distortion != 0.0) {
+    p += vector(
+      safe_snoise(p + random_vector3_offset(0.0)) * distortion,
+      safe_snoise(p + random_vector3_offset(1.0)) * distortion,
+      safe_snoise(p + random_vector3_offset(2.0)) * distortion);
+  }
+
+  float value = fractal_noise(p, detail, roughness);
+  
+  Color = color(
+    value,
+    fractal_noise(p + random_vector3_offset(3.0), detail, roughness),
+    fractal_noise(p + random_vector3_offset(4.0), detail, roughness));
+  
+  return value;
+}
+
+shader
+random_noise_3d_node
+  [[ string help = "Generate a 3-dimensional noise pattern" ]]
+(
+  point position = P,
+
+  float scale = 5.0,
+
+  float detail = 2.0,
+
+  float roughness = 0.5,
+
+  float distortion = 0.0,
+
+  output float fac = 0.0,
+
+  output color out = 0
+)
+{
+  vector p = position * scale;
+
+  fac = noise_3d(p, detail, roughness, distortion, out);
+}

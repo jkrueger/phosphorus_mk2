@@ -166,6 +166,8 @@ namespace blender {
       static const generic_node_t background;
       static const image_texture_node_t image_texture;
       static const env_texture_node_t env_texture;
+      static const generic_node_t random_noise_2d;
+      static const generic_node_t random_noise_3d;
       static const generic_node_t normal_map;
       static const generic_node_t blackbody;
       static const generic_node_t material;

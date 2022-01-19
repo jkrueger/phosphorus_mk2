@@ -8,10 +8,10 @@
  * from "Texturing and Modelling: A procedural approach"
  */
 float noise_musgrave_fBm_3d(
-  vector3 co, float H, float lacunarity, float octaves
+  vector co, float H, float lacunarity, float octaves
 )
 {
-  vector3 p = co;
+  vector p = co;
   float value = 0.0;
   float pwr = 1.0;
   float pwHL = pow(lacunarity, -H);
@@ -40,7 +40,7 @@ float noise_musgrave_fBm_3d(
  */
 shader
 musgrave_noise_3d_node
-  [[ string help = "Generate a 2-dimensional musgrave noise pattern" ]]
+  [[ string help = "Generate a 3-dimensional musgrave noise pattern" ]]
 (
   point position = P
     [[ string help = "Input vector for the noise texture. Defaults to hit position" ]],
@@ -64,7 +64,7 @@ musgrave_noise_3d_node
   float lacunarity_or_eta = max(lacunarity, 1e-5);
   float clamped_octaves = clamp(octaves, 0.0, 16.0);
 
-  vector3 p = position * scale;
+  vector p = position * scale;
 
   out = noise_musgrave_fBm_3d(p, dimension_or_eta, lacunarity_or_eta, octaves);
 }

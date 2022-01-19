@@ -1,0 +1,56 @@
+#include "noise.h"
+
+vector2 random_vector2_offset(float seed)
+{
+  return vector2(
+    100.0 + noise("hash", seed, 0.0) * 100.0,
+    100.0 + noise("hash", seed, 1.0) * 100.0);
+}
+
+float noise_2d(
+    vector2 co
+  , float detail
+  , float roughness
+  , float distortion
+  , output color Color)
+{
+  vector2 p = co;
+  if (distortion != 0.0) {
+    p += vector2(
+      safe_snoise(p + random_vector2_offset(0.0)) * distortion,
+      safe_snoise(p + random_vector2_offset(1.0)) * distortion);
+  }
+
+  float value = fractal_noise(p, detail, roughness);
+
+  Color = color(
+    value,
+    fractal_noise(p + random_vector2_offset(2.0), detail, roughness),
+    fractal_noise(p + random_vector2_offset(3.0), detail, roughness));
+
+  return value;
+}
+
+shader
+random_noise_2d_node
+  [[ string help = "Generate a 2-dimensional noise pattern" ]]
+(
+  point position = point(u, v, 0),
+
+  float scale = 5.0,
+
+  float detail = 2.0,
+
+  float roughness = 0.5,
+
+  float distortion = 0.0,
+
+  output float fac = 0.0,
+
+  output color out = 0
+)
+{
+  vector p = position * scale;
+
+  fac = noise_2d(vector2(p[0], p[1]), detail, roughness, distortion, out);
+}

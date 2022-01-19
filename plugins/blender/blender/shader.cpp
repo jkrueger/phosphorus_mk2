@@ -64,6 +64,24 @@ namespace blender {
 
     const env_texture_node_t compiler_t::env_texture;
 
+    const generic_node_t compiler_t::random_noise_2d(
+      "random_noise_2d_node",
+      /* inputs */ {{"Position", "position"}, 
+                    {"Scale", "scale"},
+                    {"Detail", "detail"}, 
+                    {"Roughness", "roughness"}, 
+                    {"Distortion", "distortion"}},
+      /* outputs */ {{ "Fac", "fac" }, { "Color", "out" }});
+
+    const generic_node_t compiler_t::random_noise_3d(
+      "random_noise_3d_node",
+      /* inputs */ {{"Position", "position"}, 
+                    {"Scale", "scale"},
+                    {"Detail", "detail"}, 
+                    {"Roughness", "roughness"}, 
+                    {"Distortion", "distortion"}},
+      /* outputs */ {{ "Fac", "fac" }, { "Color", "out" }});
+
     const generic_node_t compiler_t::normal_map(
       "normal_map_node",
       /* inputs */ {{ "Color", "sample" }, { "Strength", "strength" }},

@@ -1,0 +1,8 @@
+shader
+random_noise_1d_node
+(
+  output color out = 0
+)
+{
+  out = color(0,0,0);
+}
