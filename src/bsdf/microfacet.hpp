@@ -48,12 +48,22 @@ namespace microfacet {
         const auto li = base.to_local(wi);
         const auto lo = base.to_local(wo);
 
+        if (ts::in_same_hemisphere(li, lo)) {
+          return Imath::V3f(0.0f);
+        }
+
         const auto eta = li.y > 0.0f ? params.eta : 1.0f / params.eta;
+
+        // std::cout << "ETA: " << eta << std::endl;
 
         const auto cos_ti = ts::cos_theta(li);
         const auto cos_to = ts::cos_theta(lo);
 
-        auto wh = (wi + wo * eta).normalize();
+        if (cos_ti == 0.0f || cos_to == 0.0f) {
+          return Imath::Color3f(0.0f);
+        }
+
+        auto wh = (li + lo * eta).normalize();
 
         if (wh.y < 0) wh = -wh;
 
@@ -61,11 +71,18 @@ namespace microfacet {
           return Imath::Color3f(0.0f);
         }
 
+        const auto f = fresnel::dielectric(lo.dot(wh), eta);
+
         const auto sqrt_denom = li.dot(wh) + eta * lo.dot(wh);
         const auto factor = 1.0f / eta;
         const auto d = distribution.D(params, wh);
         const auto g = G(params, li, lo, distribution);
-        const auto c = std::abs(
+
+        // std::cout << "F: " << f << std::endl;
+        // std::cout << "D: " << d << std::endl;
+        // std::cout << "G: " << g << std::endl;
+
+        const auto c = (1.0f - f) * std::abs(
             d * g * eta * eta
           * std::abs(lo.dot(wh)) * std::abs(li.dot(wh))
           * factor * factor 
@@ -107,6 +124,15 @@ namespace microfacet {
       , float& pdf
       , const Distribution& distribution)
       {
+        if (params.eta == 1.0f) {
+          // when eta == 1, the surface normal isn't relevant anymore
+          // simply return the mirrored vector
+          wo  = -wi;
+          pdf = 1.0f;
+          
+          return Imath::V3f(1.0f);
+        }
+
         const invertible_base_t base(params.n);
 
         const auto li = base.to_local(wi);
@@ -117,14 +143,14 @@ namespace microfacet {
 
         float dpdf;
         const auto wh = distribution.sample(params, li, dpdf, sample);
-        
-        if (li.y * wh.y < 0.0f) {
+
+        if (wh.dot(li) < 0.0f) {
           return Imath::V3f(0.0f);
         }
 
-        const auto eta = li.y > 0.0f ? params.eta : 1.0f / params.eta;
+        const auto eta = li.y > 0.0f ?  1.0f / params.eta : params.eta;
 
-        const auto cos_ti = ts::cos_theta(li);
+        const auto cos_ti  = wh.dot(li);
         const auto sin2_ti = std::max(0.0f, 1.0f - cos_ti * cos_ti);
         const auto sin2_tt = eta * eta * sin2_ti;
 
@@ -133,10 +159,10 @@ namespace microfacet {
         }
 
         const auto cos_tt = std::sqrt(1.0f - sin2_tt);
-        const auto lo = eta * -li * (eta * cos_ti - cos_tt);
-      
+        const auto lo = eta * -li + (eta * cos_ti - cos_tt) * wh;
+
         const auto sqrt_denom = li.dot(wh) + eta * lo.dot(wh);
-        const auto dwh_dwi = std::abs(eta * eta * lo.dot(wh)) / sqrt_denom * sqrt_denom;
+        const auto dwh_dwi = std::abs((eta * eta * lo.dot(wh)) / (sqrt_denom * sqrt_denom));
 
         pdf = dpdf * dwh_dwi;
         wo = base.to_world(lo);
@@ -182,17 +208,7 @@ namespace microfacet {
       const auto g = G(params, li, lo, distribution);
       const auto f = fresnel::dielectric(lo.dot(wh.dot({0.0f, 1.0, 0.0}) < 0.0f ? -wh : wh), 0.5f);
 
-      // std::stringstream ss;
-      // ss << "F = " << f << " " << lo.dot(wh) << std::endl;
-      // std::cout << ss.str() << std::endl;
-
       const auto c = d * g * f * (1.0f / (4.0f * cos_ti * cos_to));
-
-      // if (c > 1.0f) {
-      //   std::stringstream ss;
-      //   ss << "d = " << d << ", g = " << g << ", c =" << c << std::endl;
-      //   std::cout << ss.str(); 
-      // }
 
       return Imath::Color3f(c);
     }
@@ -241,10 +257,6 @@ namespace microfacet {
       if (li.dot(wh) < 0.0f) {
         return Imath::V3f(0.0f);
       }
-
-      // if (li.y * wh.y < 0.0f) {
-      //   return Imath::V3f(0.0f);
-      // }
 
       const auto lo  = -li + (2.0f * li.dot(wh)) * wh;
 
@@ -350,6 +362,7 @@ namespace microfacet {
         float phi = 6.28318530718 * v;
         slope_x = r * std::cos(phi);
         slope_y = r * std::sin(phi);
+        return;
       }
 
       const auto sin_theta = std::sqrt(std::max(0.0f, 1.0f - (cos_theta*cos_theta)));
@@ -412,6 +425,7 @@ namespace microfacet {
       slope_y = slope_y * ay;
 
       Imath::V3f wh(-slope_x, 1.0f, -slope_y);
+
       wh.normalize();
 
       pdf = (D(params, wh) * cook_torrance::details::G1(params, wi, *this) * std::abs(wi.dot(wh)) / std::abs(ts::cos_theta(wi)));

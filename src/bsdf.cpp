@@ -168,6 +168,17 @@ Imath::Color3f bsdf_t::sample(
         , remapped
         , pdf
         , microfacet::ggx_t());
+
+        // std::stringstream ss;
+        // ss << "Glossy: " 
+        //    << result << " " 
+        //    << in_same_hemisphere(wi, wo) << " " 
+        //    << pdf << " " 
+        //    << wi << " " << wo
+        //    << remapped
+        //    << std::endl;
+
+        // std::cout << ss.str();
       }
       else {
         result = ct::sample(

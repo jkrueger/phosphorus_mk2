@@ -21,7 +21,13 @@ from . import (
 class Phosphoros(bpy.types.RenderEngine):
     bl_idname = "PHOSPHOROS"
     bl_label = "Phosphoros"
+
+    bl_use_eevee_viewport = True
+
+    # Enable blender shader nodes, since we compile
+    # from them to our native nodes
     bl_use_shading_nodes = True
+    bl_use_shading_nodes_custom = False
 
     def __init__(self):
         self.session = None
@@ -46,7 +52,7 @@ def register():
     properties.register()
     ui.register()
     register_class(Phosphoros)
-
+    
 def unregister():
     from bpy.utils import unregister_class
     from . import properties

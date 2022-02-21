@@ -289,7 +289,7 @@ namespace blender {
              {"Color", "Cs"}, 
              {"Roughness", "roughness"}, 
              {"Normal", "shadingNormal", true},
-             {"IoR", "IoR"}
+             {"IOR", "IoR"}
            },
            {{"BSDF", "Cout"}})
       {}

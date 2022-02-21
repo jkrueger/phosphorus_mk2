@@ -8,7 +8,7 @@
 #include <cmath>
 
 inline bool in_same_hemisphere(const Imath::V3f& a, const Imath::V3f& b) {
-  return a.dot(b) >= 0.0;
+  return a.dot(b) > 0.0;
 }
 
 inline Imath::V3f offset(
@@ -23,7 +23,7 @@ inline Imath::V3f offset(
 /* tagent space vector, and trigonometry functions */
 namespace ts {
   inline bool in_same_hemisphere(const Imath::V3f& a, const Imath::V3f& b) {
-    return (a.y * b.y) >= 0.0f;
+    return (a.y * b.y) > 0.0f;
   }
   
   inline float cos2_theta(const Imath::V3f& v) {

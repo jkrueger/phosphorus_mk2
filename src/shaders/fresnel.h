@@ -2,7 +2,7 @@
 float fresnel_dielectric(float cosi, float eta)
 {
   float c = fabs(cosi);
-  float g = eta * eta - 1 + c * c;
+  float g = eta * eta - 1.0 + c * c;
   float result;
 
   if (g > 0) {

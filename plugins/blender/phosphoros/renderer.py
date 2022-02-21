@@ -30,8 +30,6 @@ def create(engine, data, region=None, v3d=None, rv3d=None, preview_osl=False):
     engine.session = _phosphoros.create(
         engine.as_pointer(), prefs, data, region, v3d, rv3d, preview_osl)
 
-    engine.bl_use_shading_nodes_custom = False
-
 def free(engine):
     if hasattr(engine, "session"):
         if engine.session:
