@@ -25,4 +25,4 @@ There should be a binary in the build directory. Currently the supplied OSL shad
     
 After that you should be able to use the renderer.
 
-   
+![Blender BMW example](examples/bmw.png?raw=true "Blender BMW example")
