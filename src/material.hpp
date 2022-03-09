@@ -50,9 +50,10 @@ struct material_t {
     virtual void add_attribute(const std::string& name) = 0;
   };
 
-  uint32_t id;
+  uint32_t    id;
+  std::string name;
 
-  material_t();
+  material_t(const std::string& name);
   ~material_t();
 
   builder_t* builder();

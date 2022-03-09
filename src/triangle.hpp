@@ -17,6 +17,7 @@ struct triangle_t {
   triangle_t(const mesh_t* m, uint32_t set, uint32_t face);
 
   uint32_t meshid() const;
+  uint32_t faceid() const;
   uint32_t matid() const;
 
   float area() const;

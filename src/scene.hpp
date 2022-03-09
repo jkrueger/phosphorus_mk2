@@ -3,6 +3,8 @@
 #include "triangle.hpp"
 #include "entities/camera.hpp"
 
+#include <ImathSphere.h>
+
 #include <string>
 #include <vector>
 
@@ -32,6 +34,8 @@ struct scene_t {
   void add(mesh_t* mesh);
 
   void add(const std::string& name, material_t* mesh);
+
+  Imath::Sphere3f bounding_sphere() const;
 
   uint32_t num_lights() const;
 

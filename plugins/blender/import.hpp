@@ -28,8 +28,17 @@ namespace blender {
     return data && data.is_a(&RNA_Mesh);
   }
 
+  bool is_light(BL::Object& object) {
+    BL::ID id = object.data();
+    return id && id.is_a(&RNA_Light);
+  }
+
   bool is_material(BL::ID& id) {
     return id && id.is_a(&RNA_Material);
+  }
+
+  inline Imath::V3f get_row(const Imath::M44f& m, int n) {
+    return Imath::V3f(m[n][0], m[n][1], m[n][2]);
   }
 
   namespace mikk {
@@ -147,8 +156,6 @@ namespace blender {
         BL::Depsgraph depsgraph(PointerRNA_NULL);
         blender_mesh = object.to_mesh(false, depsgraph);
       }
-
-      std::cout << "Importing mesh: " << blender_mesh.name() << std::endl;
 
       if (blender_mesh.use_auto_smooth()) {
         blender_mesh.split_faces(false);
@@ -450,17 +457,107 @@ namespace blender {
       }
     }
 
+    material_t* light_shader(BL::Scene& blender_scene, BL::Depsgraph& graph, BL::Light& blender_light) {
+      material_t* out = new material_t(blender_light.name().c_str());
+
+      if (blender_light.use_nodes() && blender_light.node_tree()) {
+        std::unique_ptr<material_t::builder_t> builder(out->builder());
+
+        BL::ShaderNodeTree node_tree(blender_light.node_tree());
+        shader_tree(node_tree, graph, blender_scene, builder);
+      }
+      else {
+        std::unique_ptr<material_t::builder_t> builder(out->builder());
+
+        const auto color = blender_light.color();
+
+        builder->parameter("Cs", Imath::Color3f(color[0], color[1], color[2]));
+        builder->parameter("power", BL::PointLight(blender_light).energy());
+        builder->shader("diffuse_emitter_node", "light", "surface");
+        builder->shader("material_node", "out", "surface");
+
+        builder->connect("Cout", "Cs", "light", "out");
+      }
+
+      return out;
+    }
+
+    light_t* light(BL::Scene& blender_scene, BL::Depsgraph& graph, BL::BlendData& data, BL::Object& object, scene_t& scene) {
+      BL::Light blender_light(object.data());
+
+      const auto om = object.matrix_world();
+
+      Imath::M44f to_world;
+      memcpy(&to_world, &om, sizeof(float)*16);
+
+      switch(blender_light.type()) {
+        case BL::Light::type_POINT:
+        {
+          // BL::PointLight blender_point_light(blender_light);
+
+          auto material = light_shader(blender_scene, graph, blender_light);
+          scene.add(material->name, material);
+          scene.add(light_t::make_point(material, get_row(to_world, 3)));
+          break;
+        }
+        case BL::Light::type_AREA:
+        {
+          BL::AreaLight blender_area_light(blender_light);
+
+          auto dir = -get_row(to_world, 2);
+          dir.normalize();
+
+          auto material = light_shader(blender_scene, graph, blender_light);
+          scene.add(material->name, material);
+
+          switch (blender_area_light.shape()) {
+            case BL::AreaLight::shape_SQUARE:
+              return light_t::make_rect(material, to_world, blender_area_light.size(), blender_area_light.size());
+            case BL::AreaLight::shape_RECTANGLE:
+              return light_t::make_rect(material, to_world, blender_area_light.size(), blender_area_light.size_y());
+            default:
+              std::cout << "\tUnsupported area light shape: " << blender_area_light.shape() << std::endl;
+          }
+          break;
+        }
+        case BL::Light::type_SUN:
+        {
+          BL::SunLight blender_sun_light(blender_light);
+
+          auto material = light_shader(blender_scene, graph, blender_light);
+          scene.add(material->name, material);
+
+          Imath::V3f dir = -get_row(to_world, 2);
+          std::cout << "SUN: " << dir << std::endl;
+
+          scene.add(light_t::make_distant(material, dir));
+          break;
+        }
+        default:
+          std::cout << "\tUnsupported light type: " << blender_light.type() << std::endl;
+      }
+
+      return nullptr;
+    }
+
     void object(
-      BL::Depsgraph& graph
+      BL::Scene& blender_scene
+    , BL::Depsgraph& graph
     , BL::ViewLayer& view_layer
     , BL::BlendData& data
     , BL::Object& object
     , scene_t& scene)
     {
       if (is_mesh(object)) {
-        std::cout << "Importing: " << object.name() << std::endl;
+        std::cout << "Importing mesh: " << object.name() << std::endl;
         if(auto m = mesh(graph, data, object, scene)) {
           scene.add(m);
+        }
+      }
+      else if (is_light(object)) {
+        std::cout << "Importing light: " << object.name() << std::endl;
+        if (auto l = light(blender_scene, graph, data, object, scene)) {
+          scene.add(l);
         }
       }
     }
@@ -472,7 +569,7 @@ namespace blender {
           BL::Material material(*id);
           std::cout << "Importing material: " << material.name() << std::endl;
           if (material.use_nodes() && material.node_tree()) {
-            material_t* out = new material_t();
+            material_t* out = new material_t(material.name());
             {
               std::unique_ptr<material_t::builder_t> builder(out->builder());
 
@@ -490,7 +587,7 @@ namespace blender {
       }
     }
 
-    void objects(BL::Depsgraph& graph, BL::BlendData& data, scene_t& scene) {
+    void objects(BL::Scene& blender_scene, BL::Depsgraph& graph, BL::BlendData& data, scene_t& scene) {
       auto layer = graph.view_layer_eval();
 
       BL::Depsgraph::object_instances_iterator i;
@@ -500,7 +597,7 @@ namespace blender {
         auto obj = instance.object();
 
         if (instance.show_self()) {
-          object(graph, layer, data, obj, scene);
+          object(blender_scene, graph, layer, data, obj, scene);
         }
       }
     }
@@ -511,7 +608,7 @@ namespace blender {
       if (world.use_nodes() && world.node_tree()) {
         BL::ShaderNodeTree tree(world.node_tree());
 
-        material_t* material = new material_t();
+        material_t* material = new material_t("world");
         {
           std::unique_ptr<material_t::builder_t> builder(material->builder());
           shader_tree(tree, graph, blender_scene, builder);
@@ -519,10 +616,6 @@ namespace blender {
         scene.add("world", material);
         scene.add(light_t::make_infinite(material));
       }
-    }
-
-    inline Imath::V3f get_row(const Imath::M44f& m, int n) {
-      return Imath::V3f(m[n][0], m[n][1], m[n][2]);
     }
 
     inline float camera_focal_distance(
@@ -588,7 +681,7 @@ namespace blender {
     , scene_t& scene)
     {
       materials(graph, blender_scene, scene);
-      objects(graph, data, scene);
+      objects(blender_scene, graph, data, scene);
       world(graph, blender_scene, scene);
       camera(settings, engine, blender_scene, scene);
     }

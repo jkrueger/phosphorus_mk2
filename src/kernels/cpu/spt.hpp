@@ -24,9 +24,12 @@ namespace spt {
     const scene_t* scene;
     sampler_t* sampler;
 
-    uint16_t depth[N];      // the current depth of the path at an index
-    uint16_t path[N];       // the number of paths traced at index
-    float pdf[N];           // a pdf for a light sample at an index
+    uint16_t depth[N]; // the current depth of the path at an index
+    uint16_t path[N];  // the number of paths traced at index
+
+    // light samples for the current integrator iteration
+    sampler_t::light_sample_t light_samples[N];
+
     soa::vector3_t<N> beta; // the contribution of the current path vertex
     soa::vector3_t<N> r;    // accumulated radiance over all computed paths
 
@@ -50,6 +53,10 @@ namespace spt {
 
     inline decltype(auto) next_light_samples() {
       return sampler->next_light_samples();
+    }
+
+    inline decltype(auto) fresh_light_samples() {
+      return sampler->fresh_light_samples(scene, light_samples, N);
     }
 
     inline void mark_for_revive(uint32_t i) {
@@ -103,48 +110,27 @@ namespace spt {
       // for these paths
       revive_dead_paths(state, active, primary, hits);
 
-      const auto hit    = simd::int32v_t(HIT);
-      const auto masked = simd::int32v_t(MASKED | SHADOW);
-      const auto shadow = simd::int32v_t(SHADOW);
+      // get fresh light samples and store them in the integrator state
+      const auto samples = state->fresh_light_samples();
 
-      sampler_t::light_samples_t light_samples;
+      for (auto i=0; i<active.num; ++i) {
+        const auto n = hits->n.at(i);
+        const auto p = offset(hits->p.at(i), n);
 
-      state->sampler->fresh_light_samples(state->scene, light_samples);
-      const auto* samples = light_samples.samples;
+        auto wi = samples->light->setup_shadow_ray(p, samples[i]);
 
-      // iterate over alls paths, and generate shadow rays for them
-      for (auto i=0; i<active.num; i+=SIMD_WIDTH, ++samples) {
-        // the information about the surface we're going to hit
-        // comes from the light sample, and not from tracing
-        // the ray through the scene, so set everything up here
-        rays->set_surface(i,
-          simd::int32v_t(samples->mesh)
-        , simd::int32v_t(samples->face)
-        , simd::floatv_t(samples->u)
-        , simd::floatv_t(samples->v));
+        const auto d  = wi.length() - 0.0001f;
 
-        // use the sampled light to generate shadow rays
-        const auto n = hits->n.stream(i);
-        const auto p = simd::offset(hits->p.stream(i), n);
-
-        auto wi = samples->p.stream() - p;
-
-        const auto d = wi.length() - simd::floatv_t(0.0001f);
         wi.normalize();
 
-        // if the light source is behind the sampled point, we mask the
-        // shadow ray. this means the result of tracing it through the
-        // scene will be ignored
-        const auto is_hit = (hit & simd::int32v_t((int32_t*)(hits->flags + i))) == hit;
-        const auto ish = simd::in_same_hemisphere(n, wi);
-        const auto mask = is_hit & ish;
-        const auto flags = simd::select(mask, masked, shadow);
+        rays->reset(i, p, wi, d);
 
-        rays->reset(i, p, wi, d, flags);
-
-        // we store the pdfs for the light samples in the integrator
-        // state, since we need them later on
-        simd::floatv_t(samples->pdf).storeu(state->pdf, i);
+        if (hits->is_hit(i) && in_same_hemisphere(n, wi)) {
+          rays->shadow(i);
+        }
+        else {
+          rays->mask(i);
+        }
       }
     }
   };
@@ -232,26 +218,14 @@ namespace spt {
         return Imath::Color3f(0.0f);
       }
 
+      const auto& sample = state->light_samples[to];
+
       const auto f = bsdf->f(wi, wo);
+      const auto e = sample.light->le(*state->scene, sample, wi);
 
-      const auto mesh = state->scene->mesh(samples->meshid(to));
-      const auto material = state->scene->material(samples->matid(to));
+      const auto pdf = sample.pdf; // * d * d;
 
-      assert(mesh && material && material->is_emitter());
-
-      Imath::V3f light_n;
-      Imath::V2f light_st;
-      invertible_base_t _base;
-
-      shading_result_t light;
-      {
-        mesh->shading_parameters(samples, light_n, light_st, _base, to);
-        material->evaluate(p, wi, light_n, light_st, light);
-      }
-
-      const auto pdf = state->pdf[to] * d * d / std::fabs(light_n.dot(-wi));
-
-      return (light.e * 4) * f * (1.0f / pdf);
+      return (e * 4) * f * (1.0f / pdf);
     }
 
     bool sample_bsdf(

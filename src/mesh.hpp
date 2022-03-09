@@ -41,6 +41,24 @@ struct mesh_t {
     }
   };
 
+  struct surface_desc_t {
+    uint32_t face;
+    float    u, v;
+
+    inline surface_desc_t(uint32_t face, const Imath::V2f& uv)
+      : face(face)
+      , u(uv.x)
+      , v(uv.y)
+    {}
+
+    template<int N>
+    inline surface_desc_t(const ray_t<N>* rays, uint32_t i)
+      : face(rays->face[i])
+      , u(rays->u[i])
+      , v(rays->v[i])
+    {}
+  };
+
   /* helper stuff to construct a mesh. mostly just here to hide
    * part of the implementation from you */
   struct builder_t {
@@ -74,6 +92,7 @@ struct mesh_t {
 
   uint32_t id;
   uint32_t flags;
+  uint32_t num_vertices;
   uint32_t num_faces;
 
   mesh_t();
@@ -118,11 +137,10 @@ struct mesh_t {
   , uint32_t i) const;
 
   void shading_parameters(
-    const ray_t<>* rays     
+    const surface_desc_t& desc
   , Imath::V3f& n
   , Imath::V2f& st
-  , invertible_base_t& base
-  , uint32_t i) const;
+  , invertible_base_t& base) const;
 
   inline bool has_per_vertex_normals() const {
     return (flags & NormalsPerVertex) != 0;

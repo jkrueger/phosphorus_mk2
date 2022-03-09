@@ -9,6 +9,7 @@
 #include "utils/compiler.hpp"
 
 struct scene_t;
+struct light_t;
 
 namespace sampling {
   namespace details {
@@ -22,26 +23,34 @@ namespace sampling {
     };
 
     struct light_sample_t {
+      // the light this sample was taken from
+      const light_t* light;
+
+      // sample point information
       Imath::V3f p;
       Imath::V2f uv;
-      uint32_t mesh;
-      uint32_t face;
       float pdf;
       float area;
+
+      // light type based information needed for light
+      // evaluation
+      uint64_t data;
     };
-    
+
     template<int N>
     struct light_samples_t {
       static const uint32_t size=N;
       static const uint32_t step=SIMD_WIDTH;
       
       struct {
+        light_t* light[step];
+
         soa::vector3_t<step> p;
         float u[step];
         float v[step];
         float pdf[step];
-        int32_t mesh[step];
-        int32_t face[step];
+
+        uint64_t data[step];
       } samples[size/step];
     };
   }
@@ -97,7 +106,7 @@ struct sampler_t {
 
   const light_samples_t& next_light_samples();
 
-  void fresh_light_samples(const scene_t* scene, light_samples_t& out);
+  light_sample_t* fresh_light_samples(const scene_t* scene, light_sample_t* out, size_t n);
 
   // const float* next_1d_samples(uint32_t id);
 

@@ -222,85 +222,85 @@ struct material_t::details_t {
   {
     switch(c->id) {
     case ClosureColor::MUL:
-      {
-	const auto cw = w * c->as_mul()->weight;
-	eval_closure(result, c->as_mul()->closure, cw);
-	break;
-      }
+    {
+    	const auto cw = w * c->as_mul()->weight;
+    	eval_closure(result, c->as_mul()->closure, cw);
+    	break;
+    }
     case ClosureColor::ADD:
       eval_closure(result, c->as_add()->closureA, w);
       eval_closure(result, c->as_add()->closureB, w);
       break;
     default:
-      {
-	const auto component = c->as_comp();
-	const auto cw = w * Imath::Color3f(component->w);
+    {
+    	const auto component = c->as_comp();
+    	const auto cw = w * Imath::Color3f(component->w);
 
-	switch(component->id) {
-        case bsdf_t::Background:
-          result.e = cw;
-          break;
-        case bsdf_t::Emissive:
-          result.e = cw;
-          break;
-	case bsdf_t::Diffuse:
-	  if (result.bsdf) {
-	    result.bsdf->add_lobe(
-	      bsdf_t::Diffuse
-	    , cw
-	    , component->as<bsdf::lobes::diffuse_t>());
-	  }
-	  break;
-	case bsdf_t::OrenNayar:
-	  if (result.bsdf) {
-	    result.bsdf->add_lobe(
-              bsdf_t::OrenNayar
-            , cw
-            , component->as<bsdf::lobes::oren_nayar_t>());
-	  }
-	  break;
-	case bsdf_t::Microfacet:
-	  if (result.bsdf) {
-	    result.bsdf->add_lobe(
-	      bsdf_t::Microfacet
-	    , cw
-	    , component->as<bsdf::lobes::microfacet_t>());
-	  }
-	  break;
-	case bsdf_t::Sheen:
-	  if (result.bsdf) {
-	    result.bsdf->add_lobe(
-	      bsdf_t::Sheen
-	    , cw
-	    , component->as<bsdf::lobes::sheen_t>());
-	  }
-	  break;
-	case bsdf_t::Reflection:
-	  if (result.bsdf) {
-	    result.bsdf->add_lobe(
-	      bsdf_t::Reflection
-	    , cw
-	    , component->as<bsdf::lobes::reflect_t>());
-	  }
-	  break;
-	case bsdf_t::Refraction:
-	  if (result.bsdf) {
-	    result.bsdf->add_lobe(
-	      bsdf_t::Refraction
-	    , cw
-	    , component->as<bsdf::lobes::refract_t>());
-	  }
-	  break;
-	case bsdf_t::Transparent:
-	  if (result.bsdf) {
-	    result.bsdf->add_lobe(
-	      bsdf_t::Transparent
-	    , cw
-	    , component->as<empty_params_t>());
-	  }
-	  break;
-	}
-      }
+    	switch(component->id) {
+      case bsdf_t::Background:
+        result.e = cw;
+        break;
+      case bsdf_t::Emissive:
+        result.e = cw;
+        break;
+    	case bsdf_t::Diffuse:
+    	  if (result.bsdf) {
+    	    result.bsdf->add_lobe(
+    	      bsdf_t::Diffuse
+    	    , cw
+    	    , component->as<bsdf::lobes::diffuse_t>());
+    	  }
+    	  break;
+    	case bsdf_t::OrenNayar:
+    	  if (result.bsdf) {
+    	    result.bsdf->add_lobe(
+            bsdf_t::OrenNayar
+          , cw
+          , component->as<bsdf::lobes::oren_nayar_t>());
+    	  }
+    	  break;
+    	case bsdf_t::Microfacet:
+    	  if (result.bsdf) {
+    	    result.bsdf->add_lobe(
+    	      bsdf_t::Microfacet
+    	    , cw
+    	    , component->as<bsdf::lobes::microfacet_t>());
+    	  }
+    	  break;
+    	case bsdf_t::Sheen:
+    	  if (result.bsdf) {
+    	    result.bsdf->add_lobe(
+    	      bsdf_t::Sheen
+    	    , cw
+    	    , component->as<bsdf::lobes::sheen_t>());
+    	  }
+    	  break;
+    	case bsdf_t::Reflection:
+    	  if (result.bsdf) {
+    	    result.bsdf->add_lobe(
+    	      bsdf_t::Reflection
+    	    , cw
+    	    , component->as<bsdf::lobes::reflect_t>());
+    	  }
+    	  break;
+    	case bsdf_t::Refraction:
+    	  if (result.bsdf) {
+    	    result.bsdf->add_lobe(
+    	      bsdf_t::Refraction
+    	    , cw
+    	    , component->as<bsdf::lobes::refract_t>());
+    	  }
+    	  break;
+    	case bsdf_t::Transparent:
+    	  if (result.bsdf) {
+    	    result.bsdf->add_lobe(
+    	      bsdf_t::Transparent
+    	    , cw
+    	    , component->as<empty_params_t>());
+    	  }
+    	  break;
+    	}
+    }
     }
   }
 };
@@ -404,8 +404,9 @@ struct material_builder_t : public material_t::builder_t {
   }
 };
 
-material_t::material_t()
+material_t::material_t(const std::string& name)
   : details(new details_t())
+  , name(name)
 {}
 
 material_t::~material_t() {
@@ -451,7 +452,10 @@ void material_t::evaluate(
       hits->bsdf[index] = nullptr;
 
       std::stringstream ss;
-      ss << "CAN'T EVALUATE MATERIAL: " << id << ", " << is_emitter() << std::endl;
+      ss << "Can't evaluate material: " 
+         << name << "id=" << id 
+         << ", is_emitter=" << is_emitter() 
+         << std::endl;
       std::cout << ss.str() << std::endl;
     }
   }
@@ -480,7 +484,12 @@ void material_t::evaluate(
     details->eval_closure(result, sg.Ci);
   }
   else {
-    std::cout << "No closure returned: " << id << ", " << is_emitter() << std::endl;
+    std::stringstream ss;
+      ss << "Can't evaluate material: " 
+         << name << "id=" << id 
+         << ", is_emitter=" << is_emitter() 
+         << std::endl;
+      std::cout << ss.str() << std::endl;
   }
 }
 

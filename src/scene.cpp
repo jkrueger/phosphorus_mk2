@@ -11,9 +11,29 @@ struct scene_t::details_t {
   std::vector<material_t*> materials;
   std::vector<light_t*>    lights;
 
+  Imath::V3f center;
+  float      radius;
+
   light_t* env;
 
   std::unordered_map<std::string, material_t*> materials_by_name;
+
+  details_t() 
+    : center(0.0f)
+    , radius(0.0f)
+    , env(nullptr)
+  {}
+
+  void compute_scene_bounds() {
+    for (const auto& m : meshes) {
+      for (auto i=0; i<m->num_vertices; ++i) {
+        const auto d = (m->vertices[i] - center).length();
+        if (d > radius) {
+          radius = d;
+        }
+      }
+    }
+  }
 };
 
 scene_t::scene_t()
@@ -49,6 +69,8 @@ void scene_t::preprocess() {
   for (auto& mesh: details->meshes) {
     mesh->preprocess(this);
   }
+
+  details->compute_scene_bounds();
 
   for (auto& light: details->lights) {
     light->preprocess(this);
@@ -87,6 +109,10 @@ void scene_t::add(const std::string& name, material_t* material) {
   std::cout << "Adding material: " << name << ", with id: " << material->id << std::endl;
   details->materials.push_back(material);
   details->materials_by_name[name] = material;
+}
+
+Imath::Sphere3f scene_t::bounding_sphere() const {
+  return Imath::Sphere3f(details->center, details->radius);
 }
 
 uint32_t scene_t::num_lights() const {

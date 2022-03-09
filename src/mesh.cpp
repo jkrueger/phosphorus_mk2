@@ -25,13 +25,14 @@ struct builder_impl_t : public mesh_t::builder_t {
   {}
 
   ~builder_impl_t() {
-    mesh->vertices  = mesh->details->vertices.data();
-    mesh->normals   = mesh->details->normals.data();
-    mesh->tangents  = mesh->details->tangents.size() ? mesh->details->tangents.data() : nullptr;
-    mesh->uvs       = mesh->details->uvs.data();
-    mesh->faces     = mesh->details->faces.data();
-    mesh->sets      = mesh->details->sets.data();
-    mesh->num_faces = mesh->details->faces.size() / 3;
+    mesh->vertices     = mesh->details->vertices.data();
+    mesh->normals      = mesh->details->normals.data();
+    mesh->tangents     = mesh->details->tangents.size() ? mesh->details->tangents.data() : nullptr;
+    mesh->uvs          = mesh->details->uvs.data();
+    mesh->faces        = mesh->details->faces.data();
+    mesh->sets         = mesh->details->sets.data();
+    mesh->num_vertices = mesh->details->vertices.size();
+    mesh->num_faces    = mesh->details->faces.size() / 3;
   }
 
   void add_vertex(const Imath::V3f& v) {
@@ -159,7 +160,7 @@ void mesh_t::shading_parameters(
   Imath::V3f n;
   Imath::V2f st;
 
-  shading_parameters(rays, n, st, hits->xform[i], i);
+  shading_parameters(surface_desc_t{rays, i}, n, st, hits->xform[i]);
 
   hits->n.from(i, n);
   hits->s[i] = st.x;
@@ -167,16 +168,15 @@ void mesh_t::shading_parameters(
 }
 
 void mesh_t::shading_parameters(
-  const ray_t<>* rays     
+  const surface_desc_t& desc     
 , Imath::V3f& n
 , Imath::V2f& st
-, invertible_base_t& base
-, uint32_t i) const
+, invertible_base_t& base) const
 {
-  const auto& face = rays->face[i];
+  const auto& face = desc.face;
 
-  const auto u = rays->u[i];
-  const auto v = rays->v[i];
+  const auto u = desc.u;
+  const auto v = desc.v;
 
   const auto w = 1 - u - v;
   const auto a = faces[face];
@@ -274,6 +274,10 @@ triangle_t::triangle_t(const mesh_t* m, uint32_t set, uint32_t face)
 
 uint32_t triangle_t::meshid() const {
   return mesh->id;
+}
+
+uint32_t triangle_t::faceid() const {
+  return face;
 }
 
 uint32_t triangle_t::matid() const {

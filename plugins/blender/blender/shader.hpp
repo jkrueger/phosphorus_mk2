@@ -382,7 +382,7 @@ namespace blender {
       {}
 
       texture_file_node_t(const std::vector<std::string>& attributes)
-       : generic_node_t(node_t<T>::value, {}, {{ "Color", "Cout"}}, attributes)
+       : generic_node_t(node_t<T>::value, {}, {{ "Color", "Cout"}}, attributes)\
       {}
 
       void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {

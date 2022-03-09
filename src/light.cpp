@@ -5,7 +5,109 @@
 #include "math/sampling.hpp"
 
 #include <algorithm>
-#include <random> 
+#include <random>
+
+struct point_light_t : public light_t::details_t {
+  material_t* material;
+  Imath::V3f  position;
+
+  point_light_t(material_t* material, const Imath::V3f& position) 
+    : details_t(material->id)
+    , material(material)
+    , position(position)
+  {}
+
+  void sample(const Imath::V2f& uv, sampler_t::light_sample_t& out) const {
+    out.p    = position;
+    out.uv   = {0.0f, 0.0f};
+    out.area = 0.0f;
+    out.pdf  = 1.0f;
+    out.data = 0;
+  }
+
+  Imath::Color3f le(
+    const scene_t& scene
+  , const sampler_t::light_sample_t& sample
+  , const Imath::V3f& wi) const
+  {
+    shading_result_t light;
+    material->evaluate(sample.p, wi, Imath::V3f(0.0f), sample.uv, light);
+    
+    return light.e;
+  }
+};
+
+struct distant_light_t : public light_t::details_t {
+  material_t*     material;
+  Imath::V3f      direction;
+  Imath::Sphere3f bounds;
+
+  distant_light_t(material_t* material, const Imath::V3f& direction) 
+    : details_t(material->id)
+    , material(material)
+    , direction(direction)
+  {}
+
+  void preprocess(const scene_t* scene) {
+    bounds = scene->bounding_sphere();
+    std::cout << bounds.radius << std::endl;
+  }
+
+  void sample(const Imath::V2f& uv, sampler_t::light_sample_t& out) const {
+    out.p    = -direction * 2.0f * bounds.radius;
+    out.uv   = {0.0f, 0.0f};
+    out.area = 0.0f;
+    out.pdf  = 1.0f;
+    out.data = 0;
+  }
+
+  Imath::Color3f le(
+    const scene_t& scene
+  , const sampler_t::light_sample_t& sample
+  , const Imath::V3f& wi) const
+  {
+    shading_result_t light;
+    material->evaluate(sample.p, wi, Imath::V3f(0.0f), sample.uv, light);
+
+    return light.e;
+  }
+};
+
+struct rect_light_t : public light_t::details_t {
+  material_t*  material;
+  float width, height;
+  Imath::V3f n;
+  Imath::M44f  transform;
+
+  rect_light_t(material_t* material, const Imath::M44f& transform, float width, float height) 
+   : details_t(material->id)
+   , material(material)
+   , transform(transform)
+   , width(width)
+   , height(height)
+  {
+    n = Imath::V3f(transform[2][0], transform[2][1], transform[2][2]);
+  }
+
+  void sample(const Imath::V2f& uv, sampler_t::light_sample_t& out) const {
+    out.p    = Imath::V3f(uv.x * width, 0.0, uv.y * height) * transform;
+    out.uv   = uv;
+    out.area = width * height;
+    out.pdf  = 1.0f / out.area;
+    out.data = 0;
+  }
+
+  Imath::Color3f le(
+    const scene_t& scene
+  , const sampler_t::light_sample_t& sample
+  , const Imath::V3f& wi) const
+  {
+    shading_result_t light;
+    material->evaluate(sample.p, wi, n, sample.uv, light);
+    
+    return light.e * std::fabs(n.dot(-wi));
+  }
+};
 
 struct area_light_t : public light_t::details_t {
   mesh_t* mesh;
@@ -65,37 +167,56 @@ struct area_light_t : public light_t::details_t {
     out.p    = triangle.barycentric_to_point(barycentric);
     out.uv   = barycentric;
     out.pdf  = 1.0f / area;
-    out.mesh = triangle.meshid() | (triangle.matid() << 16);
-    out.face = triangle.face;
     out.area = area;
+
+    set_meshid(triangle.meshid(), out);
+    set_faceid(triangle.faceid(), out);
+    set_matid(triangle.matid(), out);
   }
 
-  void sample(
-    const soa::vector2_t<sampler_t::light_samples_t::step>& uv
-  , sampler_t::light_samples_t& out) const
+  Imath::Color3f le(
+    const scene_t& scene
+  , const sampler_t::light_sample_t& sample
+  , const Imath::V3f& wi) const
   {
-  //   const auto one = simd::floatv_t(1.0f);
-  //   const auto num = simd::floatv_t(triangles.size());
+    const auto mesh     = scene.mesh(meshid(sample));
+    const auto material = scene.material(matid(sample));
 
-  //   auto x = simd::floatv_t(uv.x);
-  //   auto y = simd::floatv_t(uv.y);
+    Imath::V3f n;
+    Imath::V2f st;
+    invertible_base_t _base;
 
-  //   const auto indices = simd::min(simd::floor(x * num), num - one);
+    mesh->shading_parameters({faceid(sample), sample.uv}, n, st, _base);
 
-  //   const auto e = std::numeric_limits<float>::epsilon();
-  //   const auto one_minus_epsilon = simd::floatv_t(1.0f-e);
+    shading_result_t light;
+    material->evaluate(sample.p, wi, n, st, light);
+    
+    return light.e * std::fabs(n.dot(-wi));
+  }
 
-  //   x = simd::min(x * num, one_minus_epsilon);
+  inline void set_meshid(uint64_t meshid, sampler_t::light_sample_t& sample) const {
+    sample.data |= meshid & 0xffff00000000000;
+  }
 
-  //   const auto barycentrics = triangle_t::sample(x, y);
+  inline void set_faceid(uint64_t faceid, sampler_t::light_sample_t& sample) const {
+    sample.data |= (faceid & 0xffffffff00000000) << 32;
+  }
 
-  //   out.p = mesh->barycentrics_to_point(set, indices, barycentrics);
-  //   out.u = barycentrics.x;
-  //   out.v = barycentrics.y;
-  //   out.pdf = simd::floatv_t(1.0f / area);
-  //   // out.mesh = simd::int32v_t(mesh->id | (matid << 16));
-  //   // out.face = mesh->face_ids(set, indices);
-  }  
+  inline void set_matid(uint64_t matid, sampler_t::light_sample_t& sample) const {
+    sample.data |= (matid & 0xffff000000000000) << 16;
+  }
+
+  inline uint32_t meshid(const sampler_t::light_sample_t& sample) const {
+    return (uint32_t) ((sample.data & 0xffff00000000000));
+  }
+
+  inline uint32_t matid(const sampler_t::light_sample_t& sample) const {
+    return (uint32_t) ((sample.data & 0x0000ffff00000000) >> 16);
+  }
+
+  inline uint32_t faceid(const sampler_t::light_sample_t& sample) const {
+    return (uint32_t) ((sample.data & 0x00000000ffffffff) >> 32);
+  }
 };
 
 struct infinite_light_t : public light_t::details_t {
@@ -108,7 +229,7 @@ struct infinite_light_t : public light_t::details_t {
     sample::hemisphere::uniform(uv, sampled, out.pdf);
 
     out.p = sampled * 1000.0f;
-    out.mesh = matid << 16;
+    // out.mesh = matid << 16;
   }
 };
 
@@ -122,6 +243,9 @@ light_t::~light_t() {
 
 void light_t::preprocess(const scene_t* scene) {
   switch(type) {
+  case DISTANT:
+    static_cast<distant_light_t*>(details)->preprocess(scene);
+    break;
   case AREA:
     static_cast<area_light_t*>(details)->preprocess(scene);
     break;
@@ -135,8 +259,17 @@ void light_t::sample(
   const Imath::V2f& uv
 , sampler_t::light_sample_t& out) const
 {
+  out.light = this;
+
   switch(type) {
   case POINT:
+    static_cast<const point_light_t*>(details)->sample(uv, out);
+    break;
+  case DISTANT:
+    static_cast<const distant_light_t*>(details)->sample(uv, out);
+    break;
+  case RECT:
+    static_cast<const rect_light_t*>(details)->sample(uv, out);
     break;
   case AREA:
     static_cast<const area_light_t*>(details)->sample(uv, out);
@@ -147,21 +280,62 @@ void light_t::sample(
   }
 }
 
-void light_t::sample(
-  const soa::vector2_t<sampler_t::light_samples_t::step>& uv
-, sampler_t::light_samples_t& out) const
+Imath::V3f light_t::setup_shadow_ray(
+    const Imath::V3f& p
+  , const sampler_t::light_sample_t& sample) const 
 {
-  switch(type) {
+  switch (type) {
+    case DISTANT:
+    {
+      // for distant light sources the incident light direction
+      // is the same for every point in the scene, so we compute
+      // the shadow ray direction by starting at the
+      // surface point, adding the lights direction
+      return p + sample.p;
+    }
+    default:
+      // for all other cases the tdirection for the shadow ray
+      // is computed by taking the difference between the surface
+      // point, and the sampled point on the light source
+      return sample.p - p;
+  }
+}
+
+Imath::V3f light_t::le(
+  const scene_t& scene
+, const sampler_t::light_sample_t& sample
+, const Imath::V3f& wi) const
+{
+  switch (type) {
   case POINT:
-    break;
+    return static_cast<const point_light_t*>(details)->le(scene, sample, wi);
+  case DISTANT:
+    return static_cast<const distant_light_t*>(details)->le(scene, sample, wi);
+  case RECT:
+    return static_cast<const rect_light_t*>(details)->le(scene, sample, wi);
   case AREA:
-    static_cast<const area_light_t*>(details)->sample(uv, out);
-    break;
+    return static_cast<const area_light_t*>(details)->le(scene, sample, wi);
   case INFINITE:
-    // static_cast<const infinite_light_t*>(details)->sample(uv, out);
-    printf("SIMD sampling not implemented on infinite lights");
+    // return static_cast<const infinite_light_t*>(details)->le(scene, sample, wi);
     break;
   }
+
+  return Imath::V3f(0);
+}
+
+light_t* light_t::make_point(material_t* material, const Imath::V3f& p) {
+  auto details = new point_light_t(material, p);
+  return new light_t(POINT, details);
+}
+
+light_t* light_t::make_distant(material_t* material, const Imath::V3f& d) {
+  auto details = new distant_light_t(material, d);
+  return new light_t(DISTANT, details);
+}
+
+light_t* light_t::make_rect(material_t* material, const Imath::M44f& transform, float width, float height) {
+  auto details = new rect_light_t(material, transform, width, height);
+  return new light_t(RECT, details);
 }
 
 light_t* light_t::make_area(mesh_t* mesh, uint32_t set) {

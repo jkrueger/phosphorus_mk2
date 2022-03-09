@@ -131,8 +131,7 @@ void sampler_t::preprocess(const scene_t& scene) {
         out.u[k] = sample.uv.x;
         out.v[k] = sample.uv.y;
         out.pdf[k] = sample.pdf / nlights;
-        out.mesh[k] = sample.mesh;
-        out.face[k] = sample.face;
+        out.data[k] = sample.data;
       }
     }
   }
@@ -157,9 +156,21 @@ const sampler_t::light_samples_t& sampler_t::next_light_samples() {
   return samples;
 }
 
-void sampler_t::fresh_light_samples(const scene_t* scene, light_samples_t& out) {
+sampler_t::light_sample_t* sampler_t::fresh_light_samples(const scene_t* scene, light_sample_t* out, size_t n) {
   const auto nlights = scene->num_lights();
 
+  for (auto i=0; i<n; ++i) {
+    const auto l = std::min((uint32_t) std::floor(sample() * nlights), nlights - 1);
+      const auto light = scene->light(l);
+
+      light_sample_t sample;
+      light->sample(details->sample2(), out[i]);
+
+      out[i].pdf /= nlights;
+  }
+
+  return out;
+/*
   for (auto j=0; j<light_samples_t::size/light_samples_t::step; ++j) {
     for (auto k=0; k<light_samples_t::step; ++k) {
       const auto l = std::min((uint32_t) std::floor(sample() * nlights), nlights - 1);
@@ -177,4 +188,5 @@ void sampler_t::fresh_light_samples(const scene_t* scene, light_samples_t& out) 
       s.face[k] = sample.face;
     }
   }
+  */
 }
