@@ -51,11 +51,10 @@ struct mesh_t {
       , v(uv.y)
     {}
 
-    template<int N>
-    inline surface_desc_t(const ray_t<N>* rays, uint32_t i)
-      : face(rays->face[i])
-      , u(rays->u[i])
-      , v(rays->v[i])
+    inline surface_desc_t(const ray_t& ray)
+      : face(ray.face)
+      , u(ray.u)
+      , v(ray.v)
     {}
   };
 
@@ -132,9 +131,8 @@ struct mesh_t {
 
   /* fill in the shading parameters in the state from this mesh */
   void shading_parameters(
-    const ray_t<>* rays     
-  , interaction_t<>* hits
-  , uint32_t i) const;
+    const ray_t& ray     
+  , interaction_t& hit) const;
 
   void shading_parameters(
     const surface_desc_t& desc

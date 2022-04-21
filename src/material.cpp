@@ -27,8 +27,7 @@ struct service_t : public RendererServices {
 
   /* describes the rendered object to osl */
   struct object_t {
-    interaction_t<>* hits;
-    uint32_t i;
+    interaction_t& hit;
   };
 
   ~service_t() {
@@ -75,7 +74,7 @@ struct service_t : public RendererServices {
     if (sg && sg->objdata) {
       object_t* o = (object_t*) sg->objdata;
       if (name == tangent) {
-        *((Imath::V3f*) val) = o->hits->xform[o->i].tangent();
+        *((Imath::V3f*) val) = o->hit.xform.tangent();
         return true;
       }
     }
@@ -419,21 +418,22 @@ material_t::builder_t* material_t::builder() {
 
 void material_t::evaluate(
   allocator_t& allocator
-, interaction_t<>* hits
-, const active_t<>& active)
+, interactions_t& hits
+, const active_t& active)
 {
   for (auto i=0; i<active.num; ++i) {
     const auto index = active.index[i];
+    auto& hit = hits[index];
 
-    service_t::object_t obj{hits, index};
+    service_t::object_t obj{hit};
 
     ShaderGlobals sg;
     memset(&sg, 0, sizeof(ShaderGlobals));
-    sg.P = hits->p.at(index);
-    sg.I = hits->wi.at(index);
-    sg.N = sg.Ng = hits->n.at(index);
-    sg.u = hits->s[index];
-    sg.v = hits->t[index];
+    sg.P = hit.p;
+    sg.I = hit.wi;
+    sg.N = sg.Ng = hit.n;
+    sg.u = hit.st.x;
+    sg.v = hit.st.y;
     sg.backfacing = sg.N.dot(sg.I) < 0;
     sg.objdata = &obj;
 
@@ -445,11 +445,11 @@ void material_t::evaluate(
 
       details->eval_closure(result, sg.Ci);
 
-      hits->e.from(index, result.e);
-      hits->bsdf[index] = result.bsdf;
+      hit.e    = result.e;
+      hit.bsdf = result.bsdf;
     } else {
-      hits->e.from(index, Imath::Color3f(0.0f));
-      hits->bsdf[index] = nullptr;
+      hit.e = Imath::Color3f(0.0f);
+      hit.bsdf = nullptr;
 
       std::stringstream ss;
       ss << "Can't evaluate material: " 

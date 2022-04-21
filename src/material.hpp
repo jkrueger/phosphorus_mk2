@@ -60,8 +60,8 @@ struct material_t {
 
   void evaluate(
     allocator_t& allocator
-  , interaction_t<>* hits
-  , const active_t<>& active);
+  , interactions_t& hits
+  , const active_t& active);
 
   void evaluate(
     const Imath::V3f& p

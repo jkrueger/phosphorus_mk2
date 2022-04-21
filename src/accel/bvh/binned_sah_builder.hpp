@@ -36,7 +36,7 @@ namespace bvh {
     {}
 
     inline geometry_t(
-      std::vector<primitive_t>& primitives
+        std::vector<primitive_t>& primitives
       , uint32_t start
       , uint32_t end)
     : primitives(primitives), start(start), end(end)
@@ -270,13 +270,13 @@ return node_index;
 }
 
   template<typename Things, typename Builder>
-void from(Builder& bvh, const Things& things) {
-  std::vector<primitive_t> primitives(things.size());
-  for (uint32_t i=0; i<things.size(); ++i) {
-    primitives[i] = { i, things[i].bounds() };
-  }
+  void from(Builder& bvh, const Things& things) {
+    std::vector<primitive_t> primitives(things.size());
+    for (uint32_t i=0; i<things.size(); ++i) {
+      primitives[i] = { i, things[i].bounds() };
+    }
 
-  geometry_t geometry(primitives, 0, primitives.size());
-  from(geometry, things, bvh);
-}
+    geometry_t geometry(primitives, 0, primitives.size());
+    from(geometry, things, bvh);
+  }
 }

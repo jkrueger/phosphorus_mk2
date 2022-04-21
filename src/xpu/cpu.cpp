@@ -46,7 +46,7 @@ struct cpu_t::details_t {
 
 template<typename Accel>
 struct tile_renderer_t {
-  typedef spt::state_t<> integrator_state_t;
+  typedef spt::state_t integrator_state_t;
 
   static const uint32_t ALLOCATOR_SIZE = 1024*1024*100; // 100MB
   
@@ -66,11 +66,10 @@ struct tile_renderer_t {
   integrator_state_t* integrator_state;
 
   // per tile state
-  allocator_t      allocator;
-  active_t<>       active;
-  ray_t<>*         rays;
-  interaction_t<>* primary;
-  interaction_t<>* hits;
+  allocator_t    allocator;
+  rays_t         rays;
+  interactions_t primary;
+  interactions_t hits;
 
   // output buffer for the rendered tile
   render_buffer_t buffer;
@@ -91,7 +90,7 @@ struct tile_renderer_t {
     , allocator(ALLOCATOR_SIZE)
     , buffer(frame.tiles->format)
   {
-    integrator_state = new(allocator) spt::state_t<>(&scene, frame.sampler);
+    integrator_state = new(allocator) spt::state_t(&scene, frame.sampler);
 
     channels.primary = buffer.channel(render_buffer_t::PRIMARY);
     channels.normals = buffer.channel(render_buffer_t::NORMALS);
@@ -99,9 +98,9 @@ struct tile_renderer_t {
 
   /* allocate dynamic memory used to render a tile */
   inline void prepare_tile(const job::tiles_t::tile_t& tile) {
-    rays = new(allocator) ray_t<>();
-    primary = new(allocator) interaction_t<>();
-    hits = new(allocator) interaction_t<>();
+    rays.allocate(allocator);
+    primary.allocate(allocator);
+    hits.allocate(allocator);
 
     // memset(primary, 0, sizeof(interaction_t<>));
 
@@ -118,8 +117,6 @@ struct tile_renderer_t {
   , uint32_t sample
   , const scene_t& scene)
   {
-    active.reset(0);
-
     integrator_state->reset();
 
     // memset(hits, 0, sizeof(interaction_t<>));
@@ -145,12 +142,12 @@ struct tile_renderer_t {
    * compute radiance values -> generate new paths vertices 
    *
    */
-  inline void trace_rays(const scene_t& scene, interaction_t<>* out) {
-    trace(rays, active);
-    shade(allocator, scene, active, rays, out);
-    prepare_occlusion_queries(integrator_state, active, primary, out, rays);
-    trace(rays, active);
-    integrate(integrator_state, active, primary, out, rays);
+  inline void trace_rays(const scene_t& scene, interactions_t& out) {
+    trace(rays, integrator_state->active);
+    shade(allocator, scene, integrator_state->active, rays, out);
+    prepare_occlusion_queries(integrator_state, primary, out, rays);
+    trace(rays, integrator_state->active);
+    integrate(integrator_state, primary, out, rays);
   }
 
   inline void render_tile(const job::tiles_t::tile_t& tile, const scene_t& scene) {
@@ -164,7 +161,7 @@ struct tile_renderer_t {
       prepare_sample(tile, j, scene);
       trace_primary_rays(scene);
 
-      while (active.has_live_paths()) {
+      while (integrator_state->has_live_paths()) {
         // clear temporary shading data, for every path segment
         allocator_scope_t inner_scope(allocator);
         trace_and_advance_paths(scene);
@@ -175,24 +172,14 @@ struct tile_renderer_t {
       for (auto y=0; y<tile.h; ++y) {
         for (auto x=0; x<tile.w; ++x) {
           const auto k = y * tile.w + x;
-          const auto r = integrator_state->r.at(k);
+          const auto r = integrator_state->r(k);
 
           if (channels.primary) {
-            // if (std::isnan(r.x) || std::isnan(r.y) || std::isnan(r.z)) {
-            //   std::cout << "Path is Nan" << std::endl;
-            // }
-            // if (std::isinf(r.x) || std::isinf(r.y) || std::isinf(r.z)) {
-            //   std::cout << "Path is Nan" << std::endl;
-            // }
-            // if (r.x > 1000.0f || r.y > 1000.0f || r.z > 1000.0f) {
-            //   std::cout << "Path is Firefly" << std::endl;
-            // }
-
             channels.primary->add(x, y, r * (1.0f / (spp * pps)));
           }
 
-          if (channels.normals && primary->is_hit(k)) {
-            channels.normals->set(x, y, primary->n.at(k));
+          if (channels.normals && primary[k].is_hit()) {
+            channels.normals->set(x, y, primary[k].n);
           }
         }
       }

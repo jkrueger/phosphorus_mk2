@@ -76,12 +76,12 @@ namespace camera {
   }
 
   struct perspective_kernel_t {
-    template<typename Tile, typename Samples, int N>
+    template<typename Tile, typename Samples>
     inline void operator()(
         const camera_t& camera
       , const Tile& tile
       , const Samples& samples
-      , ray_t<N>* rays)
+      , rays_t& rays)
     {
       __aligned(32) static const float onev[] = {
         -1,-1,-1,-1,-1,-1,-1,-1
@@ -95,11 +95,9 @@ namespace camera {
         0,1,2,3,4,5,6,7
       };
 
-      const auto max  = simd::floatv_t(std::numeric_limits<float>::max());
-
       const simd::matrix44v_t m(camera.to_world);
 
-      const int32_t s = ray_t<N>::step;
+      const int32_t s = SIMD_WIDTH;
 
       auto film_sample = samples.film;
       auto lens_sample = samples.lens;
@@ -149,7 +147,7 @@ namespace camera {
           p = simd::transform_point(m, p);
           d = simd::transform_vector(m, d);
           
-          rays->reset(off, p, d, max, simd::int32v_t(0));
+          rays.reset(off, p, d);
 
           sx = simd::add(sx, step);
         }

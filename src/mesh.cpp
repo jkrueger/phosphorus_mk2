@@ -153,18 +153,10 @@ simd::vector3v_t mesh_t::barycentrics_to_point(
 }
 
 void mesh_t::shading_parameters(
-  const ray_t<>* rays
-, interaction_t<>* hits
-, uint32_t i) const
+  const ray_t& ray
+, interaction_t& hit) const
 {
-  Imath::V3f n;
-  Imath::V2f st;
-
-  shading_parameters(surface_desc_t{rays, i}, n, st, hits->xform[i]);
-
-  hits->n.from(i, n);
-  hits->s[i] = st.x;
-  hits->t[i] = st.y;
+  shading_parameters(surface_desc_t{ray}, hit.n, hit.st, hit.xform);
 }
 
 void mesh_t::shading_parameters(
@@ -270,7 +262,9 @@ triangle_t::triangle_t(const mesh_t* m, uint32_t set, uint32_t face)
   : mesh(m)
   , set(set)
   , face(face)
-{}
+{
+  std::cout << "FACE: " << face << std::endl;
+}
 
 uint32_t triangle_t::meshid() const {
   return mesh->id;

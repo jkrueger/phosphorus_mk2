@@ -18,36 +18,59 @@
  * this code could probably use a complete rewrite
  */
 namespace spt {
+  /* Stores values that describe the state of a single path in the 
+   * pipeline */
+  struct path_state_t {
+    uint16_t depth; // the current depth of the path at an index
+    uint16_t path;  // the number of paths traced at index
+
+    Imath::V3f beta; // the contribution of the current path vertex
+    Imath::V3f r;    // accumulated radiance over all computed paths
+
+    inline void reset() {
+      depth = 0;
+      beta = Imath::V3f(1.0f);
+      r = Imath::V3f(0.0f);
+    }
+
+    inline void decend() {
+      ++depth;
+    }
+  };
+
   /* This stores some state needed by the path integrator */
-  template<int N = 1024>
   struct state_t {
+    static const uint32_t size = config::STREAM_SIZE;
+
     const scene_t* scene;
     sampler_t* sampler;
 
-    uint16_t depth[N]; // the current depth of the path at an index
-    uint16_t path[N];  // the number of paths traced at index
+    // states of all paths in the pipeline
+    path_state_t path[size];
+
+    // the number of paths traced at index
+    uint16_t num_paths[size];
 
     // light samples for the current integrator iteration
-    sampler_t::light_sample_t light_samples[N];
+    sampler_t::light_sample_t light_samples[size];
 
-    soa::vector3_t<N> beta; // the contribution of the current path vertex
-    soa::vector3_t<N> r;    // accumulated radiance over all computed paths
-
-    active_t<> dead;
+    // currently active paths
+    active_t active;
+    // paths that got terminated, and can be reused to
+    // sample a new path
+    active_t dead;
 
     inline state_t(const scene_t* scene, sampler_t* sampler)
       : scene(scene), sampler(sampler)
     {}
 
     inline void reset() {
-      memset(depth, 0, sizeof(depth));
-      memset(path, 0, sizeof(path));
-      memset(&r, 0, sizeof(r));
-
-      for (auto i=0; i<N; ++i) {
-        beta.from(i, Imath::V3f(1.0f));
+      for (auto i=0; i<size; ++i) {
+        path[i].reset();
+        num_paths[i] = 0;
       }
 
+      active.reset();
       dead.clear();
     }
 
@@ -56,7 +79,11 @@ namespace spt {
     }
 
     inline decltype(auto) fresh_light_samples() {
-      return sampler->fresh_light_samples(scene, light_samples, N);
+      return sampler->fresh_light_samples(scene, light_samples, size);
+    }
+
+    inline bool has_live_paths() const {
+      return active.has_active();
     }
 
     inline void mark_for_revive(uint32_t i) {
@@ -64,9 +91,13 @@ namespace spt {
     }
 
     inline void revive(uint32_t i) {
-      depth[i] = 0;
-      path[i]++;
-      beta.from(i, Imath::V3f(1.0f));
+      ++num_paths[i];
+      path[i].depth = 0;
+      path[i].beta = Imath::V3f(1.0f);
+    }
+
+    inline Imath::V3f r(uint32_t k) const {
+      return path[k].r;
     }
   };
 
@@ -78,10 +109,10 @@ namespace spt {
     {}
 
     inline void revive_dead_paths(
-      state_t<>* state
-    , active_t<>& active 
-    , const interaction_t<>* primary
-    , interaction_t<>* hits) const
+      state_t* state
+    , active_t& active 
+    , const interactions_t& primary
+    , interactions_t& hits) const
     {
       assert(active.num + state->dead.num <= active_t<>::size);
 
@@ -89,8 +120,8 @@ namespace spt {
         const auto pixel = state->dead.index[i];
         const auto index = active.num;
 
-        if (primary->is_hit(pixel)) {
-          hits->from(primary, pixel, index);
+        if (primary[pixel].is_hit()) {
+          // hits[pixel].from(primary, index);
           state->revive(pixel);
           active.add(pixel);
         }
@@ -100,12 +131,13 @@ namespace spt {
     }
 
     inline void operator()(
-      state_t<>* state
-    , active_t<>& active
-    , const interaction_t<>* primary
-    , interaction_t<>* hits
-    , ray_t<>* rays) const
+      state_t* state
+    , const interactions_t& primary
+    , interactions_t& hits
+    , rays_t& rays) const
     {
+      auto& active = state->active;
+
       // mark dead paths as alive, so we can generate new shadow rays
       // for these paths
       revive_dead_paths(state, active, primary, hits);
@@ -114,22 +146,22 @@ namespace spt {
       const auto samples = state->fresh_light_samples();
 
       for (auto i=0; i<active.num; ++i) {
-        const auto n = hits->n.at(i);
-        const auto p = offset(hits->p.at(i), n);
+        const interaction_t& hit = hits[i];
+        ray_t& ray = rays[i];
+
+        const auto p = offset(hit.p, hit.n);
 
         auto wi = samples->light->setup_shadow_ray(p, samples[i]);
-
         const auto d  = wi.length() - 0.0001f;
-
         wi.normalize();
 
-        rays->reset(i, p, wi, d);
+        ray.reset(p, wi, d);
 
-        if (hits->is_hit(i) && in_same_hemisphere(n, wi)) {
-          rays->shadow(i);
+        if (hit.is_hit() && in_same_hemisphere(hit.n, wi)) {
+          ray.shadow();
         }
         else {
-          rays->mask(i);
+          ray.mask();
         }
       }
     }
@@ -145,36 +177,44 @@ namespace spt {
     {}
 
     inline void operator()(
-      state_t<>* state
-    , active_t<>& active
-    , interaction_t<>* primary
-    , interaction_t<>* hits
-    , ray_t<>* samples) const
+      state_t* state
+    , const interactions_t& primary
+    , const interactions_t& hits
+    , rays_t& samples) const
     {
+      auto& active = state->active;
       const auto num = active.clear();
 
       for (auto i=0; i<num; ++i) {
         const auto index = active.index[i];
 
-        auto out = state->r.at(index);
+        auto& path = state->path[index];
 
-        if (hits->is_hit(i)) {
+        const auto& hit  = hits[i];
+        const auto& from = samples[i];
+
+        auto& to = samples[active.num];
+        const auto& light_sample = state->light_samples[active.num];
+
+        auto out = path.r;
+
+        if (hit.is_hit()) {
           // add direct lighting to path vertex
-          if (state->depth[index] == 0 || hits->is_specular(i)) {
-            out += state->beta.at(index) * hits->e.at(i);
+          if (path.depth == 0 || hit.is_specular()) {
+            out += path.beta * hit.e;
           }
 
           // compute direct light contribution at the current
           // path vertex. this gets modulated by the current path weight
           // and added to the path radiance
-          if (!samples->is_occluded(i)) {
-  	        out += state->beta.at(index) * li(state, samples, hits, i);
+          if (!from.is_occluded()) {
+  	        out += path.beta * li(state, from, hit, light_sample);
           }
 
-          ++state->depth[index];
+          ++path.depth;
 
           // check if we have to terminate the path
-          if (sample_bsdf(state, hits, samples, index, i, active.num)) {
+          if (sample_bsdf(state, hit, to, index)) {
             active.add(index);
           }
 
@@ -184,44 +224,31 @@ namespace spt {
         }
         else {
           // add environment lighting
-          out += state->beta.at(index) * hits->e.at(i);
+          out += path.beta * hit.e;
 
           // if ((state->path[index]+1) < paths_per_sample) {
           //   state->mark_for_revive(index);
           // }
         }
 
-        state->r.from(index, out);
+        path.r = out;
       }
     }
 
     Imath::Color3f li(
-      state_t<>* state 
-    , ray_t<>* samples
-    , interaction_t<>* hits
-    , uint32_t to) const
+      state_t* state 
+    , const ray_t& ray
+    , const interaction_t& hit
+    , const sampling::details::light_sample_t& sample) const
     {
-      assert(state && samples && hits);
-
-      const auto bsdf = hits->bsdf[to]; 
-      const auto p    = samples->p.at(to);
-      const auto wi   = samples->wi.at(to);
-      const auto wo   = hits->wi.at(to);
-      const auto n    = hits->n.at(to);
-      const auto d    = samples->d[to];
-
-      assert(bsdf);
-
       // should never happen
-      if (!bsdf) {
-        throw std::runtime_error("NO BSDF!");
-        return Imath::Color3f(0.0f);
+      if (!hit.bsdf) {
+        throw std::runtime_error("Hitpoint doesn't have a BSDF");
+        // return Imath::Color3f(0.0f);
       }
 
-      const auto& sample = state->light_samples[to];
-
-      const auto f = bsdf->f(wi, wo);
-      const auto e = sample.light->le(*state->scene, sample, wi);
+      const auto f = hit.bsdf->f(ray.wi, hit.wi);
+      const auto e = sample.light->le(*state->scene, sample, ray.wi);
 
       const auto pdf = sample.pdf; // * d * d;
 
@@ -229,30 +256,19 @@ namespace spt {
     }
 
     bool sample_bsdf(
-      state_t<>* state
-    , const interaction_t<>* hits
-    , ray_t<>* rays
-    , uint32_t index
-    , uint32_t from 
-    , uint32_t to) const
+      state_t* state
+    , const interaction_t& hit
+    , ray_t& ray
+    , uint32_t index) const
     {
-      bsdf_t* bsdf;
-      Imath::V3f p;
-      Imath::V3f wi;
-      Imath::V3f n;
       Imath::Color3f beta;
 
       if (terminate_path(state, index)) {
         return false;
       }
 
-      p = hits->p.at(from);
-      wi = hits->wi.at(from);
-      n = hits->n.at(from);
-      bsdf = hits->bsdf[from];
-
-      beta = state->beta.at(index);
-      if (!bsdf) {
+      beta = state->path[index].beta;
+      if (!hit.bsdf) {
         return false;
       }
 
@@ -262,32 +278,33 @@ namespace spt {
       Imath::V2f sample = state->sampler->sample2();
 
       // sample the bsdf based on the previous path direction
-      const auto f = bsdf->sample(sample, wi, sampled, pdf, flags);
+      const auto f = hit.bsdf->sample(sample, hit.wi, sampled, pdf, flags);
 
       if (color::is_black(f) || pdf == 0.0f) {
         return false;
       }
 
-      const auto weight = n.dot(sampled);
+      const auto weight = hit.n.dot(sampled);
 
-      state->beta.from(index, beta * (f * (std::fabs(weight) / pdf)));
+      state->path[index].beta = beta * (f * (std::fabs(weight) / pdf));
 
-      rays->reset(to, offset(p, n, weight < 0.0f), sampled);
-      rays->specular_bounce(to, bsdf_t::is_specular(flags));
+      ray.reset(offset(hit.p, hit.n, weight < 0.0f), sampled);
+      ray.specular_bounce(bsdf_t::is_specular(flags));
 
       return true;
     }
 
     inline bool terminate_path(
-      state_t<>* state
+      state_t* state
     , uint32_t index) const
     {
       auto w = 1.0f;
-      const auto beta = state->beta.at(index);
+      auto& beta  = state->path[index].beta;
+      auto& depth = state->path[index].depth;
 
-      bool alive = state->depth[index] < max_depth;
+      bool alive = depth < max_depth;
       if (alive) {
-        if (state->depth[index] >= 3) {
+        if (depth >= 3) {
           float q = std::max((float) 0.05f, 1.0f - color::y(beta));
           alive = state->sampler->sample() >= q;
           if (alive) {
@@ -296,7 +313,7 @@ namespace spt {
         }
       }
 
-      state->beta.from(index, beta * w);
+      beta = beta * w;
 
       return !alive;
     }

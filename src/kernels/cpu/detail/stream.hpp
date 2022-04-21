@@ -22,10 +22,10 @@ namespace stream {
     }
 
     template<typename T>
-    inline void init(const active_t<>& a, const T* stream) {
+    inline void init(const active_t& a, const T& rays) {
       num[0] = 0;
       for (auto i=0; i<a.num; ++i) {
-        if (!stream->is_masked(i)) {
+        if (!rays[i].is_masked()) {
           active[0][num[0]++] = i;
         }
       }

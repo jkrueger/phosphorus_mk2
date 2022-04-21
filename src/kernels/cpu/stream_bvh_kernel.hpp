@@ -18,9 +18,11 @@ struct stream_mbvh_kernel_t {
 
   /* find the closest intersection point for all rays in the
    * current work item in the pipeline */
-  void trace(ray_t<>* rays, active_t<>& active) const;
+  void trace(soa::ray_t& packed, rays_t& out, const active_t& active) const;
 
-  inline void operator()(ray_t<>* rays, active_t<>& active) const {
-    trace(rays, active);
+  inline void operator()(rays_t& rays, const active_t& active) const {
+    // construct SOA formatted ray stream
+    soa::ray_t packed(rays, active);
+    trace(packed, rays, active);
   }
 };

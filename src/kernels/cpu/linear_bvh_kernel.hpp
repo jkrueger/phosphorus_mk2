@@ -18,9 +18,9 @@ struct linear_mbvh_kernel_t {
 
   /* find the closest intersection point for all rays in the
    * current work item in the pipeline */
-  void trace(ray_t<>* rays, active_t<>& active) const;
+  void trace(rays_t& rays, active_t& active) const;
 
-  inline void operator()(ray_t<>* rays, active_t<>& active) const {
+  inline void operator()(rays_t& rays, active_t& active) const {
     trace(rays, active);
   }
 };

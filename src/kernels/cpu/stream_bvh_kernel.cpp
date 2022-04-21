@@ -14,11 +14,11 @@ struct stream_mbvh_kernel_t::details_t{
 
 /* Implements MBVH-RS algorithm for tracing a set of rays through 
  * the scene */
-template<typename Stream>
 void intersect(
-  stream_mbvh_kernel_t::details_t* state
-  , Stream* stream
-  , const active_t<>& active
+    stream_mbvh_kernel_t::details_t* state
+  , soa::ray_t& stream
+  , rays_t& out
+  , const active_t& active
   , const accel::mbvh_t* bvh)
 {
   typedef simd::float_t<accel::mbvh_t::width> float_t;
@@ -27,7 +27,7 @@ void intersect(
   auto& tasks = state->tasks;
 
   // set initial lane for root node, including all rays
-  lanes.init(active, stream);
+  lanes.init(active, out);
 
   // all rays were masked
   if (lanes.num[0] == 0) {
@@ -58,7 +58,7 @@ void intersect(
 
         const auto ray = *todo;
 
-        if (stream->is_shadow(ray) && stream->is_hit(ray)) {
+        if (out[ray].is_shadow() && out[ray].is_hit()) {
           ++todo;
           continue;
         }
@@ -66,9 +66,9 @@ void intersect(
         auto hits =
         simd::intersect<accel::mbvh_t::width>(
           bounds
-        , stream->p.v_at(ray)
-        , stream->wi.v_at(ray).rcp()
-        , stream->d[ray]
+        , stream.p.v_at(ray)
+        , stream.wi.v_at(ray).rcp()
+        , stream.d[ray]
         , dist);
 
         num_active = num_active + (one & hits);
@@ -129,10 +129,10 @@ void intersect(
 
         do {
           if (num < 8) {
-            bvh->triangles[index].iterate_rays(stream, begin, num);
+            bvh->triangles[index].iterate_rays(stream, out, begin, num);
     	    }
     	    else {
-    	      bvh->triangles[index].iterate_triangles(stream, begin, num);
+    	      bvh->triangles[index].iterate_triangles(stream, out, begin, num);
     	    }
           
           // DEBUG: bvh->triangles[index].baseline(stream, begin, num);
@@ -156,6 +156,6 @@ stream_mbvh_kernel_t::~stream_mbvh_kernel_t() {
   delete details;
 }
 
-void stream_mbvh_kernel_t::trace(ray_t<>* rays, active_t<>& active) const {
-  intersect(details, rays, active, bvh);
+void stream_mbvh_kernel_t::trace(soa::ray_t& packed, rays_t& out, const active_t& active) const {
+  intersect(details, packed, out, active, bvh);
 }

@@ -71,9 +71,10 @@ namespace accel {
        * Intersect each ray with each triangle stored in this accelerator, 
        * one by one. This is mostly here as a baseline algorithm to verify 
        * the vectorized implementations  */
-      template<typename T>
+      template<typename T, typename Out>
       inline void baseline(
-        T* stream
+        T& stream
+      , Out& out
       , uint32_t* indices
       , uint32_t num_rays) const
       {
@@ -83,7 +84,7 @@ namespace accel {
 
             auto v0v1 = _e0.at(j);
             auto v0v2 = _e1.at(j);
-            auto p    = stream->wi.at(index).cross(v0v2);
+            auto p    = stream.wi.at(index).cross(v0v2);
 
             auto det = v0v1.dot(p);
 
@@ -93,7 +94,7 @@ namespace accel {
 
             auto ood = 1.0f / det;
 
-            auto t = stream->p.at(index) - _v0.at(j);
+            auto t = stream.p.at(index) - _v0.at(j);
 
             auto u = t.dot(p) * ood;
             if (u < 0.0f || u > 1.0f) {
@@ -102,29 +103,32 @@ namespace accel {
 
             auto q = t.cross(v0v1);
 
-            auto v = stream->wi.at(index).dot(q) * ood;
+            auto v = stream.wi.at(index).dot(q) * ood;
             if (v < 0.0f || (u + v) > 1.0f) {
               continue;
             }
 
             const auto d = v0v2.dot(q) * ood;
 
-            if (d < 0.0f || d >= stream->d[index]) {
+            if (d < 0.0f || d >= stream.d[index]) {
               continue;
             }
 
-            if (!stream->is_shadow(index)) {
-              stream->set_surface(index, meshid[j], faceid[j], u, v);
+            if (!out[index].is_shadow()) {
+              out[index].set_surface(meshid[j], faceid[j], u, v);
             }
-	        
-            stream->hit(index, d);
+	          
+            out[index].hit(d);
+
+            stream.set_max_distance(index, d);
           }
         }
       }
       
-      template<typename T>
+      template<typename T, typename Out>
       inline void iterate_rays(
-	      T* stream
+	      T& stream
+      , Out& out
       , uint32_t* indices
       , uint32_t num_rays) const
       {
@@ -141,10 +145,10 @@ namespace accel {
       	for (auto i=0; i<num_rays; ++i) {
       	  const auto index = indices[i];
 
-      	  const auto o  = stream->p.v_at(index);
-      	  const auto wi = stream->wi.v_at(index);
+      	  const auto o  = stream.p.v_at(index);
+      	  const auto wi = stream.wi.v_at(index);
 
-      	  const simd::float_t<N> d(stream->d[index]);
+      	  const simd::float_t<N> d(stream.d[index]);
 
       	  const auto t   = o - v0;
       	  const auto p   = wi.cross(e1);
@@ -167,7 +171,7 @@ namespace accel {
       	    __aligned(32) float dists[N];
       	    ds.store(dists);
 
-      	    float closest = stream->d[index];
+      	    float closest = stream.d[index];
 
       	    int idx = -1;
       	    while(mask != 0) {
@@ -185,24 +189,26 @@ namespace accel {
       	      us.store(u);
       	      vs.store(v);
 
-              if (!stream->is_shadow(index)) {
-                stream->set_surface(
-                  index
-                , meshid[idx]
+              if (!out[index].is_shadow()) {
+                out[index].set_surface(
+                  meshid[idx]
                 , faceid[idx]
                 , u[idx]
                 , v[idx]);
               }
 
-      	      stream->hit(index, closest);
+      	      out[index].hit(closest);
+
+              stream.set_max_distance(index, closest);
       	    }
       	  }
       	}
       }
 
-      template<typename Stream>
+      template<typename T, typename Out>
       inline void iterate_triangles(
-        Stream* stream
+        T& stream
+      , Out& out
       , uint32_t* indices
       , uint32_t num_rays) const
       {
@@ -218,10 +224,10 @@ namespace accel {
 
       	const auto rays = simd::int32_t<N>::loadu((int32_t*) indices);
 
-      	const auto o  = stream->p.gather(rays);
-      	const auto wi = stream->wi.gather(rays);
+      	const auto o  = stream.p.gather(rays);
+      	const auto wi = stream.wi.gather(rays);
       	
-      	simd::float_t<N> d(stream->d, rays);
+      	simd::float_t<N> d(stream.d, rays);
       	simd::int32_t<N> j((int32_t) -1);
 
       	for (auto i=0; i<num; ++i) {
@@ -272,16 +278,17 @@ namespace accel {
       	    const auto x = indices[r];
       	    const auto t = ts[r];
 
-            if (!stream->is_shadow(x)) {
-              stream->set_surface(
-                x
-              , meshid[t]
+            if (!out[x].is_shadow()) {
+              out[x].set_surface(
+                meshid[t]
               , faceid[t]
               , us[r]
               , vs[r]);
             }
             
-      	    stream->hit(x, ds[r]);
+      	    out[x].hit(ds[r]);
+
+            stream.set_max_distance(x, ds[r]);
       	  }
       	}
       }
