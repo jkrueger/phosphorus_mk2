@@ -262,9 +262,7 @@ triangle_t::triangle_t(const mesh_t* m, uint32_t set, uint32_t face)
   : mesh(m)
   , set(set)
   , face(face)
-{
-  std::cout << "FACE: " << face << std::endl;
-}
+{}
 
 uint32_t triangle_t::meshid() const {
   return mesh->id;
