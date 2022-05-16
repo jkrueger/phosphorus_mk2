@@ -20,6 +20,8 @@ struct parsed_options_t {
   bool progressive;
   // render a separate output for normals
   bool render_normals;
+  // render as if every surface is a diffuse reflector
+  bool render_diffuse_scene;
   // print statistics while rendering
   bool verbose;
   // number of pixel samples.
@@ -35,6 +37,7 @@ struct parsed_options_t {
     , single_threaded(false)
     , progressive(false)
     , render_normals(false)
+    , render_diffuse_scene(false)
     , verbose(false)
     , samples_per_pixel(DEFAULT_SAMPLES_PER_PIXEL)
     , paths_per_sample(DEFAULT_PATHS_PER_SAMPLE)

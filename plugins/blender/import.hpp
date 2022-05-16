@@ -321,13 +321,32 @@ namespace blender {
       return mesh;
     }
 
+    void map_inputs(BL::ShaderNode& node, const shader::compiler_t* compiler, std::unordered_map<std::string, shader::socket_t>& inputs) {
+      BL::Node::inputs_iterator socket;
+      for (node.inputs.begin(socket); socket!=node.inputs.end(); ++socket) {
+        for (auto& mapping : compiler->input_socket(*socket)) {
+          inputs.insert(std::make_pair(socket->identifier(), std::move(mapping)));
+        }
+      }
+    }
+
+    void map_outputs(BL::ShaderNode& node, const shader::compiler_t* compiler, std::unordered_map<std::string, shader::socket_t>& outputs) {
+      BL::Node::outputs_iterator socket;
+      for (node.outputs.begin(socket); socket!=node.outputs.end(); ++socket) {
+        if (const auto& mapping = compiler->output_socket(*socket)) {
+          outputs.insert(std::make_pair(socket->identifier(), std::move(mapping.value())));
+        }
+      }
+    }
+
     void shader_tree(
       BL::ShaderNodeTree& tree
     , BL::Depsgraph& graph
     , BL::Scene& scene
     , material_t::builder_t::scoped_t& builder)
     {
-      std::unordered_map<std::string, const shader::compiler_t*> compilers;
+      std::unordered_map<std::string, shader::socket_t> inputs;
+      std::unordered_map<std::string, shader::socket_t> outputs;
 
       std::unordered_map<void*, std::list<PointerRNA>> in;
       std::unordered_map<void*, std::list<PointerRNA>> out;
@@ -376,25 +395,39 @@ namespace blender {
         sorted.push_back(node);
       }
 
-      for (auto i=sorted.begin(); i!=sorted.end(); ++i) {
-        BL::ShaderNode node(*i);
+      for (auto& i : sorted) {
+        BL::ShaderNode node(i);
         if (node.is_a(&RNA_ShaderNodeOutputMaterial) ||
             node.is_a(&RNA_ShaderNodeOutputWorld)) {
           continue;
         }
         else if (node.is_a(&RNA_ShaderNodeGroup)) {
-          // TODO: log not supported
+          BL::ShaderNodeTree node_tree = BL::ShaderNodeTree(((BL::NodeGroup) node).node_tree());
+          shader_tree(node_tree, graph, scene, builder);
+
+          if (const auto compiler = shader::compiler_t::factory(node)) {
+            compiler->compile(node, builder, scene);
+            map_inputs(node, compiler, inputs);
+            map_outputs(node, compiler, outputs);
+          }
         }
         else if (node.is_a(&RNA_NodeGroupInput)) {
-          // TODO: log not supported
+          if (const auto compiler = shader::compiler_t::factory(node)) {
+            compiler->compile(node, builder, scene);
+            map_outputs(node, compiler, outputs);
+          }
         }
         else if (node.is_a(&RNA_NodeGroupOutput)) {
-          // TODO: log not supported
+          if (const auto compiler = shader::compiler_t::factory(node)) {
+            compiler->compile(node, builder, scene);
+            map_inputs(node, compiler, inputs);
+          }
         }
         else {
           if (const auto compiler = shader::compiler_t::factory(node)) {
             compiler->compile(node, builder, scene);
-            compilers.insert({node.name(), compiler});
+            map_inputs(node, compiler, inputs);
+            map_outputs(node, compiler, outputs);
           }
         }
       }
@@ -402,59 +435,49 @@ namespace blender {
       if (auto output_node = tree.get_output_node(2)) {
         if (const auto compiler = shader::compiler_t::factory(output_node)) {
           compiler->compile(output_node, builder, scene);
-          compilers.insert({output_node.name(), compiler});
+          map_inputs(output_node, compiler, inputs);
         }
       }
 
       for (tree.links.begin(link); link!=tree.links.end(); ++link) {
-        if (!link->is_valid()) {
+        if (!link->is_valid()
+            || link->to_socket().node().is_a(&RNA_NodeGroupInput)
+            || link->from_socket().node().is_a(&RNA_NodeGroupOutput)) {
+          // skip invalid links, and shader group inputs/outputs, to avoid
+          // double linking
           continue;
         }
 
         auto from_socket = link->from_socket();
-        auto to_socket = link->to_socket();
+        auto to_socket   = link->to_socket();
 
-        auto from_compiler = compilers.find(from_socket.node().name());
-        auto to_compiler = compilers.find(to_socket.node().name());
+        auto from_mapping = outputs.find(from_socket.identifier());
+        auto to_mapping   = inputs.find(to_socket.identifier());
 
-        if (from_compiler == compilers.end() || to_compiler == compilers.end()) {
+        if (from_mapping == outputs.end()) {
           std::cout 
-            << "Can't find compilers for nodes: (" 
-            << from_socket.node().name() << ", " 
-            << to_socket.node().name() << ")" 
-            << std::endl;
-          continue;
-        }
-        
-        const auto outputSocket = from_compiler->second->output_socket(from_socket);
-        const auto inputSockets = to_compiler->second->input_socket(to_socket);
-
-        if (!outputSocket) {
-          std::cout 
-            << "Can't find output socket \'" 
-            << from_socket.identifier() 
+            << "Can't find mapping for output socket: " 
+            << from_socket.identifier()
             << "\' for shader: " 
-            << link->from_socket().node().name() 
+            << from_socket.node().name() 
             << std::endl;
           continue;
         }
 
-        if (inputSockets.empty()) {
+        if (to_mapping == inputs.end()) {
           std::cout 
-            << "Can't find input socket \'" 
+            << "Can't find mapping for input socket: " 
             << to_socket.identifier() 
-            << "\' for shader: " 
-            << link->to_socket().node().name() 
+            << " for shader: " 
+            << to_socket.node().name()
             << std::endl;
           continue;
         }
 
-        for (auto& socket : inputSockets) {
-          builder->connect(
-            outputSocket.value().name(), socket.name(),
-            outputSocket.value().node(), socket.node()
-          );
-        }
+        builder->connect(
+          from_mapping->second.name(), to_mapping->second.name(),
+          from_mapping->second.node(), to_mapping->second.node()
+        );
       }
     }
 
@@ -529,7 +552,6 @@ namespace blender {
           scene.add(material->name, material);
 
           Imath::V3f dir = -get_row(to_world, 2);
-          std::cout << "SUN: " << dir << std::endl;
 
           scene.add(light_t::make_distant(material, dir));
           break;
@@ -663,6 +685,8 @@ namespace blender {
       scene.camera.fov = camera.angle();
       scene.camera.sensor_width = camera.sensor_width();
       scene.camera.sensor_height = camera.sensor_height();
+      scene.camera.clip_near = camera.clip_start();
+      scene.camera.clip_far = camera.clip_end();
 
       if (camera.dof() && camera.dof().use_dof()) {
         float fstop = camera.dof().aperture_fstop();

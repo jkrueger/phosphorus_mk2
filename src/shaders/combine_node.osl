@@ -1,0 +1,12 @@
+shader
+combine_node
+(
+  float r = 0.0,
+  float g = 0.0,
+  float b = 0.0,
+
+  output color out = 0.0
+)
+{
+  out = color(r, g, b);
+}

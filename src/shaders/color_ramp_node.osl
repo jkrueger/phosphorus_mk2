@@ -1,0 +1,21 @@
+#include "color_ramp.h"
+
+shader
+color_ramp_node
+ [[ string help = "Maps a scalar to a color using a color gradient" ]]
+(
+  float fac = 0
+    [[ string help = "Input factor" ]],
+
+  color ramp_color[] = {0}
+    [[ string help = "Input color gradient" ]],
+
+  int interpolate = 1
+    [[ string help = "If set to 1, will interpolate between colors in the lookup table" ]],
+
+  output color out = 0
+    [[ string help = "Output color" ]]
+)
+{
+  out = rgb_ramp_lut(ramp_color, fac, interpolate, 0);
+}

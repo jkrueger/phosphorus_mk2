@@ -2,7 +2,75 @@
 shader principled_bsdf_node
   [[ string help = "Disney Principled BSDF shader" ]]
 (
-  float Metalli8c 
+  color base = 1.0,
+
+  float metallic = 0.0,
+
+  float anisotropic = 0.0,
+
+  float specular = 0.5,
+
+  float specular_tint = 0.0,
+
+  float roughness = 0.0,
+
+  float sheen_weight = 0.0,
+
+  float sheen_tint = 0.5,
+
+  float clearcoat = 0.0,
+
+  float clearcoat_roughness = 0.0,
+
+  float ior = 1.45,
+
+  float transmission = 0.0,
+
+  float transmission_roughness = 0.0,
+
+  normal shading_normal = N,
+
+  normal clearcoat_normal = N,
+
+  output closure color out = 0
 )
 {
+  float diffuse_weight = (1.0 - clamp(metallic, 0.0, 1.0)) * (1.0 - clamp(transmission, 0.0, 1.0));
+
+  float final_transmission = clamp(transmission, 0.0, 1.0) * (1.0 - clamp(metallic, 0.0, 1.0));
+
+  float specular_weight = (1.0 - final_transmission);
+
+  float lum   = luminance(base);
+  color ctint = lum > 0 ? base / lum : color(1.0, 1.0, 1.0);
+
+  float eta = backfacing() ? 1.0 / ior : ior;
+
+  if (diffuse_weight > 1e-5) {
+    // TODO: optionally do subsurface scattering
+    out = base * disney_diffuse(shading_normal);
+
+    out = out + disney_retro(shading_normal, roughness);
+
+    if (sheen_weight > 0.0) {
+      color sheen_color = (1.0 - sheen_tint) * color(1.0, 1.0, 1.0) + sheen_tint * ctint;
+      out = out + sheen_color * sheen_weight * disney_sheen(shading_normal);
+    }
+
+    out = out * diffuse_weight;
+  }
+
+  if (specular_weight > 0.0) {
+    float aspect = sqrt(1.0 - anisotropic * 0.9);
+    float r2 = roughness * roughness;
+
+    float ax = r2 / aspect;
+    float ay = r2 * aspect;
+
+    color cspec0 = lerp(metallic,
+      sqr(eta - 1) / sqr(eta + 1) * lerp(specular_tint, color(1.0, 1.0, 1.0), ctint),
+      base);
+
+    out = out + specular_weight * disney_microfacet(shading_normal, ax, ay, eta, metallic, cspec0);
+  }
 }

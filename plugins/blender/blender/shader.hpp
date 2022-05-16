@@ -29,9 +29,15 @@ namespace blender {
     struct refraction_node_t;
     struct glass_node_t;
     struct mix_rgb_node_t;
+    struct rgb_curves_node_t;
+    struct color_ramp_node_t;
 
     struct image_texture_node_t;
     struct env_texture_node_t;
+
+    struct group_node_t;
+    struct group_input_node_t;
+    struct group_output_node_t;
 
     /* represents a shader node/parameter name pair, that is used
      * to link up shader nodes */
@@ -70,10 +76,14 @@ namespace blender {
 
       inline std::string from_blender_blend_type(int bd) {
         switch(bd) {
+        case BL::ShaderNodeMixRGB::blend_type_MIX:
+          return "mix";
         case BL::ShaderNodeMixRGB::blend_type_MULTIPLY:
           return "mul";
         case BL::ShaderNodeMixRGB::blend_type_ADD:
           return "add";
+        case BL::ShaderNodeMixRGB::blend_type_DARKEN:
+          return "darken";
         default:
           std::cout << "Unsupported blend type. Defaulting to mul" << std::endl;
           return "mul";
@@ -153,16 +163,25 @@ namespace blender {
 
       static const generic_node_t add_shader;
       static const generic_node_t mix_shader;
+      static const generic_node_t const_color;
       static const mix_rgb_node_t mix_rgb;
+      static const rgb_curves_node_t rgb_curves;
+      static const color_ramp_node_t color_ramp;
+      static const generic_node_t transform_point;
+      static const generic_node_t invert;
+      static const generic_node_t split;
+      static const generic_node_t combine;     
       static const generic_node_t luminance;
+      static const generic_node_t gamma;
       static const generic_node_t fresnel;
+      static const generic_node_t principled_bsdf;
       static const generic_node_t diffuse_bsdf;
       static const glossy_node_t glossy_bsdf;
       static const glass_node_t glass_bsdf;
       static const generic_node_t sheen_bsdf;
       static const generic_node_t transparent_bsdf;
       static const refraction_node_t refraction_bsdf;
-      static const generic_node_t emission_bsdf;
+      static const generic_node_t emission;
       static const generic_node_t background;
       static const image_texture_node_t image_texture;
       static const env_texture_node_t env_texture;
@@ -171,6 +190,9 @@ namespace blender {
       static const generic_node_t musgrave_noise_3d;
       static const generic_node_t normal_map;
       static const generic_node_t blackbody;
+      static const group_node_t group;
+      static const group_input_node_t group_input;
+      static const group_output_node_t group_output;
       static const generic_node_t material;
     };
 
@@ -261,6 +283,60 @@ namespace blender {
         BL::ShaderNodeMixRGB mix_node(node.ptr);
 
         builder->parameter("operation", details::from_blender_blend_type(mix_node.blend_type()));
+        generic_node_t::compile(node, builder, scene);
+      }
+    };
+
+    struct color_ramp_node_t : public generic_node_t {
+      color_ramp_node_t()
+       : generic_node_t("color_ramp_node",
+          /* inputs */ {{ "Fac", "fac" }}, 
+          /* outputs */ {{ "Color", "out" }})
+      {}
+
+      void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
+        BL::ShaderNodeValToRGB ramp_node(node);
+        BL::ColorRamp color_ramp(ramp_node.color_ramp());
+
+        std::vector<Imath::Color3f> ramp; ramp.resize(256);
+        std::vector<float> alpha; alpha.resize(256);
+
+        for (auto i=0; i<256; ++i) {
+          float color[4];
+
+          color_ramp.evaluate((float)i / (float)(255), color);
+          ramp[i]  = Imath::V3f(color[0], color[1], color[2]);
+          alpha[i] = color[3];
+        }
+
+        builder->parameter("ramp_color", ramp);
+        generic_node_t::compile(node, builder, scene);
+      }
+    };
+
+    struct rgb_curves_node_t : public generic_node_t {
+      rgb_curves_node_t()
+       : generic_node_t("rgb_curves_node",
+          /* inputs */ {{ "Fac", "fac" }, { "Color", "in" }}, 
+          /* outputs */ {{ "Color", "out" }})
+      {}
+
+      void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
+        BL::ShaderNodeValToRGB ramp_node(node);
+        BL::ColorRamp color_ramp(ramp_node.color_ramp());
+
+        std::vector<Imath::Color3f> ramp; ramp.resize(256);
+        std::vector<float> alpha; alpha.resize(256);
+
+        for (auto i=0; i<256; ++i) {
+          float color[4];
+
+          color_ramp.evaluate((float)i / (float)(255), color);
+          ramp[i]  = Imath::V3f(color[0], color[1], color[2]);
+          alpha[i] = color[3];
+        }
+
+        builder->parameter("ramp_color", ramp);
         generic_node_t::compile(node, builder, scene);
       }
     };
@@ -439,5 +515,80 @@ namespace blender {
 
     struct env_texture_node_t : texture_file_node_t<BL::ShaderNodeTexEnvironment> 
     {};
+
+    struct group_node_t : compiler_t {
+      virtual void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
+        BL::Node::inputs_iterator in;
+        for (node.inputs.begin(in); in!=node.inputs.end(); ++in) {
+          set_default(*in, "in", builder);
+          builder->shader(passthrough_shader(*in), in->identifier(), "surface");
+        }
+
+        BL::Node::outputs_iterator out;
+        for (node.outputs.begin(out); out!=node.outputs.end(); ++out) {
+          builder->shader(passthrough_shader(*out), out->identifier(), "surface");
+        }
+      }
+
+      inline std::string passthrough_shader(BL::NodeSocket& socket) const {
+        const auto& type = socket.type();
+        switch(type) {
+        case BL::NodeSocket::type_VALUE:
+          return "passthrough_float_node";
+        case BL::NodeSocket::type_INT:
+          return "passthrough_int_node";
+        case BL::NodeSocket::type_RGBA:
+          return "passthrough_color_node";
+        case BL::NodeSocket::type_VECTOR:
+          return "passthrough_vector_node";
+        case BL::NodeSocket::type_STRING:
+          return "passthrough_string_node";
+        case BL::NodeSocket::type_SHADER:
+          return "passthrough_shader_node";
+        default:
+          std::cout
+            << "Don't know how to passthrough parameter of type: "
+            << type
+            << std::endl;
+          break;
+        }
+
+        return "";
+      }
+
+      virtual sockets_t input_socket(BL::NodeSocket& socket) const {
+        return sockets_t( {{ socket.identifier(), "in" }} );
+      }
+
+      virtual std::optional<socket_t> output_socket(BL::NodeSocket& socket) const {
+        return socket_t{ socket.identifier(), "out" };
+      }
+    };
+ 
+    struct group_input_node_t : compiler_t {
+      virtual void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const
+      {}
+
+      virtual sockets_t input_socket(BL::NodeSocket& socket) const {
+        return sockets_t();
+      }
+
+      virtual std::optional<socket_t> output_socket(BL::NodeSocket& socket) const {
+        return socket_t{ socket.identifier(), "out" };
+      }
+    };
+
+    struct group_output_node_t : compiler_t {
+      virtual void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const
+      {}
+
+      virtual sockets_t input_socket(BL::NodeSocket& socket) const {
+        return sockets_t({{ socket.identifier(), "in" }});
+      }
+
+      virtual std::optional<socket_t> output_socket(BL::NodeSocket& socket) const {
+        return {};
+      }
+    };
   }
 }
