@@ -1,0 +1,11 @@
+shader
+const_color_node
+  [[ string help = "Mostly used to provide constant values from a modelling tool" ]]
+(
+  color in = 0,
+
+  output color out = 0
+)
+{
+  out = in;
+}

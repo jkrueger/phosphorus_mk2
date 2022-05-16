@@ -3,6 +3,7 @@
 #include "state.hpp"
 
 #include "bsdf/lambert.hpp"
+#include "bsdf/disney.hpp"
 #include "bsdf/oren_nayar.hpp"
 #include "bsdf/reflection.hpp"
 #include "bsdf/refraction.hpp"
@@ -42,10 +43,28 @@ Imath::Color3f eval(
       result = lambert::f(param.diffuse, wi, wo);
       break;
     }
+  case bsdf_t::DisneyDiffuse:
+    {
+      pdf = lambert::pdf(param.diffuse, wi, wo);
+      result = disney::diffuse::f(param.diffuse, wi, wo);
+      break;
+    }
+  case bsdf_t::DisneySheen:
+    {
+      pdf = lambert::pdf(param.diffuse, wi, wo);
+      result = disney::sheen::f(param.diffuse, wi, wo);
+      break;
+    }
   case bsdf_t::OrenNayar:
     {
       pdf = oren_nayar::pdf(param.oren_nayar, wi, wo);
       result = oren_nayar::f(param.oren_nayar, wi, wo);
+      break;
+    }
+  case bsdf_t::DisneyRetro:
+    {
+      pdf = lambert::pdf(param.diffuse, wi, wo);
+      result = disney::retro::f(param.disney_retro, wi, wo);
       break;
     }
   case bsdf_t::Microfacet:
@@ -76,6 +95,17 @@ Imath::Color3f eval(
           << param.microfacet.distribution
           << std::endl;
       }
+      break;
+    }
+  case bsdf_t::DisneyMicrofacet:
+    {
+      pdf = ct::pdf(param.microfacet, wi, wo, microfacet::ggx_t());
+      result = ct::f(
+          param.disney_microfacet
+        , wi
+        , wo
+        , disney::microfacet::disney_ggx_t()
+        , disney::microfacet::disney_fresnel_t{param.disney_microfacet.metallic, param.disney_microfacet.cspec0});
       break;
     }
   case bsdf_t::Sheen:
@@ -151,6 +181,9 @@ Imath::Color3f bsdf_t::sample(
 
   switch(type[index]) {
   case Diffuse:
+  case DisneyDiffuse:
+  case DisneySheen:
+  case DisneyRetro:
     result = lambert::sample(p.diffuse, wi, wo, remapped, pdf);
     break;
   case OrenNayar:

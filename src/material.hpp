@@ -45,6 +45,10 @@ struct material_t {
 
     virtual void parameter(
       const std::string& name
+    , const std::vector<Imath::Color3f>& c) = 0;
+
+    virtual void parameter(
+      const std::string& name
     , const std::string& s) = 0;
 
     virtual void add_attribute(const std::string& name) = 0;

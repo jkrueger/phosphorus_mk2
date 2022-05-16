@@ -115,6 +115,8 @@ namespace camera {
 
       auto off = 0;
 
+      const simd::floatv_t min(camera.clip_near);
+
       const auto stepx = simd::load(1.0f / (float)camera.film.width);
       const auto stepy = simd::load(1.0f / (float)camera.film.height);
       const auto ratio = simd::load((float)camera.film.width/(float)camera.film.height);
@@ -146,8 +148,12 @@ namespace camera {
 
           p = simd::transform_point(m, p);
           d = simd::transform_vector(m, d);
+
+          if (camera.clip_near > 0.0f) {
+            p = p + d * min;
+          }
           
-          rays.reset(off, p, d);
+          rays.reset(off, p, d, camera.clip_far);
 
           sx = simd::add(sx, step);
         }

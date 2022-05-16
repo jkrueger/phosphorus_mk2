@@ -28,6 +28,15 @@ namespace bsdf {
       }
     };
 
+    struct disney_retro_t : public lobe_t {
+      static const uint32_t flags = REFLECT | DIFFUSE;
+      
+      float roughness;
+
+      inline void precompute() {
+      }
+    };
+
     struct oren_nayar_t : public lobe_t {
       static const uint32_t flags = REFLECT | DIFFUSE;
 
@@ -97,6 +106,19 @@ namespace bsdf {
           + 0.0171201f * x * x * x
           + 0.000640711f * x * x * x * x;
       }
+    };
+
+    struct disney_microfacet_t : public lobe_t {
+      static const uint32_t flags = GLOSSY | REFLECT;
+
+      float xalpha;
+      float yalpha;
+      float eta;
+      float metallic;
+      Imath::Color3f cspec0;
+
+      inline void precompute() 
+      {}
     };
 
     struct sheen_t : public lobe_t  {

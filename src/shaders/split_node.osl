@@ -1,0 +1,22 @@
+
+shader
+split_node
+ [[ string help = "Splits a color input into into its components" ]]
+(
+  color in = 0
+    [[ string help = "First input color" ]],
+
+  output float r = 0
+    [[ string help = "Red color channel" ]],
+
+  output float g = 0
+    [[ string help = "Green color channel" ]],
+
+  output float b = 0
+    [[ string help = "Blue color channel" ]]
+)
+{
+  r = in.r;
+  g = in.g;
+  b = in.b;
+}

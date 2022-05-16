@@ -19,11 +19,16 @@ mix_color_node
     [[ string help = "Output color" ]]
 )
 {
-  if (operation == "mul") {
+  if (operation == "mix") {
+    Cout = (1-fac) * A + fac * B;
+  } 
+  else if (operation == "mul") {
     Cout = (1-fac) * A + fac * (A * B);
   }
-
-  if (operation == "add") {
+  else if (operation == "add") {
     Cout = (1-fac) * A + fac * (A + B);
+  }
+  else if (operation == "darken") {
+    Cout = mix(A, min(A, B), fac);
   }
 }

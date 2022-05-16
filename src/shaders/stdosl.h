@@ -463,6 +463,11 @@ closure color debug(string tag) BUILTIN;
 closure color holdout() BUILTIN;
 closure color subsurface(float eta, float g, color mfp, color albedo) BUILTIN;
 
+closure color disney_diffuse(normal N) BUILTIN;
+closure color disney_sheen(normal N) BUILTIN;
+closure color disney_retro(normal N, float roughness) BUILTIN;
+closure color disney_microfacet(normal N, float ax, float ay, float eta, float metallic, color cspec) BUILTIN;
+
 // Renderer state
 int backfacing () BUILTIN;
 int raytype (string typename) BUILTIN;
@@ -480,11 +485,15 @@ int getmatrix (string fromspace, output matrix M) {
 // Miscellaneous
 
 float lerp(float t, float a, float b) {
-  return (1.0f - t) * a + t * b;
+  return (1.0 - t) * a + t * b;
 }
 
 color lerp(float t, color a, color b) {
-  return (1.0f - t) * a + t * b;
+  return (1.0 - t) * a + t * b;
+}
+
+float sqr(float x) {
+  return x * x;
 }
 
 #undef BUILTIN

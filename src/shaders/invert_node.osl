@@ -1,0 +1,16 @@
+shader
+invert_node
+(
+  float fac = 1.0
+    [[ string help = "Mix factor between inverted, and original color" ]],
+
+  color in = 0
+    [[ string help = "Input color" ]],
+
+  output color out = 0
+    [[ string help = "Output color" ]]
+)
+{
+  color inv = color(1.0) - in;
+  out = (1-fac) * in + fac * inv;
+}

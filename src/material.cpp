@@ -86,7 +86,7 @@ struct service_t : public RendererServices {
 const ustring service_t::tangent("geom:tangent");
 
 struct material_t::details_t {
-  static const uint32_t PARAMETER_BUFFER_SIZE = 256;
+  static const uint32_t PARAMETER_BUFFER_SIZE = 4096;
   
   static service_t*     service;
   static ShadingSystem* system;
@@ -166,6 +166,19 @@ struct material_t::details_t {
         CLOSURE_FLOAT_PARAM(bsdf::lobes::sheen_t, r),
         CLOSURE_FINISH_PARAM(bsdf::lobes::sheen_t)
       },
+      {
+        CLOSURE_VECTOR_PARAM(bsdf::lobes::disney_retro_t, n),
+        CLOSURE_FLOAT_PARAM(bsdf::lobes::disney_retro_t, roughness),
+        CLOSURE_FINISH_PARAM(bsdf::lobes::disney_retro_t)
+      },
+      {
+        CLOSURE_VECTOR_PARAM(bsdf::lobes::disney_microfacet_t, n),
+        CLOSURE_FLOAT_PARAM(bsdf::lobes::disney_microfacet_t, xalpha),
+        CLOSURE_FLOAT_PARAM(bsdf::lobes::disney_microfacet_t, yalpha),
+        CLOSURE_FLOAT_PARAM(bsdf::lobes::disney_microfacet_t, eta),
+        CLOSURE_FLOAT_PARAM(bsdf::lobes::disney_microfacet_t, metallic),
+        CLOSURE_COLOR_PARAM(bsdf::lobes::disney_microfacet_t, cspec0),
+      },
     };
 
     system->register_closure("emission", bsdf_t::Emissive, params[0], NULL, NULL);
@@ -177,6 +190,10 @@ struct material_t::details_t {
     system->register_closure("refraction", bsdf_t::Refraction, params[4], NULL, NULL);
     system->register_closure("microfacet", bsdf_t::Microfacet, params[5], NULL, NULL);
     system->register_closure("sheen", bsdf_t::Sheen, params[6], NULL, NULL);
+    system->register_closure("disney_diffuse", bsdf_t::DisneyDiffuse, params[1], NULL, NULL);
+    system->register_closure("disney_retro", bsdf_t::DisneyRetro, params[7], NULL, NULL);
+    system->register_closure("disney_sheen", bsdf_t::DisneySheen, params[1], NULL, NULL);
+    system->register_closure("disney_microfacet", bsdf_t::DisneyMicrofacet, params[8], NULL, NULL);
   }
 
   static void attach() {
@@ -250,6 +267,22 @@ struct material_t::details_t {
     	    , component->as<bsdf::lobes::diffuse_t>());
     	  }
     	  break;
+      case bsdf_t::DisneyDiffuse:
+        if (result.bsdf) {
+          result.bsdf->add_lobe(
+            bsdf_t::DisneyDiffuse
+          , cw
+          , component->as<bsdf::lobes::diffuse_t>());
+        }
+        break;
+      case bsdf_t::DisneySheen:
+        if (result.bsdf) {
+          result.bsdf->add_lobe(
+            bsdf_t::DisneySheen
+          , cw
+          , component->as<bsdf::lobes::diffuse_t>());
+        }
+        break;
     	case bsdf_t::OrenNayar:
     	  if (result.bsdf) {
     	    result.bsdf->add_lobe(
@@ -258,14 +291,30 @@ struct material_t::details_t {
           , component->as<bsdf::lobes::oren_nayar_t>());
     	  }
     	  break;
+      case bsdf_t::DisneyRetro:
+        if (result.bsdf) {
+          result.bsdf->add_lobe(
+            bsdf_t::DisneyRetro
+          , cw
+          , component->as<bsdf::lobes::disney_retro_t>());
+        }
+        break;
     	case bsdf_t::Microfacet:
     	  if (result.bsdf) {
-    	    result.bsdf->add_lobe(
+    	    result.bsdf->add_microfacet_lobe(
     	      bsdf_t::Microfacet
     	    , cw
     	    , component->as<bsdf::lobes::microfacet_t>());
     	  }
     	  break;
+      case bsdf_t::DisneyMicrofacet:
+        if (result.bsdf) {
+          result.bsdf->add_lobe(
+            bsdf_t::DisneyMicrofacet
+          , cw
+          , component->as<bsdf::lobes::disney_microfacet_t>());
+        }
+        break;
     	case bsdf_t::Sheen:
     	  if (result.bsdf) {
     	    result.bsdf->add_lobe(
@@ -342,6 +391,30 @@ struct material_builder_t : public material_t::builder_t {
     , src_param
     , dst_layer
     , dst_param);
+  }
+
+  void parameter(
+    const std::string& name
+  , const std::vector<Imath::Color3f>& cs)
+  {
+    const auto& c = cs[0];
+
+    const auto p = material->details->parameters.write_float(c.x);
+    material->details->parameters.write_float(c.y);
+    material->details->parameters.write_float(c.z);
+
+    for (auto i=1; i<cs.size(); ++i) {
+      const auto& c = cs[i];
+      material->details->parameters.write_float(c.x);
+      material->details->parameters.write_float(c.y);
+      material->details->parameters.write_float(c.z);
+    }
+    
+    material_t::details_t::system->Parameter(
+      name
+    , TypeDesc(TypeDesc::FLOAT, TypeDesc::VEC3, TypeDesc::COLOR, cs.size())
+    , p
+    , false);
   }
 
   void parameter(
