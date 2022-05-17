@@ -14,6 +14,7 @@
 
 #include <mikktspace.h>
 
+#include <cmath>
 #include <functional>
 #include <iostream>
 #include <list>
@@ -639,7 +640,7 @@ namespace blender {
 
       Imath::V3f dof_dir = get_row(scene.camera.to_world, 3) - get_row(dof_to_world, 3);
 
-      return std::fabsf(view_dir.dot(dof_dir));
+      return std::fabs(view_dir.dot(dof_dir));
     }
 
     void camera(

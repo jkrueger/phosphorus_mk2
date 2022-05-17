@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ImathBox.h>
+#include <Imath/ImathBox.h>
 
 namespace aabb {
 

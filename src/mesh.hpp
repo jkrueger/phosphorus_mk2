@@ -3,7 +3,7 @@
 #include "state.hpp"
 #include "triangle.hpp"
 
-#include <ImathVec.h>
+#include <Imath/ImathVec.h>
 
 #include <vector>
 

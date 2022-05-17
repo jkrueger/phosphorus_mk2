@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ImathVec.h>
+#include <Imath/ImathVec.h>
 
 #include <cmath>
 

@@ -2,7 +2,7 @@
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-register"
-#include <ImathColor.h>
+#include <Imath/ImathColor.h>
 #pragma clang diagnostic pop
 
 namespace color {

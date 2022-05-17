@@ -480,11 +480,11 @@ int getmatrix (string fromspace, output matrix M) {
 // Miscellaneous
 
 float lerp(float t, float a, float b) {
-  return (1.0f - t) * a + t * b;
+  return (1.0 - t) * a + t * b;
 }
 
 color lerp(float t, color a, color b) {
-  return (1.0f - t) * a + t * b;
+  return (1.0 - t) * a + t * b;
 }
 
 #undef BUILTIN

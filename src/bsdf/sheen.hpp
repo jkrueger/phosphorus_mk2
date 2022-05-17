@@ -4,8 +4,8 @@
 #include "microfacet.hpp"
 #include "math/vector.hpp"
 
-#include <ImathColor.h>
-#include <ImathVec.h>
+#include <Imath/ImathColor.h>
+#include <Imath/ImathVec.h>
 
 namespace microfacet {
   /* Implements a microfacet reflection modek for velvety materials.

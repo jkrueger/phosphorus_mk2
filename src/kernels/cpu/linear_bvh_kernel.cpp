@@ -5,7 +5,7 @@
 #include "math/simd/aabb.hpp"
 #include "utils/compiler.hpp"
 
-#include "ImathBoxAlgo.h"
+#include "Imath/ImathBoxAlgo.h"
 
 linear_mbvh_kernel_t::linear_mbvh_kernel_t(const accel::mbvh_t* bvh)
   : bvh(bvh)

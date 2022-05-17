@@ -122,7 +122,7 @@ namespace blender {
           {
             char buf[1024];
             char *str = RNA_string_get_alloc(
-              &socket.ptr, "default_value", buf, sizeof(buf));
+              &socket.ptr, "default_value", buf, sizeof(buf), nullptr);
             builder->parameter(to, std::string(str));
             break;
           }

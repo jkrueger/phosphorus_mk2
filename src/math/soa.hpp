@@ -4,7 +4,7 @@
 #include "simd.hpp"
 #include "utils/assert.hpp"
 
-#include <ImathVec.h>
+#include <Imath/ImathVec.h>
 
 namespace soa {
   template<int N>

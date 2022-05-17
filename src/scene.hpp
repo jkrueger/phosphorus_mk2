@@ -3,7 +3,7 @@
 #include "triangle.hpp"
 #include "entities/camera.hpp"
 
-#include <ImathSphere.h>
+#include <Imath/ImathSphere.h>
 
 #include <string>
 #include <vector>

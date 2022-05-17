@@ -5,7 +5,7 @@ def init():
     import os.path
 
     path = os.path.dirname(__file__)
-    user_path = os.path.dirname(os.path.abspath(bpy.utils.user_resource('CONFIG', '')))
+    user_path = os.path.dirname(os.path.abspath(bpy.utils.user_resource('CONFIG', path='')))
     resource_path = os.path.dirname(os.path.abspath(bpy.utils.resource_path('LOCAL')))
 
     _phosphoros.init(path, resource_path, user_path, bpy.app.background)

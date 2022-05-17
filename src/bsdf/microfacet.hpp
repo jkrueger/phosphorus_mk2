@@ -5,7 +5,7 @@
 #include "math/orthogonal_base.hpp"
 #include "math/vector.hpp"
 
-#include <ImathColor.h>
+#include <Imath/ImathColor.h>
 
 namespace microfacet {
 

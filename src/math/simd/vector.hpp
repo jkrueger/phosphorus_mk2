@@ -3,7 +3,7 @@
 #include "float8.hpp"
 #include "int8.hpp"
 
-#include <ImathVec.h>
+#include <Imath/ImathVec.h>
 
 #include <xmmintrin.h>
 

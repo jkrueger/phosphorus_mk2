@@ -2,7 +2,7 @@
 
 #include "utils/color.hpp"
 
-#include <ImathVec.h>
+#include <Imath/ImathVec.h>
 
 struct render_buffer_t;
 

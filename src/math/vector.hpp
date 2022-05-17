@@ -2,7 +2,7 @@
 
 #include "utils/algo.hpp"
 
-#include <ImathVec.h>
+#include <Imath/ImathVec.h>
 
 #include <algorithm>
 #include <cmath>

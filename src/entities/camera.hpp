@@ -2,7 +2,7 @@
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-register"
-#include <ImathMatrix.h>
+#include <Imath/ImathMatrix.h>
 #pragma clang diagnostic pop
 
 /* The camera data model, used by the rest of the rendering 

@@ -5,8 +5,8 @@
 #include "math/aabb.hpp"
 #include "math/simd.hpp"
 
-#include <ImathBox.h>
-#include <ImathVec.h>
+#include <Imath/ImathBox.h>
+#include <Imath/ImathVec.h>
 
 #include <algorithm>
 #include <iostream>

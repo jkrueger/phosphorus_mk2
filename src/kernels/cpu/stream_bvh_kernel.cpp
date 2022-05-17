@@ -5,7 +5,7 @@
 #include "math/simd/aabb.hpp"
 #include "utils/compiler.hpp"
 
-#include "ImathBoxAlgo.h"
+#include "Imath/ImathBoxAlgo.h"
 
 struct stream_mbvh_kernel_t::details_t{
   stream::lanes_t<accel::mbvh_t::width> lanes;
