@@ -1,0 +1,10 @@
+
+shader add_node
+(
+  float a = 0.0,
+  float b = 0.0,
+  output float out = 0.0
+)
+{
+  out = a + b;
+}

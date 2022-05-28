@@ -341,6 +341,49 @@ namespace blender {
       }
     };
 
+    struct layer_weight_node_t : public compiler_t {
+      void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
+        BL::ShaderNodeBsdfGlossy lw_node(node.ptr);
+
+        BL::NodeSocket fresnel = lw_node.outputs[0];
+        BL::NodeSocket facing  = lw_node.outputs[1];
+
+        if (fresnel.is_linked()) {
+          set_default_from(node, "Blend", "in", build);
+          builder->shader("input/artistic_ior_node");
+          builder->shader("fresnel_dielectric_node");
+
+          builder->connect("out", "eta", "input/facing_node", "fresnel_dielectric_node");
+        }
+
+        if (facing.is_linked()) {
+          builder->shader("input/facing_node");
+
+          set_default_from(node, "Blend", "fac", builder);
+          builder->shader("math/bias_node");
+
+          builder->connect("out", "fac", "input/facing_node", "math/bias_node");
+        }
+      }
+
+      sockets_t input_socket(BL::NodeSocket& socket) const 
+      { 
+        if (socket.name() == "Blend") {
+          return{ { "Blend", "fac" } };
+        }
+
+        return sockets_t(); 
+      }
+
+      std::optional<socket_t> output_socket(BL::NodeSocket& socket) const {
+        if (socket.name() == "Fresnel") {
+          return socket_t{ "Fresnel", "out" };
+        }
+        
+        return socket_t{ "Facing", "out" };
+      }
+    };
+
     struct glossy_node_t : public generic_node_t {
       glossy_node_t()
        : generic_node_t("glossy_bsdf_node", {

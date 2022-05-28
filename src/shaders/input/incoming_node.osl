@@ -1,0 +1,9 @@
+
+shader incoming_node
+  [[ string help = "Sets the output vector to the incoming ray direction" ]]
+(
+  output vector out = 0
+)
+{
+  out = I; 
+}
