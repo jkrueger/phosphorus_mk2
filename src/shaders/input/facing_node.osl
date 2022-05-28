@@ -1,0 +1,12 @@
+
+shader facing_node
+  [[ string help = "Returns the absolute cosine of the angle between the incoming, and normal vectors" ]]
+(
+  vector i = I,
+  vector n = N,
+
+  output vector out = 0
+)
+{
+  out = fabs(dot(i, n));
+}

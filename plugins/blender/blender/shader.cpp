@@ -7,6 +7,8 @@ namespace blender {
       /* inputs */ {{ "Shader", "A" }, { "Shader.001", "B" }, { "Shader_001", "B" }}, 
       /* outputs */ {{ "Shader", "Cout" }});
 
+    const layer_weight_node_t compiler_t::layer_weight;
+
     const mix_rgb_node_t compiler_t::mix_rgb;
 
     const generic_node_t compiler_t::const_color(
@@ -162,6 +164,9 @@ namespace blender {
       if (node.is_a(&RNA_ShaderNodeMixShader)) { return &mix_shader; }
       
       if (node.is_a(&RNA_ShaderNodeRGB)) { return &const_color; }
+      
+      if (node.is_a(&RNA_ShaderNodeLayerWeight)) { return &layer_weight; }
+
       if (node.is_a(&RNA_ShaderNodeMixRGB)) { return &mix_rgb; }
       if (node.is_a(&RNA_ShaderNodeRGBCurve)) { return &rgb_curves; }
       if (node.is_a(&RNA_ShaderNodeValToRGB)) { return &color_ramp; }

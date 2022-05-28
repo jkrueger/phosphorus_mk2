@@ -1,0 +1,9 @@
+
+shader normal_node
+  [[ string help = "Sets the output of the node to the currently bound surface normal" ]]
+(
+  output normal out = 0
+)
+{
+  out = N;
+}

@@ -73,4 +73,7 @@ shader principled_bsdf_node
 
     out = out + specular_weight * disney_microfacet(shading_normal, ax, ay, eta, metallic, cspec0);
   }
+
+  // TODO: clearcoat
+  // TODO: transmission
 }

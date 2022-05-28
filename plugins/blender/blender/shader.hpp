@@ -28,6 +28,8 @@ namespace blender {
     struct glossy_node_t;
     struct refraction_node_t;
     struct glass_node_t;
+
+    struct layer_weight_node_t;
     struct mix_rgb_node_t;
     struct rgb_curves_node_t;
     struct color_ramp_node_t;
@@ -84,6 +86,8 @@ namespace blender {
           return "add";
         case BL::ShaderNodeMixRGB::blend_type_DARKEN:
           return "darken";
+        case BL::ShaderNodeMixRGB::blend_type_LIGHTEN:
+          return "lighten";
         default:
           std::cout << "Unsupported blend type. Defaulting to mul" << std::endl;
           return "mul";
@@ -164,6 +168,7 @@ namespace blender {
       static const generic_node_t add_shader;
       static const generic_node_t mix_shader;
       static const generic_node_t const_color;
+      static const layer_weight_node_t layer_weight;
       static const mix_rgb_node_t mix_rgb;
       static const rgb_curves_node_t rgb_curves;
       static const color_ramp_node_t color_ramp;
@@ -338,6 +343,49 @@ namespace blender {
 
         builder->parameter("ramp_color", ramp);
         generic_node_t::compile(node, builder, scene);
+      }
+    };
+
+    struct layer_weight_node_t : public compiler_t {
+      void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
+        BL::ShaderNodeBsdfGlossy lw_node(node.ptr);
+
+        BL::NodeSocket fresnel = lw_node.outputs[0];
+        BL::NodeSocket facing  = lw_node.outputs[1];
+
+        if (fresnel.is_linked()) {
+          set_default_from(node, "Blend", "in", build);
+          builder->shader("input/artistic_ior_node");
+          builder->shader("fresnel_dielectric_node");
+
+          builder->connect("out", "eta", "input/facing_node", "fresnel_dielectric_node");
+        }
+
+        if (facing.is_linked()) {
+          builder->shader("input/facing_node");
+
+          set_default_from(node, "Blend", "fac", builder);
+          builder->shader("math/bias_node");
+
+          builder->connect("out", "fac", "input/facing_node", "math/bias_node");
+        }
+      }
+
+      sockets_t input_socket(BL::NodeSocket& socket) const 
+      { 
+        if (socket.name() == "Blend") {
+          return{ { "Blend", "fac" } };
+        }
+
+        return sockets_t(); 
+      }
+
+      std::optional<socket_t> output_socket(BL::NodeSocket& socket) const {
+        if (socket.name() == "Fresnel") {
+          return socket_t{ "Fresnel", "out" };
+        }
+        
+        return socket_t{ "Facing", "out" };
       }
     };
 
