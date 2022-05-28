@@ -28,6 +28,8 @@ namespace blender {
     struct glossy_node_t;
     struct refraction_node_t;
     struct glass_node_t;
+
+    struct layer_weight_node_t;
     struct mix_rgb_node_t;
     struct rgb_curves_node_t;
     struct color_ramp_node_t;
@@ -84,6 +86,8 @@ namespace blender {
           return "add";
         case BL::ShaderNodeMixRGB::blend_type_DARKEN:
           return "darken";
+        case BL::ShaderNodeMixRGB::blend_type_LIGHTEN:
+          return "lighten";
         default:
           std::cout << "Unsupported blend type. Defaulting to mul" << std::endl;
           return "mul";
@@ -164,6 +168,7 @@ namespace blender {
       static const generic_node_t add_shader;
       static const generic_node_t mix_shader;
       static const generic_node_t const_color;
+      static const layer_weight_node_t layer_weight;
       static const mix_rgb_node_t mix_rgb;
       static const rgb_curves_node_t rgb_curves;
       static const color_ramp_node_t color_ramp;
