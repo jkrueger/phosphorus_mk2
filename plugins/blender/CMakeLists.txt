@@ -25,10 +25,7 @@ set_target_properties(_phosphoros PROPERTIES PREFIX "")
 
 include_directories(
  ../../src
- /usr/local/include
- /usr/include/OpenEXR
- /usr/local/include/OpenEXR
- /usr/local/include/Imath
+ lib/include
  ${BLENDER_PATH}/git/source/blender/render/extern/include
  ${BLENDER_PATH}/git/source/blender/makesrna
  ${BLENDER_PATH}/build/source/blender/makesrna/intern
@@ -36,11 +33,11 @@ include_directories(
  ${BLENDER_PATH}/git/intern/guardedalloc
  ${BLENDER_PATH}/git/intern/mikktspace
  ${BLENDER_PATH}/git/source/blender/makesdna
- ${BLENDER_PATH}/lib/darwin/python/include/python3.7m)
+ /opt/lib/python-3.10/include/python3.10)
 
 target_link_directories(_phosphoros
   PUBLIC
-  /usr/local/lib)
+  lib/lib)
 
 target_link_libraries(_phosphoros
   xml2
@@ -48,14 +45,24 @@ target_link_libraries(_phosphoros
   curses
   m
   z
-  Imath
-  Iex
-  OpenImageIO
-  OpenImageIO_Util
-  pugixml
   oslcomp
   oslquery
-  oslexec)
+  oslexec
+  LLVM-10
+  clang-10
+  clang-cpp-10
+  Imath-3_2
+  Iex-3_2
+  OpenEXR-3_2
+  OpenEXRCore-3_2
+  OpenEXRUtil-3_2
+  OpenImageIO
+  OpenImageIO_Util
+  IlmThread-3_2
+  pugixml
+  jpeg
+  png
+  tiff)
 
 execute_process (COMMAND ${LLVM_PATH}/bin/llvm-config --libfiles
                  OUTPUT_VARIABLE LLVM_LIBRARIES
