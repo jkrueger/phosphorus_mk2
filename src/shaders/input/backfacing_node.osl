@@ -1,0 +1,9 @@
+
+shader raytype_node
+  [[ string help = "Input node that injects a scalar factor that is either 1, or 0, depending on whether the current surface faces the currently processed ray" ]]
+(
+  output float out = 0
+)
+{
+  out = backfacing() ? 1.0 : 0.0;
+}

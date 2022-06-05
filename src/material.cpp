@@ -24,6 +24,10 @@ using namespace OSL_NAMESPACE;
 
 struct service_t : public RendererServices {
   static const ustring tangent;
+  static const ustring object_random;
+
+  // uncomment when actually needed to query scene properties
+  // const scene_t* scene;
 
   /* describes the rendered object to osl */
   struct object_t {
@@ -77,6 +81,10 @@ struct service_t : public RendererServices {
         *((Imath::V3f*) val) = o->hit.xform.tangent();
         return true;
       }
+      if (name == object_random) {
+        *((float*) val) = o->hit.mesh->object_random();
+        return true;
+      }
     }
 
     return false;
@@ -84,9 +92,10 @@ struct service_t : public RendererServices {
 };
 
 const ustring service_t::tangent("geom:tangent");
+const ustring service_t::object_random("object:random");
 
 struct material_t::details_t {
-  static const uint32_t PARAMETER_BUFFER_SIZE = 4096;
+  static const uint32_t PARAMETER_BUFFER_SIZE = 1024;
   
   static service_t*     service;
   static ShadingSystem* system;
@@ -94,16 +103,9 @@ struct material_t::details_t {
   static thread_local PerThreadInfo*  pti;
   static thread_local ShadingContext* ctx;
 
-  struct empty_params_t
-  {
-    static const uint32_t flags = bsdf::TRANSMIT;
-
-    void precompute() {}
-  };
-
   ShaderGroupRef group;
 
-  buffer_t<PARAMETER_BUFFER_SIZE> parameters;
+  buffer_t parameters;
 
   bool is_emitter;
 
@@ -111,6 +113,7 @@ struct material_t::details_t {
 
   details_t()
     : is_emitter(false)
+    , parameters(PARAMETER_BUFFER_SIZE)
   {}
 
   static void boot(const std::string& path) {
@@ -124,17 +127,34 @@ struct material_t::details_t {
     service = new service_t(/* ... */);
     system  = new ShadingSystem(service, nullptr, nullptr);
 
+    static const char* raytypes[] = {
+      "camera",
+      "shadow",
+      "diffuse",
+      "specular",
+      "glossy",
+      "__reserved__", // reserved by hit state
+      "__reserved__"  // reserved by hit masked state
+    };
+
+    const int num_raytypes = sizeof(raytypes) / sizeof(raytypes[0]);
+
     system->attribute("searchpath:shader", path + "/shaders");
-    system->texturesys()->attribute("max_memory_MB", 16384);
+    system->attribute("raytypes", TypeDesc(TypeDesc::STRING, num_raytypes), raytypes);
+    system->texturesys()->attribute("max_memory_MB", 24000);
     system->texturesys()->attribute("autotile", 64);
 
     ClosureParam params[][32] = {
       {
-        CLOSURE_FINISH_PARAM(empty_params_t)
+        CLOSURE_FINISH_PARAM(lobes::empty_params_t)
       },
       {
         CLOSURE_VECTOR_PARAM(bsdf::lobes::diffuse_t, n),
         CLOSURE_FINISH_PARAM(bsdf::lobes::diffuse_t)
+      },
+      {
+        CLOSURE_VECTOR_PARAM(bsdf::lobes::translucent_t, n),
+        CLOSURE_FINISH_PARAM(bsdf::lobes::translucent_t)
       },
       {
         CLOSURE_VECTOR_PARAM(bsdf::lobes::oren_nayar_t, n),
@@ -178,22 +198,23 @@ struct material_t::details_t {
         CLOSURE_FLOAT_PARAM(bsdf::lobes::disney_microfacet_t, eta),
         CLOSURE_FLOAT_PARAM(bsdf::lobes::disney_microfacet_t, metallic),
         CLOSURE_COLOR_PARAM(bsdf::lobes::disney_microfacet_t, cspec0),
-      },
+      }
     };
 
     system->register_closure("emission", bsdf_t::Emissive, params[0], NULL, NULL);
     system->register_closure("background", bsdf_t::Background, params[0], NULL, NULL);
     system->register_closure("transparent", bsdf_t::Transparent, params[0], NULL, NULL);
     system->register_closure("diffuse", bsdf_t::Diffuse, params[1], NULL, NULL);
-    system->register_closure("oren_nayar", bsdf_t::OrenNayar, params[2], NULL, NULL);
-    system->register_closure("reflection", bsdf_t::Reflection, params[3], NULL, NULL);
-    system->register_closure("refraction", bsdf_t::Refraction, params[4], NULL, NULL);
-    system->register_closure("microfacet", bsdf_t::Microfacet, params[5], NULL, NULL);
-    system->register_closure("sheen", bsdf_t::Sheen, params[6], NULL, NULL);
+    system->register_closure("translucent", bsdf_t::Translucent, params[2], NULL, NULL);
+    system->register_closure("oren_nayar", bsdf_t::OrenNayar, params[3], NULL, NULL);
+    system->register_closure("reflection", bsdf_t::Reflection, params[4], NULL, NULL);
+    system->register_closure("refraction", bsdf_t::Refraction, params[5], NULL, NULL);
+    system->register_closure("microfacet", bsdf_t::Microfacet, params[6], NULL, NULL);
+    system->register_closure("sheen", bsdf_t::Sheen, params[7], NULL, NULL);
     system->register_closure("disney_diffuse", bsdf_t::DisneyDiffuse, params[1], NULL, NULL);
-    system->register_closure("disney_retro", bsdf_t::DisneyRetro, params[7], NULL, NULL);
+    system->register_closure("disney_retro", bsdf_t::DisneyRetro, params[8], NULL, NULL);
     system->register_closure("disney_sheen", bsdf_t::DisneySheen, params[1], NULL, NULL);
-    system->register_closure("disney_microfacet", bsdf_t::DisneyMicrofacet, params[8], NULL, NULL);
+    system->register_closure("disney_microfacet", bsdf_t::DisneyMicrofacet, params[9], NULL, NULL);
   }
 
   static void attach() {
@@ -257,6 +278,12 @@ struct material_t::details_t {
         result.e = cw;
         break;
       case bsdf_t::Emissive:
+        // if (result.bsdf) {
+        //   result.bsdf->add_lobe(
+        //       bsdf_t::Emissive
+        //     , cw
+        //     , nullptr);
+        // }
         result.e = cw;
         break;
     	case bsdf_t::Diffuse:
@@ -267,6 +294,14 @@ struct material_t::details_t {
     	    , component->as<bsdf::lobes::diffuse_t>());
     	  }
     	  break;
+      case bsdf_t::Translucent:
+        if (result.bsdf) {
+          result.bsdf->add_lobe(
+            bsdf_t::Translucent
+          , cw
+          , component->as<bsdf::lobes::translucent_t>());
+        }
+        break;
       case bsdf_t::DisneyDiffuse:
         if (result.bsdf) {
           result.bsdf->add_lobe(
@@ -344,7 +379,7 @@ struct material_t::details_t {
     	    result.bsdf->add_lobe(
     	      bsdf_t::Transparent
     	    , cw
-    	    , component->as<empty_params_t>());
+    	    , component->as<bsdf::lobes::transparent_params_t>());
     	  }
     	  break;
     	}
@@ -509,6 +544,7 @@ void material_t::evaluate(
     sg.v = hit.st.y;
     sg.backfacing = sg.N.dot(sg.I) < 0;
     sg.objdata = &obj;
+    sg.raytype = hit.flags;
 
     details->execute(sg);
 

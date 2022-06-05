@@ -445,8 +445,8 @@ closure color background() BUILTIN;
 closure color diffuse(normal N) BUILTIN;
 closure color oren_nayar (normal N, float sigma) BUILTIN;
 closure color translucent(normal N) BUILTIN;
-closure color phong(normal N, float exponent) BUILTIN;
-closure color ward(normal N, vector T,float ax, float ay) BUILTIN;
+// closure color phong(normal N, float exponent) BUILTIN;
+// closure color ward(normal N, vector T,float ax, float ay) BUILTIN;
 closure color microfacet(string distribution, normal N, vector U, float xalpha,
                          float yalpha, float eta, int refract) BUILTIN;
 closure color microfacet(string distribution, normal N, float alpha, float eta,

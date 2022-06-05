@@ -114,7 +114,7 @@ namespace spt {
     , const interactions_t& primary
     , interactions_t& hits) const
     {
-      assert(active.num + state->dead.num <= active_t<>::size);
+      assert(active.num + state->dead.num <= active_t::size);
 
       for (auto i=0; i<state->dead.num; ++i) {
         const auto pixel = state->dead.index[i];
@@ -155,14 +155,11 @@ namespace spt {
         const auto d  = wi.length() - 0.0001f;
         wi.normalize();
 
-        ray.reset(p, wi, d);
-
-        if (hit.is_hit() && in_same_hemisphere(hit.n, wi)) {
-          ray.shadow();
-        }
-        else {
-          ray.mask();
-        }
+        ray.reset(
+          p, wi, 
+          hit.is_hit() && in_same_hemisphere(hit.n, wi) ? 
+            SHADOW : MASKED, 
+          d);
       }
     }
   };
@@ -200,7 +197,7 @@ namespace spt {
 
         if (hit.is_hit()) {
           // add direct lighting to path vertex
-          if (path.depth == 0 || hit.is_specular()) {
+          if (/* path.depth == 0 || */ hit.is_specular()) {
             out += path.beta * hit.e;
           }
 
@@ -224,7 +221,7 @@ namespace spt {
         }
         else {
           // add environment lighting
-          out += path.beta * hit.e;
+          // out += path.beta * hit.e;
 
           // if ((state->path[index]+1) < paths_per_sample) {
           //   state->mark_for_revive(index);
@@ -243,8 +240,8 @@ namespace spt {
     {
       // should never happen
       if (!hit.bsdf) {
-        throw std::runtime_error("Hitpoint doesn't have a BSDF");
-        // return Imath::Color3f(0.0f);
+        std::cout << "Hitpoint doesn't have a BSDF" << std::endl;
+        return Imath::Color3f(0.0f);
       }
 
       const auto f = hit.bsdf->f(ray.wi, hit.wi);
@@ -289,7 +286,10 @@ namespace spt {
       state->path[index].beta = beta * (f * (std::fabs(weight) / pdf));
 
       ray.reset(offset(hit.p, hit.n, weight < 0.0f), sampled);
+
+      ray.diffuse_bounce(bsdf_t::is_diffuse(flags));
       ray.specular_bounce(bsdf_t::is_specular(flags));
+      ray.glossy_bounce(bsdf_t::is_glossy(flags));
 
       return true;
     }

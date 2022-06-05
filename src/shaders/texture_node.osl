@@ -5,11 +5,8 @@ shader texture_node
   string filename = ""
     [[ string help = "Texture filename" ]],
 
-  float s = u
-    [[ string help = "s coordinate for the lookup" ]],
-
-  float t = v
-    [[ string help = "t coordinate for the lookup" ]],
+  point uv = point(u, v, 0.0)
+    [[ string help = "txture coordinate for the lookup" ]],
 
   float sblur = 0
     [[ string help = "Blur in the s direction",
@@ -33,5 +30,5 @@ shader texture_node
     [[ string help = "Output color" ]]
   )
 {
-  Cout = texture(filename, s, t, "sblur", sblur, "tblur", tblur, "swrap", swrap, "twrap", twrap);
+  Cout = texture(filename, uv.x, uv.y, "sblur", sblur, "tblur", tblur, "swrap", swrap, "twrap", twrap);
 }

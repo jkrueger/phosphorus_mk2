@@ -1,0 +1,11 @@
+
+shader raytype_node
+  [[ string help = "Input node that injects a scalar factor that is either 1, or 0, if the current raytype matches the input" ]]
+(
+  string type = "diffuse",
+
+  output float out = 0
+)
+{
+  out = raytype(type) ? 1.0 : 0.0;
+}

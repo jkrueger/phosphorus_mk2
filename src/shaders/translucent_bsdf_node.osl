@@ -1,0 +1,17 @@
+
+shader
+translucent_bsdf_node
+  [[ string help = "Lambertian diffuse transmision BSDF shader" ]]
+(
+  color base = 0
+    [[ string help = "Base material color" ]],
+
+  normal shading_normal = N
+    [[ string help = "The normal used for shading calculations" ]],
+
+  output closure color out = 0
+    [[ string help = "Output color" ]]
+)
+{
+  out = base * translucent(shading_normal);
+}

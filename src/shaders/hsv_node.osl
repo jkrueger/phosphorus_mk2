@@ -1,4 +1,4 @@
-#include "colorspaces.h"
+#include "colorspace.h"
 
 shader
 hsv_node

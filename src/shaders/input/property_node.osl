@@ -1,0 +1,17 @@
+
+shader property_node
+  [[ string help = "Input node that injects a renderer property into the shader" ]]
+(
+  string name = "",
+
+  output float out = 0
+)
+{
+  float attr = 0;
+  if (getattribute(name, attr)) {
+    out = attr;
+  }
+  else {
+    printf("Query for unknown property: %s\n", name);
+  }
+}

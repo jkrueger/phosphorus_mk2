@@ -9,12 +9,30 @@ namespace blender {
 
     const layer_weight_node_t compiler_t::layer_weight;
 
-    const mix_rgb_node_t compiler_t::mix_rgb;
-
-    const generic_node_t compiler_t::const_color(
+    const input_node_t compiler_t::const_color(
       "const_color_node",
-      /* inputs */ {{ "Color", "in" }}, 
-      /* outputs */ {{ "Color", "out" }});
+      "Color",
+      {{ "Color", "out", }});
+
+    const light_path_node_t compiler_t::light_path;
+
+    const property_node_t compiler_t::object_info(
+      std::vector<property_node_t::property_t>(
+        {{ "input/property_node", "Random", "object:random" }}));
+
+    const property_node_t compiler_t::geometry(
+      std::vector<property_node_t::property_t>(
+        {{ "input/position_node", "Position" },
+         { "input/normal_node", "Normal" },
+         { "input/incoming_node", "Incoming" },
+         { "input/backfacing_node", "Backfacing" }}));
+
+    const property_node_t compiler_t::tex_coordinate(
+      /*properties*/ std::vector<property_node_t::property_t>({{"input/uv_node", "UV" }}));
+
+    const math_node_t compiler_t::math;
+
+    const mix_rgb_node_t compiler_t::mix_rgb;
 
     const rgb_curves_node_t compiler_t::rgb_curves;
 
@@ -27,17 +45,27 @@ namespace blender {
 
     const generic_node_t compiler_t::transform_point(
       "transform_point_node",
-      /* inputs */ {{ "VectorIn", "in" }, { "Scale", "scale" }, { "Rotation", "rotation" }, { "Location", "translation" }}, 
-      /* outputs */ {{ "VerctorOut", "out" }});
+      /* inputs */ {{ "Vector", "in" }, { "Scale", "scale" }, { "Rotation", "rotation" }, { "Location", "translation" }}, 
+      /* outputs */ {{ "Vector", "out" }});
+
+    const generic_node_t compiler_t::transform_vector(
+      "transform_vector_node",
+      /* inputs */ {{ "Vector", "in" }, { "Scale", "scale" }, { "Rotation", "rotation" }}, 
+      /* outputs */ {{ "Vector", "out" }});
 
     const generic_node_t compiler_t::split(
       "split_node",
-      /* inputs */ {{ "Color", "in" }}, 
+      /* inputs */ {{ "Image", "in" }}, 
       /* outputs */ {{ "R", "r" }, { "G", "g"}, {"B", "b"}});
 
     const generic_node_t compiler_t::combine(
       "combine_node",
-      /* inputs */ {{ "r", "g", "b" }}, 
+      /* inputs */ {{ "Color", "in" }, { "Fac", "fac" }, { "R", "r" }, { "G", "g" }, { "B", "b" }}, 
+      /* outputs */ {{ "Image", "out" }});
+
+    const generic_node_t compiler_t::hsv(
+      "hsv_node",
+      /* inputs */ {{ "Hue", "hue" }, { "Saturation", "saturation" }, { "Value", "value" }}, 
       /* outputs */ {{ "Color", "out" }});
 
     const generic_node_t compiler_t::mix_shader(
@@ -164,15 +192,22 @@ namespace blender {
       if (node.is_a(&RNA_ShaderNodeMixShader)) { return &mix_shader; }
       
       if (node.is_a(&RNA_ShaderNodeRGB)) { return &const_color; }
+      if (node.is_a(&RNA_ShaderNodeTexCoord)) { return &tex_coordinate; }
+      if (node.is_a(&RNA_ShaderNodeLightPath)) { return &light_path; }
+      if (node.is_a(&RNA_ShaderNodeNewGeometry)) { return &geometry; }
+      if (node.is_a(&RNA_ShaderNodeObjectInfo)) { return &object_info; }
       
       if (node.is_a(&RNA_ShaderNodeLayerWeight)) { return &layer_weight; }
 
+      if (node.is_a(&RNA_ShaderNodeMath)) { return &math; }
       if (node.is_a(&RNA_ShaderNodeMixRGB)) { return &mix_rgb; }
       if (node.is_a(&RNA_ShaderNodeRGBCurve)) { return &rgb_curves; }
       if (node.is_a(&RNA_ShaderNodeValToRGB)) { return &color_ramp; }
       if (node.is_a(&RNA_ShaderNodeInvert)) { return &invert; }
       if (node.is_a(&RNA_ShaderNodeSeparateRGB)) { return &split; }
       if (node.is_a(&RNA_ShaderNodeCombineRGB)) { return &combine; }
+      if (node.is_a(&RNA_ShaderNodeHueSaturation)) { return &hsv; }
+
       if (node.is_a(&RNA_ShaderNodeRGBToBW)) { return &luminance; }
       if (node.is_a(&RNA_ShaderNodeGamma)) { return &gamma; }
 
@@ -181,6 +216,8 @@ namespace blender {
         switch(mapping_node.vector_type()) {
           case BL::ShaderNodeMapping::vector_type_POINT:
             return &transform_point;
+          case BL::ShaderNodeMapping::vector_type_VECTOR:
+            return &transform_vector;
           default:
             std::cout 
               << "Mapping type: " 

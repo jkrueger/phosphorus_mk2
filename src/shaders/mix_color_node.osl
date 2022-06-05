@@ -32,6 +32,6 @@ mix_color_node
     Cout = mix(A, min(A, B), fac);
   }
   else if (operation == "lighten") {
-    Cout = mix(A, max(A, B), fac)
+    Cout = mix(A, max(A, B), fac);
   }
 }

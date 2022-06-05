@@ -54,8 +54,6 @@ namespace microfacet {
 
         const auto eta = li.y > 0.0f ? params.eta : 1.0f / params.eta;
 
-        // std::cout << "ETA: " << eta << std::endl;
-
         const auto cos_ti = ts::cos_theta(li);
         const auto cos_to = ts::cos_theta(lo);
 
@@ -77,10 +75,6 @@ namespace microfacet {
         const auto factor = 1.0f / eta;
         const auto d = distribution.D(params, wh);
         const auto g = G(params, li, lo, distribution);
-
-        // std::cout << "F: " << f << std::endl;
-        // std::cout << "D: " << d << std::endl;
-        // std::cout << "G: " << g << std::endl;
 
         const auto c = (1.0f - f) * std::abs(
             d * g * eta * eta

@@ -6,5 +6,5 @@ shader div_node
   output float out = 0.0
 )
 {
-  out = b !- 0.0 ? a / b : 0.0;
+  out = b != 0.0 ? a / b : 0.0;
 }

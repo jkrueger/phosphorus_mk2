@@ -30,7 +30,7 @@ namespace disney {
     , const Imath::V3f& wo)
     {
       const auto wh = (wi + wo).normalize();
-      const auto cos_thetad = wi.dot(wh);
+      const auto cos_thetad = wo.dot(wh);
 
       const auto fi = fresnel::schlick_weight(params.n.dot(wi));
       const auto fo = fresnel::schlick_weight(params.n.dot(wo));

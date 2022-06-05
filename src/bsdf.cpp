@@ -43,6 +43,12 @@ Imath::Color3f eval(
       result = lambert::f(param.diffuse, wi, wo);
       break;
     }
+  case bsdf_t::Translucent:
+    {
+      pdf = lambert::refract::pdf(param.translucent, wi, wo);
+      result = lambert::refract::f(param.translucent, wi, wo);
+      break;
+    }
   case bsdf_t::DisneyDiffuse:
     {
       pdf = lambert::pdf(param.diffuse, wi, wo);
@@ -99,13 +105,14 @@ Imath::Color3f eval(
     }
   case bsdf_t::DisneyMicrofacet:
     {
-      pdf = ct::pdf(param.microfacet, wi, wo, microfacet::ggx_t());
+      pdf = ct::pdf(param.microfacet, wi, wo, disney::microfacet::disney_ggx_t());
       result = ct::f(
           param.disney_microfacet
         , wi
         , wo
         , disney::microfacet::disney_ggx_t()
-        , disney::microfacet::disney_fresnel_t{param.disney_microfacet.metallic, param.disney_microfacet.cspec0});
+        //, disney::microfacet::disney_fresnel_t{param.disney_microfacet.metallic, param.disney_microfacet.cspec0}
+        );
       break;
     }
   case bsdf_t::Sheen:
@@ -128,6 +135,10 @@ Imath::Color3f eval(
   case bsdf_t::Transparent:
     pdf = 0.0f;
     break;
+  // case bsdf_t::Emissive:
+  //   pdf = 1.0f;
+  //   result = Imath::Color3f(1.0f);
+  //   break;
   default:
     std::cerr << "Can't evaluate BSDF type: " << type << std::endl;
     break;
@@ -152,7 +163,7 @@ Imath::Color3f bsdf_t::f(const Imath::V3f& wi, const Imath::V3f& wo) const {
     const auto atl = angle_to_light(p[i], wi);
     const auto reflect = atl * angle_to_light(p[i], wo) > 0.0f;
 
-    if ((reflect && is_reflective(i)) || (!reflect && is_transmissive(i))) {
+    if (type[i] == Emissive || (reflect && is_reflective(i)) || (!reflect && is_transmissive(i))) {
       out += e * weight[i] * atl;
     }
   }
@@ -189,6 +200,9 @@ Imath::Color3f bsdf_t::sample(
   case OrenNayar:
     result = oren_nayar::sample(p.oren_nayar, wi, wo, remapped, pdf);
     break;
+  case Translucent:
+    result = lambert::refract::sample(p.translucent, wi, wo, remapped, pdf);
+    break;  
   case Microfacet:
     if (p.microfacet.is_ggx() ||
         // NOTE: default to ggx as well, until we have a beckman implementation
@@ -229,6 +243,15 @@ Imath::Color3f bsdf_t::sample(
         << p.microfacet.distribution
         << std::endl;
     }
+    break;
+  case DisneyMicrofacet:
+    result = ct::sample(
+          p.disney_microfacet
+        , wi
+        , wo
+        , remapped
+        , pdf
+        , disney::microfacet::disney_ggx_t());
     break;
   case Sheen:
     result = microfacet::sheen::sample(p.sheen, wi, wo, remapped, pdf);

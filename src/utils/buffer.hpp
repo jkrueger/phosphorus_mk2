@@ -1,15 +1,29 @@
 #pragma once
 
-template<int N>
+#include "assert.hpp"
+
 struct buffer_t {
-  uint8_t buffer[N];
+  uint8_t* buffer;
   uint8_t* pos;
 
-  buffer_t()
-    : pos(buffer)
-  {}
+  size_t size;
+
+  buffer_t(size_t s)
+   : size(s)
+  {
+    buffer = (uint8_t*) malloc(size);
+    pos = buffer;
+  }
+
+  ~buffer_t() {
+    free(buffer);
+  }
 
   float* write_float(float v) {
+    if ((pos - buffer) + sizeof(float) >= size) {
+      grow();
+    }
+  
     float* p = (float*) pos;
     (*p) = v;
     pos += sizeof(float);
@@ -17,6 +31,10 @@ struct buffer_t {
   }
 
   int* write_int(int v) {
+    if ((pos - buffer)  + sizeof(int) >= size) {
+      grow();
+    }
+
     int* p = (int*) pos;
     (*p) = v;
     pos += sizeof(int);
@@ -24,6 +42,10 @@ struct buffer_t {
   }
 
   float* write_3f(float a, float b, float c) {
+    if ((pos - buffer) +  (sizeof(float) * 3) >= size) {
+      grow();
+    }
+
     float* p = (float*) pos;
     p[0] = a;
     p[1] = b;
@@ -34,9 +56,19 @@ struct buffer_t {
 
   template<typename T>
   void* write_ptr(T* ptr) {
+    if ((pos - buffer) + sizeof(intptr_t) >= size) {
+      grow();
+    }
+
     intptr_t* p = (intptr_t*) pos;
     (*p) = (intptr_t) ptr;
     pos += sizeof(intptr_t);
     return p;
+  }
+
+  void grow() {
+    buffer = (uint8_t*) realloc(buffer, size * 2);
+    pos = buffer + size;
+    size *= 2;
   }
 };

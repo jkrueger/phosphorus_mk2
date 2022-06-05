@@ -1,5 +1,5 @@
 
-color rgb_to_hsv(color c) {
+color rgb_to_hsv(color rgb) {
   float cmax, cmin, h, s, v, cdelta;
   color c;
 
@@ -63,23 +63,17 @@ color hsv_to_rgb(color c) {
     q = v * (1.0 - (s * f));
     t = v * (1.0 - (s * (1.0 - f)));
 
-    switch (int(i))
-    case 0:
+    if (i == 0.0)
       rgb = color(v, t, p);
-      break;
-    case 1:
+    else if (i == 1.0)
       rgb = color(q, v, p);
-    break;
-    case 2:
+    else if (i == 2.0)
       rgb = color(p, v, t);
-      break;
-    case 3:
+    else if (i == 3.0)
       rgb = color(p, q, v);
-      break;
-    case 4:
+    else if (i == 4.0)
       rgb = color(t, p, v);
-      break;
-    default:
+    else
       rgb = color(v, p, q);
   }
 

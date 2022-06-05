@@ -149,11 +149,11 @@ namespace camera {
           p = simd::transform_point(m, p);
           d = simd::transform_vector(m, d);
 
-          if (camera.clip_near > 0.0f) {
-            p = p + d * min;
-          }
+          // if (camera.clip_near > 0.0f) {
+          //   p = p + d * min;
+          // }
           
-          rays.reset(off, p, d, camera.clip_far);
+          rays.reset(off, p, d, CAMERA, camera.clip_far);
 
           sx = simd::add(sx, step);
         }

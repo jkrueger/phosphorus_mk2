@@ -1,0 +1,9 @@
+
+shader uv_node
+  [[ string help = "Sets the output of the node to the currently bound texture coordinates" ]]
+(
+  output point out = 0
+)
+{
+  out = point(u, v, 0.0);
+}

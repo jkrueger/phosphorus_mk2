@@ -2,19 +2,19 @@
 shader bias_node
   [[ string help = "Biases the scalar input towards 0/1 based on a factor" ]]
 (
-  float fac = 0.5
+  float fac = 0.5,
 
-  float in = 0,
+  float in = 0.0,
 
-  float output out
+  output float out = 0.0
 )
 {
   out = in;
 
   if (fac != 0.5) {
-    fac = clamp(fac, 0.0, 1.0 - 1e-5);
-    out = pow(in, fac);
+    float f = clamp(fac, 0.0, 1.0 - 1e-5);
+    out = pow(in, f);
   }
 
-  out = 1.0 - out
+  out = 1.0 - out;
 }

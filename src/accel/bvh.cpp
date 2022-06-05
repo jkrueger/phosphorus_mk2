@@ -66,12 +66,12 @@ namespace accel {
       const triangle_t* tris[mbvh_t::width];
 
       for (auto i=begin; i<end; i+=mbvh_t::width) {
-	auto num = std::min(8u, (uint32_t)(end-i));
-	for (auto j=0; j<num; ++j) {
-	  tris[j] = &things[primitives[i+j].index];
-	}
-	triangles.emplace_back(tris, num);
-	size += num;
+      	auto num = std::min(8u, (uint32_t)(end-i));
+      	for (auto j=0; j<num; ++j) {
+      	  tris[j] = &things[primitives[i+j].index];
+      	}
+      	triangles.emplace_back(tris, num);
+      	size += num;
       }
 
       return off;

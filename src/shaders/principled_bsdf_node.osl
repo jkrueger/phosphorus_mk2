@@ -48,9 +48,7 @@ shader principled_bsdf_node
 
   if (diffuse_weight > 1e-5) {
     // TODO: optionally do subsurface scattering
-    out = base * disney_diffuse(shading_normal);
-
-    out = out + disney_retro(shading_normal, roughness);
+    out = base * disney_diffuse(shading_normal) + base * disney_retro(shading_normal, roughness);
 
     if (sheen_weight > 0.0) {
       color sheen_color = (1.0 - sheen_tint) * color(1.0, 1.0, 1.0) + sheen_tint * ctint;
@@ -68,12 +66,21 @@ shader principled_bsdf_node
     float ay = r2 * aspect;
 
     color cspec0 = lerp(metallic,
-      sqr(eta - 1) / sqr(eta + 1) * lerp(specular_tint, color(1.0, 1.0, 1.0), ctint),
+      (sqr(eta - 1) / sqr(eta + 1)) * lerp(specular_tint, color(1.0, 1.0, 1.0), ctint),
       base);
 
     out = out + specular_weight * disney_microfacet(shading_normal, ax, ay, eta, metallic, cspec0);
+    // out = out + base * specular_weight * microfacet("ggx", shading_normal, vector(0), ax, ay, eta, 0);
+  }
+
+  if (final_transmission > 1e-5) {
+    if (transmission_roughness == 0.0) {
+      out += final_transmission * refraction(shading_normal, eta);
+    }
+    else {
+      out += final_transmission * microfacet("ggx", shading_normal, vector(0), transmission_roughness, transmission_roughness, eta, 1);
+    }
   }
 
   // TODO: clearcoat
-  // TODO: transmission
 }

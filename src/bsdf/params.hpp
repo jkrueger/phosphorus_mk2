@@ -21,8 +21,29 @@ namespace bsdf {
   };
 
   namespace lobes {
+    struct empty_params_t
+    {
+      static const uint32_t flags = REFLECT;
+
+      void precompute() {}
+    };
+
+    struct transparent_params_t
+    {
+      static const uint32_t flags = TRANSMIT | SPECULAR;
+
+      void precompute() {}
+    };
+
     struct diffuse_t : public lobe_t {
       static const uint32_t flags = REFLECT | DIFFUSE;
+      
+      inline void precompute() {
+      }
+    };
+
+    struct translucent_t : public lobe_t {
+      static const uint32_t flags = TRANSMIT | DIFFUSE;
       
       inline void precompute() {
       }

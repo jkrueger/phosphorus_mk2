@@ -38,7 +38,7 @@ color rgb_ramp_lut(
 
   color result = lut[i];
 
-  if (interpolate) {
+  if (interpolate && t > 0.0) {
     result = (1.0 - t) * result + t * lut[i + 1];
   }
 
