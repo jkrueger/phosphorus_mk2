@@ -221,7 +221,7 @@ namespace spt {
         }
         else {
           // add environment lighting
-          // out += path.beta * hit.e;
+          out += path.beta * hit.e;
 
           // if ((state->path[index]+1) < paths_per_sample) {
           //   state->mark_for_revive(index);
