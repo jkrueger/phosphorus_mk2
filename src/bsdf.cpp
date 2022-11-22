@@ -105,14 +105,15 @@ Imath::Color3f eval(
     }
   case bsdf_t::DisneyMicrofacet:
     {
-      pdf = ct::pdf(param.microfacet, wi, wo, disney::microfacet::disney_ggx_t());
+      pdf = ct::pdf(param.disney_microfacet, wi, wo, disney::microfacet::disney_ggx_t());
       result = ct::f(
           param.disney_microfacet
         , wi
         , wo
         , disney::microfacet::disney_ggx_t()
-        //, disney::microfacet::disney_fresnel_t{param.disney_microfacet.metallic, param.disney_microfacet.cspec0}
+        , disney::microfacet::disney_fresnel_t{param.disney_microfacet.metallic, param.disney_microfacet.cspec0}
         );
+      // std::cout << "EVAL result: " << result << " pdf: " << pdf << std::endl;
       break;
     }
   case bsdf_t::Sheen:
@@ -215,17 +216,6 @@ Imath::Color3f bsdf_t::sample(
         , remapped
         , pdf
         , microfacet::ggx_t());
-
-        // std::stringstream ss;
-        // ss << "Glossy: " 
-        //    << result << " " 
-        //    << in_same_hemisphere(wi, wo) << " " 
-        //    << pdf << " " 
-        //    << wi << " " << wo
-        //    << remapped
-        //    << std::endl;
-
-        // std::cout << ss.str();
       }
       else {
         result = ct::sample(
@@ -251,7 +241,9 @@ Imath::Color3f bsdf_t::sample(
         , wo
         , remapped
         , pdf
-        , disney::microfacet::disney_ggx_t());
+        , disney::microfacet::disney_ggx_t()
+        , disney::microfacet::disney_fresnel_t{p.disney_microfacet.metallic, p.disney_microfacet.cspec0});
+    // std::cout << "SAMPLE result: " << result << " pdf: " << pdf << std::endl;
     break;
   case Sheen:
     result = microfacet::sheen::sample(p.sheen, wi, wo, remapped, pdf);

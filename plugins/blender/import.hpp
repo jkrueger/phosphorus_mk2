@@ -38,6 +38,10 @@ namespace blender {
     return id && id.is_a(&RNA_Material);
   }
 
+  inline Imath::V3f get_column(const Imath::M44f& m, int n) {
+    return Imath::V3f(m[0][n], m[1][n], m[2][n]);
+  }
+
   inline Imath::V3f get_row(const Imath::M44f& m, int n) {
     return Imath::V3f(m[n][0], m[n][1], m[n][2]);
   }
@@ -364,7 +368,7 @@ namespace blender {
       BL::ShaderNode& node
     , const shader::compiler_t* compiler
     , std::unordered_map<void*, BL::NodeLink>& links
-    , std::unordered_map<std::string, shader::socket_t>& outputs
+    , std::unordered_map<void*, shader::socket_t>& outputs
     , std::vector<std::function<void (material_t::builder_t::scoped_t&)>>& linkers
     , material_t::builder_t::scoped_t& builder)
     {
@@ -383,8 +387,8 @@ namespace blender {
         if (guard != links.end()) {
           auto link = guard->second;
 
-          auto from_socket  = link.from_socket();         
-          auto from_mapping = outputs.find(from_socket.identifier());
+          auto from_socket  = link.from_socket();
+          auto from_mapping = outputs.find(from_socket.ptr.data);
 
           if (from_mapping == outputs.end()) {
             std::cout 
@@ -412,6 +416,8 @@ namespace blender {
             const auto node  = name ? name.value() : from_mapping->second.node();
             const auto param = name ? "out" : from_mapping->second.name();
 
+            std::cout << "Connecting: " << param << " to " << to_mapping.name() << std::endl;
+
             linkers.push_back([=](material_t::builder_t::scoped_t& builder) {
               builder->connect(
                 param, to_mapping.name(),
@@ -426,13 +432,13 @@ namespace blender {
     void map_outputs(
       BL::ShaderNode& node
     , const shader::compiler_t* compiler
-    , std::unordered_map<std::string, shader::socket_t>& outputs) 
+    , std::unordered_map<void*, shader::socket_t>& outputs) 
     {
       BL::Node::outputs_iterator socket;
       for (node.outputs.begin(socket); socket!=node.outputs.end(); ++socket) {
 
         if (const auto& mapping = compiler->output_socket(*socket)) {
-          outputs.insert(std::make_pair(socket->identifier(), std::move(mapping.value())));
+          outputs.insert(std::make_pair(socket->ptr.data, std::move(mapping.value())));
         }
       }
     }
@@ -444,7 +450,7 @@ namespace blender {
     , material_t::builder_t::scoped_t& builder)
     {
       std::unordered_map<void*, BL::NodeLink> links;
-      std::unordered_map<std::string, shader::socket_t> outputs;
+      std::unordered_map<void*, shader::socket_t> outputs;
 
       std::unordered_map<void*, std::list<PointerRNA>> in;
       std::unordered_map<void*, std::list<PointerRNA>> out;
@@ -504,6 +510,8 @@ namespace blender {
           continue;
         }
         else if (node.is_a(&RNA_ShaderNodeGroup)) {
+          std::cout << "Compiling group: " << node.name() << std::endl;
+
           BL::ShaderNodeTree node_tree = BL::ShaderNodeTree(((BL::NodeGroup) node).node_tree());
           shader_tree(node_tree, graph, scene, builder);
 
@@ -516,6 +524,7 @@ namespace blender {
           }
         }
         else if (node.is_a(&RNA_NodeGroupInput)) {
+          std::cout << "Compiling group input: " << node.name() << std::endl;
           if (const auto compiler = shader::compiler_t::factory(node)) {
             map_outputs(node, compiler, outputs);
             
@@ -523,6 +532,7 @@ namespace blender {
           }
         }
         else if (node.is_a(&RNA_NodeGroupOutput)) {
+          std::cout << "Compiling group output: " << node.name() << std::endl;
           if (const auto compiler = shader::compiler_t::factory(node)) {
             map_inputs(node, compiler, links, outputs, linkers, builder);
 
@@ -532,6 +542,8 @@ namespace blender {
         }
         else {
           if (const auto compiler = shader::compiler_t::factory(node)) {
+            std::cout << "Compiling: " << node.name() << std::endl;
+
             map_inputs(node, compiler, links, outputs, linkers, builder);
             map_outputs(node, compiler, outputs);
 
@@ -541,6 +553,7 @@ namespace blender {
       }
 
       if (auto output_node = tree.get_output_node(2)) {
+        std::cout << "Compiling: " << output_node.name() << std::endl;
         if (const auto compiler = shader::compiler_t::factory(output_node)) {
           map_inputs(output_node, compiler, links, outputs, linkers, builder);
           compiler->compile(output_node, builder, scene);
@@ -689,6 +702,7 @@ namespace blender {
             material_t* out = new material_t(material.name());
             {
               std::unique_ptr<material_t::builder_t> builder(out->builder());
+              builder->parameter("Cs", Imath::Color3f(1, 1, 1));
               builder->shader("diffuse_bsdf_node", "diffuse", "surface");
               builder->shader("material_node", material.name(), "surface");
               builder->connect("Cout", "Cs", "diffuse", material.name());

@@ -146,12 +146,14 @@ namespace spt {
       const auto samples = state->fresh_light_samples();
 
       for (auto i=0; i<active.num; ++i) {
-        const interaction_t& hit = hits[i];
+        const auto& sample = samples[i];
+        const auto& hit = hits[i];
+        
         ray_t& ray = rays[i];
 
         const auto p = offset(hit.p, hit.n);
 
-        auto wi = samples->light->setup_shadow_ray(p, samples[i]);
+        auto wi = sample.light->setup_shadow_ray(p, sample);
         const auto d  = wi.length() - 0.0001f;
         wi.normalize();
 
@@ -189,15 +191,15 @@ namespace spt {
 
         const auto& hit  = hits[i];
         const auto& from = samples[i];
+        const auto& light_sample = state->light_samples[i];
 
         auto& to = samples[active.num];
-        const auto& light_sample = state->light_samples[active.num];
 
         auto out = path.r;
 
         if (hit.is_hit()) {
           // add direct lighting to path vertex
-          if (/* path.depth == 0 || */ hit.is_specular()) {
+          if (path.depth == 0 || hit.is_specular()) {
             out += path.beta * hit.e;
           }
 
@@ -236,7 +238,7 @@ namespace spt {
       state_t* state 
     , const ray_t& ray
     , const interaction_t& hit
-    , const sampling::details::light_sample_t& sample) const
+    , const sampling::details::light_sample_t& ls) const
     {
       // should never happen
       if (!hit.bsdf) {
@@ -245,11 +247,9 @@ namespace spt {
       }
 
       const auto f = hit.bsdf->f(ray.wi, hit.wi);
-      const auto e = sample.light->le(*state->scene, sample, ray.wi);
+      const auto e = ls.light->le(*state->scene, ls, ray.wi);
 
-      const auto pdf = sample.pdf; // * d * d;
-
-      return (e * 4) * f * (1.0f / pdf);
+      return e * f * (1.0f / ls.pdf);
     }
 
     bool sample_bsdf(

@@ -198,6 +198,7 @@ struct material_t::details_t {
         CLOSURE_FLOAT_PARAM(bsdf::lobes::disney_microfacet_t, eta),
         CLOSURE_FLOAT_PARAM(bsdf::lobes::disney_microfacet_t, metallic),
         CLOSURE_COLOR_PARAM(bsdf::lobes::disney_microfacet_t, cspec0),
+        CLOSURE_FINISH_PARAM(bsdf::lobes::disney_microfacet_t)
       }
     };
 

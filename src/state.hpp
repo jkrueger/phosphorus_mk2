@@ -108,12 +108,12 @@ struct ray_t {
   inline void reset(
     const Imath::V3f& _p
   , const Imath::V3f& _wi
-  , uint32_t flags = 0
+  , uint32_t _flags = 0
   , float _d = std::numeric_limits<float>::max()) {
     p = _p;
     wi = _wi;
     d = _d;
-    flags = flags;
+    flags = _flags;
   }
 
   inline void set_surface(
@@ -280,7 +280,6 @@ namespace soa {
       uint32_t i
     , const Imath::V3f& _p
     , const Imath::V3f& _wi
-    , uint32_t flags = 0
     , float _d = std::numeric_limits<float>::max())
     {
       p.from(i, _p);

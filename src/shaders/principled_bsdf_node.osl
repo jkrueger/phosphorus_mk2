@@ -70,7 +70,6 @@ shader principled_bsdf_node
       base);
 
     out = out + specular_weight * disney_microfacet(shading_normal, ax, ay, eta, metallic, cspec0);
-    // out = out + base * specular_weight * microfacet("ggx", shading_normal, vector(0), ax, ay, eta, 0);
   }
 
   if (final_transmission > 1e-5) {

@@ -260,7 +260,7 @@ namespace blender {
         } 
       }
 
-      if (node.is_a(&RNA_ShaderNodeNormalMap)) { return &normal_map; }      
+      // if (node.is_a(&RNA_ShaderNodeNormalMap)) { return &normal_map; }      
 
       if (node.is_a(&RNA_ShaderNodeGroup)) { return &group; }
       if (node.is_a(&RNA_NodeGroupInput)) { return &group_input; }

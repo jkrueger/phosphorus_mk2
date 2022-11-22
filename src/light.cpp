@@ -48,7 +48,7 @@ struct distant_light_t : public light_t::details_t {
   distant_light_t(material_t* material, const Imath::V3f& direction, float angle) 
     : details_t(material->id)
     , material(material)
-    , radius(tanf(angle))
+    , radius(tanf(angle * 0.5f))
     , ooarea(radius > 0.0f ? 1.0f / (M_PI * radius * radius) : 1.0f)
     , direction(direction)
     , base(direction)
@@ -62,8 +62,8 @@ struct distant_light_t : public light_t::details_t {
     Imath::V3f d = direction;
 
     if (radius > 0.0f) {
-      auto disc   = sample::disc::concentric(uv);
-      d = direction + base.to_world(Imath::V3f(uv.x, uv.y, 0.0f)) * radius;
+      auto disc = sample::disc::concentric(uv);
+      d = (direction + (base.a * uv.x + base.c * uv.y)) * radius;
       d.normalize();
     }
 
@@ -72,7 +72,7 @@ struct distant_light_t : public light_t::details_t {
     out.p    = -d * 2.0f * bounds.radius;
     out.uv   = {0.0f, 0.0f};
     out.area = 0.0f;
-    out.pdf  = ooarea / (cos_theta * cos_theta * cos_theta);
+    out.pdf  = 1.0f; // ooarea / (cos_theta * cos_theta * cos_theta);
     out.data = 0;
   }
 
@@ -102,13 +102,14 @@ struct rect_light_t : public light_t::details_t {
    , height(height)
   {
     n = Imath::V3f(transform[2][0], transform[2][1], transform[2][2]);
+    n.normalize();
   }
 
   void sample(const Imath::V2f& uv, sampler_t::light_sample_t& out) const {
     out.p    = Imath::V3f(uv.x * width, 0.0, uv.y * height) * transform;
     out.uv   = uv;
     out.area = width * height;
-    out.pdf  = 1.0f / out.area;
+    out.pdf  = M_PI * 4.0f; // * 1.0f / out.area;
     out.data = 0;
   }
 
@@ -120,6 +121,8 @@ struct rect_light_t : public light_t::details_t {
     shading_result_t light;
     material->evaluate(sample.p, wi, n, sample.uv, light);
     
+    // std::cout << "LIGHT: " << sample.light->id << " " << light.e << std::endl;
+
     return light.e * std::fabs(n.dot(-wi));
   }
 };
@@ -297,8 +300,8 @@ void light_t::sample(
 }
 
 Imath::V3f light_t::setup_shadow_ray(
-    const Imath::V3f& p
-  , const sampler_t::light_sample_t& sample) const 
+  const Imath::V3f& p
+, const sampler_t::light_sample_t& sample) const 
 {
   switch (type) {
     case DISTANT:
@@ -307,7 +310,7 @@ Imath::V3f light_t::setup_shadow_ray(
       // is the same for every point in the scene, so we compute
       // the shadow ray direction by starting at the
       // surface point, adding the lights direction
-      return p + sample.p;
+      return sample.p;
     }
     default:
       // for all other cases the direction for the shadow ray
