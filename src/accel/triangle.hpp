@@ -136,9 +136,6 @@ namespace accel {
       , uint32_t* indices
       , uint32_t num_rays) const
       {
-        if (this == 0) { std::cout << "this is NULL" << std::endl; }
-        if (indices == 0) { std::cout << "indices is NULL" << std::endl; }
-
 	      const auto
 	        one  = simd::floatv_t(1.0f),
 	        zero = simd::floatv_t(0.0f),
@@ -285,7 +282,7 @@ namespace accel {
       	    const auto x = indices[r];
       	    const auto t = ts[r];
  
-            if (!out[x].is_visible(visibility[r])) {
+            if (!out[x].is_visible(visibility[t])) {
               continue;
             }
 
