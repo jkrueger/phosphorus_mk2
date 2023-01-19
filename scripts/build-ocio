@@ -28,14 +28,11 @@ else
   echo "Rebuilding..."
 fi
 
-INSTALL_PREFIX="$INSTALL_DIR" \
-OCIO_BUILD_TESTS=0 \
-OCIO_BUILD_TOOLS=0 \
-USE_PYTHON=0 \
-USE_QT=0 \
-USE_NUKE=0 \
-ENABLE_OpenVDB=0 \
-make -j4 install
+mkdir -p build
+cd build
+
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" -DOCIO_BUILD_APPS=OFF -DOCIO_BUILD_PYTHON=OFF -DOCIO_BUILD_TESTS=OFF -DOCIO_BUILD_GPU_TESTS=OFF -DOCIO_BUILD_JAVA=OFF .. 
+cmake --build . --config Release --target install
 
 popd
 
