@@ -128,7 +128,7 @@ namespace camera {
 
         for (auto x=0; x<tile.w; x+=s, ++film_sample, ++lens_sample, off+=s) {
           const auto ndcx = (nhalf + sx) * stepx - half;
-
+          
           simd::vector3v_t p(0.0f, 0.0f, 0.0f);
           simd::vector3v_t d(film_sample->x, film_sample->y, onev);
 

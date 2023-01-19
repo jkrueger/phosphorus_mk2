@@ -3,6 +3,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-register"
 #include <Imath/ImathVec.h>
+#include <Imath/ImathColor.h>
 #include <OpenImageIO/ustring.h>
 #pragma clang diagnostic pop
 

@@ -185,9 +185,10 @@ struct tile_renderer_t {
       // this should run through a filter kernel instead
       for (auto y=0; y<tile.h; ++y) {
         for (auto x=0; x<tile.w; ++x) {
+          
           const auto k = y * tile.w + x;
           const auto r = integrator_state->r(k);
-
+  
           if (channels.primary) {
             channels.primary->add(x, y, r * (1.0f / (spp * pps)));
           }

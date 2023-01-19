@@ -207,7 +207,7 @@ namespace spt {
           // path vertex. this gets modulated by the current path weight
           // and added to the path radiance
           if (!from.is_occluded()) {
-  	        out += path.beta * li(state, from, hit, light_sample);
+             out += path.beta * li(state, from, hit, light_sample);
           }
 
           ++path.depth;
@@ -224,12 +224,11 @@ namespace spt {
         else {
           // add environment lighting
           out += path.beta * hit.e;
-
           // if ((state->path[index]+1) < paths_per_sample) {
           //   state->mark_for_revive(index);
           // }
         }
-
+        
         path.r = out;
       }
     }

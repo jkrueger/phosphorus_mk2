@@ -237,10 +237,10 @@ struct rays_t {
   , const uint32_t flags = 0
   , float d = std::numeric_limits<float>::max())
   {
-    float px[SIMD_WIDTH], py[SIMD_WIDTH], pz[SIMD_WIDTH];
+    __aligned(32) float px[SIMD_WIDTH], py[SIMD_WIDTH], pz[SIMD_WIDTH];
     p.store(px, py, pz);
 
-    float wx[SIMD_WIDTH], wy[SIMD_WIDTH], wz[SIMD_WIDTH];
+    __aligned(32) float wx[SIMD_WIDTH], wy[SIMD_WIDTH], wz[SIMD_WIDTH];
     wi.store(wx, wy, wz);
 
     for (auto i=0; i<SIMD_WIDTH; ++i) {

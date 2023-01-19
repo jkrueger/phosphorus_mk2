@@ -35,7 +35,7 @@ namespace lambert {
     wo = base.to_world(wo);
     return f(params, wi, wo);
   }
-
+  
   namespace refract {
     Imath::Color3f f(
       const bsdf::lobes::translucent_t& params
