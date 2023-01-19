@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+set -ex
+
+OPENEXR_REPO="git@github.com:AcademySoftwareFoundation/openexr.git"
+OPENEXR_VERSION="v3.1.5"
+OPENEXR_BUILD_TYPE=${OPENEXR_BUILD_TYPE:=Release}
+
+SOURCE_DIR="$PWD/deps/openexr"
+INSTALL_DIR="$PWD/dist"
+
+echo "Building OpenEXR"
+
+mkdir -p deps && true
+mkdir -p dist && true
+
+if [[ ! -e ${SOURCE_DIR} ]]; then
+    git clone $OPENEXR_REPO $SOURCE_DIR
+fi
+
+pushd $SOURCE_DIR
+git checkout -f ${OPENEXR_VERSION}
+
+mkdir -p build && true
+cd build
+
+cmake -DCMAKE_BUILD_TYPE="$OPENEXR_BUILD_TYPE" \
+      -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+      -DOPENEXR_BUILD_UTILS=0 \
+      -DBUILD_TESTING=0 \
+      -DPYILMBASE_ENABLE=0 \
+      -DOPENEXR_VIEWERS_ENABLE=0 \
+      -DINSTALL_OPENEXR_EXAMPLES=0 \
+      -DOPENEXR_INSTALL_EXAMPLES=0 \
+      ..
+
+make
+make install
+
+popd
+
+echo "Finished OPENEXR build"

@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+set -e
+
+OCIO_REPO="git@github.com:AcademySoftwareFoundation/OpenColorIO.git"
+OCIO_VERSION="v2.2.0"
+OCIO_BUILD_TYPE=${OCIO_BUILD_TYPE:=Release}
+
+SOURCE_DIR="$PWD/deps/ocio"
+INSTALL_DIR="$PWD/dist"
+
+echo "Building OCIO"
+
+mkdir -p deps && true
+mkdir -p dist && true
+
+if [[ ! -e ${SOURCE_DIR} ]]; then
+    git clone $OCIO_REPO $SOURCE_DIR
+fi
+
+pushd $SOURCE_DIR
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [[ "$BRANCH" == "master" || "$BRANCH" == "main" ]]; then
+  echo "Checking out ${OCIO_VERSION}"
+  git checkout -f ${OCIO_VERSION}
+else
+  echo "Rebuilding..."
+fi
+
+INSTALL_PREFIX="$INSTALL_DIR" \
+OCIO_BUILD_TESTS=0 \
+OCIO_BUILD_TOOLS=0 \
+USE_PYTHON=0 \
+USE_QT=0 \
+USE_NUKE=0 \
+ENABLE_OpenVDB=0 \
+make -j4 install
+
+popd
+
+echo "Finished OCIO build"
