@@ -36,6 +36,7 @@ namespace accel {
 
       uint32_t meshid[N];
       uint32_t faceid[N];
+      uint32_t visibility[N];
 
       inline moeller_trumbore_t(const triangle_t** triangles, uint32_t num)
 	      : num(num)
@@ -64,6 +65,8 @@ namespace accel {
 
       	  meshid[i] = mesh | (mat << 16);
       	  faceid[i] = triangles[i]->face;
+
+          visibility[i] = triangles[i]->visibility();
       	}
       }
 
@@ -110,7 +113,8 @@ namespace accel {
 
             const auto d = v0v2.dot(q) * ood;
 
-            if (d < 0.0f || d >= stream.d[index]) {
+            if (d < 0.0f || d >= stream.d[index] || 
+              !out[index].is_visible(visibility[index])) {
               continue;
             }
 
@@ -182,7 +186,7 @@ namespace accel {
       	      }
       	    }
 
-      	    if (idx != -1) {
+      	    if (idx != -1 && out[index].is_visible(visibility[idx])) {
       	      __aligned(32) float u[N];
       	      __aligned(32) float v[N];
 
@@ -277,6 +281,10 @@ namespace accel {
       	  if (r < num_rays) {
       	    const auto x = indices[r];
       	    const auto t = ts[r];
+ 
+            if (!out[x].is_visible(visibility[t])) {
+              continue;
+            }
 
             if (!out[x].is_shadow()) {
               out[x].set_surface(

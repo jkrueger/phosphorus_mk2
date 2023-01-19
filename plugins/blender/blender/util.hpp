@@ -1,5 +1,7 @@
 #pragma once
 
+#include "state.hpp"
+
 namespace blender {
   namespace util {
     /* Get the string representation of an enum value from Blender */
@@ -24,6 +26,15 @@ namespace blender {
         }
       }
       return false;
+    }
+
+    inline uint32_t ray_visibility(BL::Object& o) {
+      uint32_t flags = 0;
+
+      flags |= o.visible_camera() ? static_cast<uint32_t>(visibility_t::Camera) : 0;
+      flags |= o.visible_shadow() ? static_cast<uint32_t>(visibility_t::Shadow) : 0;
+
+      return flags;
     }
   }
 }

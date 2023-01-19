@@ -69,7 +69,7 @@ struct light_t {
   static light_t* make_point(material_t* material, const Imath::V3f& position);
 
   /* constructs a distant point light source (i.e. sun light) */
-  static light_t* make_distant(material_t* material, const Imath::V3f& direction);
+  static light_t* make_distant(material_t* material, const Imath::V3f& direction, float angle);
 
   /* add a simple rectangular area light */
   static light_t* make_rect(material_t* material, const Imath::M44f& transform, float width, float height);

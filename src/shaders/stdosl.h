@@ -445,8 +445,8 @@ closure color background() BUILTIN;
 closure color diffuse(normal N) BUILTIN;
 closure color oren_nayar (normal N, float sigma) BUILTIN;
 closure color translucent(normal N) BUILTIN;
-closure color phong(normal N, float exponent) BUILTIN;
-closure color ward(normal N, vector T,float ax, float ay) BUILTIN;
+// closure color phong(normal N, float exponent) BUILTIN;
+// closure color ward(normal N, vector T,float ax, float ay) BUILTIN;
 closure color microfacet(string distribution, normal N, vector U, float xalpha,
                          float yalpha, float eta, int refract) BUILTIN;
 closure color microfacet(string distribution, normal N, float alpha, float eta,
@@ -462,6 +462,11 @@ closure color transparent() BUILTIN;
 closure color debug(string tag) BUILTIN;
 closure color holdout() BUILTIN;
 closure color subsurface(float eta, float g, color mfp, color albedo) BUILTIN;
+
+closure color disney_diffuse(normal N) BUILTIN;
+closure color disney_sheen(normal N) BUILTIN;
+closure color disney_retro(normal N, float roughness) BUILTIN;
+closure color disney_microfacet(normal N, float ax, float ay, float eta, float metallic, color cspec) BUILTIN;
 
 // Renderer state
 int backfacing () BUILTIN;
@@ -485,6 +490,10 @@ float lerp(float t, float a, float b) {
 
 color lerp(float t, color a, color b) {
   return (1.0 - t) * a + t * b;
+}
+
+float sqr(float x) {
+  return x * x;
 }
 
 #undef BUILTIN

@@ -7,7 +7,7 @@
 
 //#ifdef __AVX512__
 //#define SIMD_WIDTH 16
-#if defined(__AVX2__)
+#if defined(__AVX2__) 
 #define SIMD_WIDTH 8
 #endif
 

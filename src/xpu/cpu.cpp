@@ -13,6 +13,7 @@
 #include "kernels/cpu/stream_bvh_kernel.hpp"
 // #include "kernels/cpu/linear_bvh_kernel.hpp"
 #include "kernels/cpu/deferred_shading_kernel.hpp"
+#include "kernels/cpu/diffuse_shading_kernel.hpp"
 #include "kernels/cpu/spt.hpp"
 
 #include "utils/allocator.hpp"
@@ -42,9 +43,22 @@ struct cpu_t::details_t {
 
     bvh::from(builder, triangles);
   }
+
+  template<typename Renderer>
+  inline void render(
+    const scene_t& scene
+  , frame_state_t& frame) 
+  {
+    Renderer renderer(options, accel, scene, frame);
+
+    job::tiles_t::tile_t tile;
+    while (frame.tiles->next(tile)) {
+      renderer.render_tile(tile, scene);
+    }
+  }
 };
 
-template<typename Accel>
+template<typename Accel, typename ShadingKernel>
 struct tile_renderer_t {
   typedef spt::state_t integrator_state_t;
 
@@ -58,7 +72,7 @@ struct tile_renderer_t {
   // rendering kernel functions
   camera::perspective_kernel_t camera_rays;
   Accel                        trace;
-  deferred_shading_kernel_t    shade;
+  ShadingKernel                shade;
   spt::light_sampler_t         prepare_occlusion_queries;
   spt::integrator_t            integrate;
 
@@ -80,13 +94,13 @@ struct tile_renderer_t {
     render_buffer_t::channel_t* normals;
   } channels;
 
-  inline tile_renderer_t(const cpu_t* cpu, const scene_t& scene, frame_state_t& frame)
-    : spp(cpu->spp)
-    , pps(cpu->pps)
+  inline tile_renderer_t(const parsed_options_t& options, const accel::mbvh_t& accel, const scene_t& scene, frame_state_t& frame)
+    : spp(options.samples_per_pixel)
+    , pps(options.paths_per_sample)
     , frame(frame)
-    , trace(&cpu->details->accel)
-    , prepare_occlusion_queries(cpu->details->options)
-    , integrate(cpu->details->options)
+    , trace(&accel)
+    , prepare_occlusion_queries(options)
+    , integrate(options)
     , allocator(ALLOCATOR_SIZE)
     , buffer(frame.tiles->format)
   {
@@ -171,9 +185,10 @@ struct tile_renderer_t {
       // this should run through a filter kernel instead
       for (auto y=0; y<tile.h; ++y) {
         for (auto x=0; x<tile.w; ++x) {
+          
           const auto k = y * tile.w + x;
           const auto r = integrator_state->r(k);
-
+  
           if (channels.primary) {
             channels.primary->add(x, y, r * (1.0f / (spp * pps)));
           }
@@ -191,6 +206,10 @@ struct tile_renderer_t {
     , buffer);
   }
 };
+
+typedef tile_renderer_t<stream_mbvh_kernel_t, deferred_shading_kernel_t> default_tile_renderer_t;
+typedef tile_renderer_t<stream_mbvh_kernel_t, diffuse_shading_kernel_t>  diffuse_tile_renderer_t;
+
 
 cpu_t::cpu_t(const parsed_options_t& options)
   : details(new details_t(options))
@@ -214,12 +233,12 @@ void cpu_t::start(const scene_t& scene, frame_state_t& frame) {
       	// create per thread state in the shading system
       	material_t::attach();
 
-        tile_renderer_t<stream_mbvh_kernel_t> renderer(this, scene, frame);
-
-      	job::tiles_t::tile_t tile;
-      	while (frame.tiles->next(tile)) {
-          renderer.render_tile(tile, scene);
-      	}
+        if (details->options.render_diffuse_scene) {
+          details->render<diffuse_tile_renderer_t>(scene, frame);
+        }
+        else {
+          details->render<default_tile_renderer_t>(scene, frame);
+        }
       }, std::cref(scene), std::ref(frame)));
   }
 }

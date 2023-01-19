@@ -114,7 +114,7 @@ namespace spt {
     , const interactions_t& primary
     , interactions_t& hits) const
     {
-      assert(active.num + state->dead.num <= active_t<>::size);
+      assert(active.num + state->dead.num <= active_t::size);
 
       for (auto i=0; i<state->dead.num; ++i) {
         const auto pixel = state->dead.index[i];
@@ -146,23 +146,22 @@ namespace spt {
       const auto samples = state->fresh_light_samples();
 
       for (auto i=0; i<active.num; ++i) {
-        const interaction_t& hit = hits[i];
+        const auto& sample = samples[i];
+        const auto& hit = hits[i];
+        
         ray_t& ray = rays[i];
 
         const auto p = offset(hit.p, hit.n);
 
-        auto wi = samples->light->setup_shadow_ray(p, samples[i]);
+        auto wi = sample.light->setup_shadow_ray(p, sample);
         const auto d  = wi.length() - 0.0001f;
         wi.normalize();
 
-        ray.reset(p, wi, d);
-
-        if (hit.is_hit() && in_same_hemisphere(hit.n, wi)) {
-          ray.shadow();
-        }
-        else {
-          ray.mask();
-        }
+        ray.reset(
+          p, wi, 
+          hit.is_hit() && in_same_hemisphere(hit.n, wi) ? 
+            SHADOW : MASKED, 
+          d);
       }
     }
   };
@@ -192,9 +191,9 @@ namespace spt {
 
         const auto& hit  = hits[i];
         const auto& from = samples[i];
+        const auto& light_sample = state->light_samples[i];
 
         auto& to = samples[active.num];
-        const auto& light_sample = state->light_samples[active.num];
 
         auto out = path.r;
 
@@ -208,7 +207,7 @@ namespace spt {
           // path vertex. this gets modulated by the current path weight
           // and added to the path radiance
           if (!from.is_occluded()) {
-  	        out += path.beta * li(state, from, hit, light_sample);
+             out += path.beta * li(state, from, hit, light_sample);
           }
 
           ++path.depth;
@@ -225,12 +224,11 @@ namespace spt {
         else {
           // add environment lighting
           out += path.beta * hit.e;
-
           // if ((state->path[index]+1) < paths_per_sample) {
           //   state->mark_for_revive(index);
           // }
         }
-
+        
         path.r = out;
       }
     }
@@ -239,20 +237,18 @@ namespace spt {
       state_t* state 
     , const ray_t& ray
     , const interaction_t& hit
-    , const sampling::details::light_sample_t& sample) const
+    , const sampling::details::light_sample_t& ls) const
     {
       // should never happen
       if (!hit.bsdf) {
-        throw std::runtime_error("Hitpoint doesn't have a BSDF");
-        // return Imath::Color3f(0.0f);
+        std::cout << "Hitpoint doesn't have a BSDF" << std::endl;
+        return Imath::Color3f(0.0f);
       }
 
       const auto f = hit.bsdf->f(ray.wi, hit.wi);
-      const auto e = sample.light->le(*state->scene, sample, ray.wi);
+      const auto e = ls.light->le(*state->scene, ls, ray.wi);
 
-      const auto pdf = sample.pdf; // * d * d;
-
-      return (e * 4) * f * (1.0f / pdf);
+      return e * f * (1.0f / ls.pdf);
     }
 
     bool sample_bsdf(
@@ -289,7 +285,10 @@ namespace spt {
       state->path[index].beta = beta * (f * (std::fabs(weight) / pdf));
 
       ray.reset(offset(hit.p, hit.n, weight < 0.0f), sampled);
+
+      ray.diffuse_bounce(bsdf_t::is_diffuse(flags));
       ray.specular_bounce(bsdf_t::is_specular(flags));
+      ray.glossy_bounce(bsdf_t::is_glossy(flags));
 
       return true;
     }

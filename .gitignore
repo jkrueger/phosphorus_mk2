@@ -45,7 +45,10 @@ debug
 release
 scenes
 design
+dist
+deps
 
 # extra files
 TODO
 .DS_Store
+

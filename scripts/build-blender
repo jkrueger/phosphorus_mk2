@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+set -ex
+
+BLENDER_REPO="https://git.blender.org/blender.git"
+BLENDER_VERSION="v3.3.1"
+
+SOURCE_DIR="$PWD/deps/blender/git"
+INSTALL_DIR="$PWD/apps"
+
+echo "Building Blender"
+
+mkdir -p deps/blender && true
+mkdir -p apps && true
+
+if [[ ! -e ${SOURCE_DIR} ]]; then
+    git clone $BLENDER_REPO $SOURCE_DIR
+fi
+
+pushd $SOURCE_DIR
+git checkout -f ${BLENDER_VERSION}
+git switch -c v3.3.1
+
+make update
+make
+
+popd
+
+echo "Finished Blender build"

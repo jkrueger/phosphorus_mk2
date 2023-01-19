@@ -54,8 +54,6 @@ namespace microfacet {
 
         const auto eta = li.y > 0.0f ? params.eta : 1.0f / params.eta;
 
-        // std::cout << "ETA: " << eta << std::endl;
-
         const auto cos_ti = ts::cos_theta(li);
         const auto cos_to = ts::cos_theta(lo);
 
@@ -72,15 +70,12 @@ namespace microfacet {
         }
 
         const auto f = fresnel::dielectric(lo.dot(wh), eta);
+        
 
         const auto sqrt_denom = li.dot(wh) + eta * lo.dot(wh);
         const auto factor = 1.0f / eta;
         const auto d = distribution.D(params, wh);
         const auto g = G(params, li, lo, distribution);
-
-        // std::cout << "F: " << f << std::endl;
-        // std::cout << "D: " << d << std::endl;
-        // std::cout << "G: " << g << std::endl;
 
         const auto c = (1.0f - f) * std::abs(
             d * g * eta * eta
@@ -171,12 +166,17 @@ namespace microfacet {
       }
     }
 
-    template<typename Params, typename Distribution>
+    template<
+      typename Params
+    , typename Distribution
+    , typename Fresnel = decltype(fresnel::dielectric)
+    >
     inline Imath::Color3f f(
       const Params& params
     , const Imath::V3f& wi
     , const Imath::V3f& wo
-    , const Distribution& distribution)
+    , const Distribution& distribution
+    , const Fresnel& fresnel = fresnel::dielectric)
     {
       using namespace details;
 
@@ -185,9 +185,13 @@ namespace microfacet {
       const auto li = base.to_local(wi);
       const auto lo = base.to_local(wo);
 
+      // std::cout << "TEST0: " << params.n << " " << li << " " << lo << std::endl;
+
       if (!ts::in_same_hemisphere(li, lo)) {
         return Imath::Color3f(0.0f);
       }
+
+      // std::cout << "TEST" << std::endl;
 
       auto wh = li + lo;
 
@@ -197,16 +201,24 @@ namespace microfacet {
       if (cos_ti == 0 || cos_to == 0) {
         return Imath::Color3f(0.0f);
       }
+
+      // std::cout << "TEST2" << std::endl;
       
       if (wh.x == 0 || wh.y == 0 || wh.z == 0) {
         return Imath::Color3f(0.0f);
       }
 
+      // std::cout << "TEST3" << std::endl;
+
       wh.normalize();
 
       const auto d = distribution.D(params, wh);
       const auto g = G(params, li, lo, distribution);
-      const auto f = fresnel::dielectric(lo.dot(wh.dot({0.0f, 1.0, 0.0}) < 0.0f ? -wh : wh), 0.5f);
+      const auto f = fresnel(lo.dot(wh.dot({0.0f, 1.0, 0.0}) < 0.0f ? -wh : wh), 0.5f);
+
+      // std::cout << "F: " << f << std::endl;
+      // std::cout << "D: " << d << std::endl;
+      // std::cout << "G: " << g << std::endl;
 
       const auto c = d * g * f * (1.0f / (4.0f * cos_ti * cos_to));
 
@@ -234,14 +246,19 @@ namespace microfacet {
       return (distribution.D(params, wh) * cook_torrance::details::G1(params, wi, distribution) * std::abs(li.dot(wh)) / std::abs(ts::cos_theta(li))) / (4.0f * li.dot(wh));
     }
 
-    template<typename Params, typename Distribution>
+    template<
+      typename Params
+    , typename Distribution
+    , typename Fresnel = decltype(fresnel::dielectric)
+    >
     Imath::Color3f sample(
       const Params& params
     , const Imath::V3f& wi
     , Imath::V3f& wo
     , const Imath::V2f& sample
     , float& opdf
-    , const Distribution& distribution)
+    , const Distribution& distribution
+    , const Fresnel& fresnel = fresnel::dielectric)
     {
       const invertible_base_t base(params.n);
 
@@ -267,13 +284,7 @@ namespace microfacet {
       opdf = dpdf / (4.0f * li.dot(wh));
       wo   = base.to_world(lo);
 
-      // if (std::abs(opdf - microfacet::cook_torrance::pdf(params, wi, wo, distribution)) > 0.001) {
-      //   std::stringstream ss;
-      //   ss << "PDF function is broken: " << opdf << " != " << microfacet::cook_torrance::pdf(params, wi, wo, distribution) << std::endl;
-      //   std::cout << ss.str();
-      // }
-
-      return f(params, wi, wo, distribution);
+      return f(params, wi, wo, distribution, fresnel);
     }
   }
 
@@ -305,8 +316,9 @@ namespace microfacet {
   /* GGX microfacet distribution implementation */
   struct ggx_t {
     /* microfacet distriubtion function */
+    template<typename Params>
     inline float D(
-      const bsdf::lobes::microfacet_t& params
+      const Params& params
     , const Imath::V3f& v) const
     {
       const auto tan2_theta = ts::tan2_theta(v);
@@ -327,8 +339,9 @@ namespace microfacet {
     }
 
     /* shadowing term function */
+    template<typename Params>
     inline float Lambda(
-      const bsdf::lobes::microfacet_t& params
+      const Params& params
     , const Imath::V3f& v) const
     {
       const auto abs_tan_theta = std::abs(ts::tan_theta(v));
@@ -397,8 +410,9 @@ namespace microfacet {
       slope_y = S * z * std::sqrt(1.0f + slope_x * slope_x);
     }
 
+    template<typename Params>
     inline Imath::V3f sample(
-      const bsdf::lobes::microfacet_t& params
+      const Params& params
     , const Imath::V3f& wi
     , float& pdf 
     , const Imath::V2f& uv) const

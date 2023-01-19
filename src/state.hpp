@@ -71,10 +71,23 @@ struct active_t {
   }
 };
 
-static const uint32_t HIT      = 1;
-static const uint32_t MASKED   = (1 << 1);
-static const uint32_t SHADOW   = (1 << 2);
-static const uint32_t SPECULAR = (1 << 3);
+static const uint32_t CAMERA   = 1;
+static const uint32_t SHADOW   = 2;
+static const uint32_t DIFFUSE  = 4;
+static const uint32_t SPECULAR = 8;
+static const uint32_t GLOSSY   = 16;
+static const uint32_t HIT      = 32;
+static const uint32_t MASKED   = 64;
+
+/* flags to indicate the visibility of objects to certain
+ * types of rays */
+enum class visibility_t : uint32_t {
+  Camera   = CAMERA,
+  Shadow   = SHADOW,
+  Diffuse  = DIFFUSE,
+  Specular = SPECULAR,
+  Glossy   = GLOSSY
+};
 
 /* Models a ray as it gets processed in the rendering pipeline */
 struct ray_t {
@@ -95,11 +108,12 @@ struct ray_t {
   inline void reset(
     const Imath::V3f& _p
   , const Imath::V3f& _wi
+  , uint32_t _flags = 0
   , float _d = std::numeric_limits<float>::max()) {
     p = _p;
     wi = _wi;
     d = _d;
-    flags = 0;
+    flags = _flags;
   }
 
   inline void set_surface(
@@ -134,12 +148,30 @@ struct ray_t {
     flags |= MASKED;
   }
 
+  inline void diffuse_bounce(bool b) {
+    if (b) {
+      flags |= DIFFUSE;
+    }
+    else {
+      flags &= ~DIFFUSE;
+    }
+  }
+
   inline void specular_bounce(bool b) {
     if (b) {
       flags |= SPECULAR;
     }
     else {
       flags &= ~SPECULAR;
+    }
+  }
+
+  inline void glossy_bounce(bool b) {
+    if (b) {
+      flags |= GLOSSY;
+    }
+    else {
+      flags &= ~GLOSSY;
     }
   }
 
@@ -153,6 +185,11 @@ struct ray_t {
 
   inline bool is_shadow() const {
     return (flags & SHADOW) == SHADOW;
+  }
+
+  /* checks if an object is visible to this ray */
+  inline bool is_visible(uint32_t vis) const {
+    return !is_shadow() || (vis & static_cast<uint32_t>(visibility_t::Shadow));
   }
 
   inline bool is_occluded() const {
@@ -197,12 +234,13 @@ struct rays_t {
     uint32_t off
   , const simd::vector3v_t& p
   , const simd::vector3v_t& wi
+  , const uint32_t flags = 0
   , float d = std::numeric_limits<float>::max())
   {
-    float px[SIMD_WIDTH], py[SIMD_WIDTH], pz[SIMD_WIDTH];
+    __aligned(32) float px[SIMD_WIDTH], py[SIMD_WIDTH], pz[SIMD_WIDTH];
     p.store(px, py, pz);
 
-    float wx[SIMD_WIDTH], wy[SIMD_WIDTH], wz[SIMD_WIDTH];
+    __aligned(32) float wx[SIMD_WIDTH], wy[SIMD_WIDTH], wz[SIMD_WIDTH];
     wi.store(wx, wy, wz);
 
     for (auto i=0; i<SIMD_WIDTH; ++i) {
@@ -216,7 +254,7 @@ struct rays_t {
       r.wi.z = wz[i];
 
       r.d = d;
-      r.flags = 0;
+      r.flags = flags;
     }
   }
 };
@@ -280,6 +318,8 @@ struct interaction_t {
   Imath::Color3f e;
 
   invertible_base_t xform;
+
+  struct mesh_t* mesh;
 
   inline bool is_hit() const {
     return (flags & HIT) == HIT;

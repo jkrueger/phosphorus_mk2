@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+set -e
+
+OIIO_REPO="git@github.com:OpenImageIO/oiio.git"
+OIIO_VERSION="v2.4.5.0"
+OIIO_BUILD_TYPE=${OIIO_BUILD_TYPE:=Release}
+
+SOURCE_DIR="$PWD/deps/oiio"
+INSTALL_DIR="$PWD/dist"
+
+echo "Building OIIO"
+
+mkdir -p deps && true
+mkdir -p dist && true
+
+if [[ ! -e ${SOURCE_DIR} ]]; then
+    git clone $OIIO_REPO $SOURCE_DIR
+fi
+
+pushd $SOURCE_DIR
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [[ "$BRANCH" == "master" || "$BRANCH" == "main" ]]; then
+  echo "Checking out ${OIIO_VERSION}"
+  git checkout -f ${OIIO_VERSION}
+else
+  echo "Rebuilding..."
+fi
+
+INSTALL_PREFIX="$INSTALL_DIR" \
+OIIO_BUILD_TESTS=0 \
+OIIO_BUILD_TOOLS=0 \
+USE_PYTHON=0 \
+USE_QT=0 \
+USE_NUKE=0 \
+ENABLE_OpenVDB=0 \
+make -j4 install
+
+popd
+
+echo "Finished OIIO build"

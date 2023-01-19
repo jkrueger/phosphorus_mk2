@@ -25,6 +25,10 @@ normal_map_node
     Normal = normal(0, 0, 0);
   }
 
+  // normal N2 = normalize(N + (N - Normal) * max(strength, 0.0));
+
+  // printf("%f, %f, %f\n", N, Normal, N2);
+
   // modify original normal given the input strength
   Normal = normalize(N + (N - Normal) * max(strength, 0.0));
 }

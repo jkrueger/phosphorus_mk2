@@ -113,15 +113,11 @@ void sampler_t::preprocess(const scene_t& scene) {
 
   const auto nlights = scene.num_lights();
 
-  static uint32_t stats[8] = {0,0,0,0,0,0,0,0};
-
   for (auto i=0; i<details_t::NUM_LIGHT_SAMPLE_SETS; i++) {
     for (auto j=0; j<light_samples_t::size/light_samples_t::step; ++j) {
       for (auto k=0; k<light_samples_t::step; ++k) {
         const auto l = std::min((uint32_t) std::floor(sample() * nlights), nlights - 1);
         const auto light = scene.light(l);
-
-        stats[l]++;
 
         light_sample_t sample;
         light->sample(details->sample2(), sample);
@@ -134,10 +130,6 @@ void sampler_t::preprocess(const scene_t& scene) {
         out.data[k] = sample.data;
       }
     }
-  }
-
-  for(auto i=0; i<8;++i) {
-    std::cout << stats[i] << ", " << std::endl; 
   }
 }
 

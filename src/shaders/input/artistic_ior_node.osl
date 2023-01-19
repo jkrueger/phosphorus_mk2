@@ -1,0 +1,11 @@
+
+shader artistic_ior_node
+  [[ string help = "Converts a (0.0, 1.0) artistic ior representation to a value used in the pipeline" ]]
+(
+  float in = 0.5,
+  output float out = 0.0
+)
+{
+  float eta = max(1.0-in, 1.01e-5);
+  out = backfacing() ? eta : 1.0 / eta;
+}

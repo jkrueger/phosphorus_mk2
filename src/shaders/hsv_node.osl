@@ -1,0 +1,30 @@
+#include "colorspace.h"
+
+shader
+hsv_node
+(
+  color in = 0.0,
+
+  float hue = 0.5,
+  float saturation = 1.0,
+  float value = 1.0,
+
+  float fac = 0.5,
+
+  output color out = 0.0
+)
+{
+  color c = rgb_to_hsv(in);
+
+  c[0] = fmod(c[0] + hue + 0.5, 1.0);
+  c[1] = clamp(c[1] * saturation, 0.0, 1.0);
+  c[2] = c[2] * value;
+
+  c = hsv_to_rgb(c);
+
+  c[0] = max(c[0], 0.0);
+  c[1] = max(c[1], 0.0);
+  c[2] = max(c[2], 0.0);
+
+  out = mix(in, c, fac);
+}

@@ -33,7 +33,7 @@ void intersect(
   if (lanes.num[0] == 0) {
     return;
   }
-
+  
   const float_t zero(0.0f);
   const simd::int32v_t one(1);
 

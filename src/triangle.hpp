@@ -28,6 +28,8 @@ struct triangle_t {
   const Imath::V3f& b() const;
   const Imath::V3f& c() const;
 
+  uint32_t visibility() const;
+
   Imath::V3f barycentric_to_point(const Imath::V2f& uv) const;
 
   /* convert a sample from the unit square to barycentric coordinates

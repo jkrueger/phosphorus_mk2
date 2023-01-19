@@ -94,7 +94,11 @@ struct mesh_t {
   uint32_t num_vertices;
   uint32_t num_faces;
 
-  mesh_t();
+  uint32_t visibility;
+
+  float random; // a unique random value for this object
+
+  mesh_t(uint32_t visibility);
   ~mesh_t();
 
   builder_t* builder();
@@ -151,4 +155,6 @@ struct mesh_t {
   inline uint32_t material(uint32_t set) const {
     return sets[set].mat();
   }
+
+  inline float object_random() const { return 0.5f; }
 };

@@ -12,23 +12,31 @@ struct bsdf_t {
    * on the gpu as well, where we don't have virtual fcuntion calls
    * the type flags are used for dispatch  */
   enum type_t {
-    Emissive    = 0,
-    Diffuse     = 1,
-    OrenNayar   = 2,
-    Reflection  = 4,
-    Refraction  = 8,
-    Microfacet  = 16,
-    Sheen       = 32,
-    Background  = 64,
-    Transparent = 128,
+    Emissive         = 0,
+    Diffuse          = 1,
+    Translucent      = 2,
+    OrenNayar        = 4,
+    Reflection       = 8,
+    Refraction       = 16,
+    Microfacet       = 32,
+    Sheen            = 64,
+    Background       = 128,
+    Transparent      = 256,
+    DisneyDiffuse    = 512,
+    DisneyRetro      = 1024,
+    DisneySheen      = 2048,
+    DisneyMicrofacet = 4096
   };
 
   union param_t{
     bsdf::lobes::diffuse_t diffuse;
+    bsdf::lobes::translucent_t translucent;
     bsdf::lobes::oren_nayar_t oren_nayar;
+    bsdf::lobes::disney_retro_t disney_retro;
     bsdf::lobes::reflect_t reflect;
     bsdf::lobes::refract_t refract;
     bsdf::lobes::microfacet_t microfacet;
+    bsdf::lobes::disney_microfacet_t disney_microfacet;
     bsdf::lobes::sheen_t sheen;
   };
 
@@ -57,28 +65,20 @@ struct bsdf_t {
     flags[lobes] = T::flags;
     weight[lobes] = c;
 
-    const auto index = lobes*sizeof(param_t);
-    auto param = (T*) &params[index];
+    if (p) {
+      const auto index = lobes*sizeof(param_t);
+      auto param = (T*) &params[index];
 
-    memcpy(param, p, sizeof(T));
-    param->precompute();
+      memcpy(param, p, sizeof(T));
+      param->precompute();
+    }
 
     ++lobes;
   }
 
-  template<>
-  inline void add_lobe(type_t t, const Imath::Color3f& c, const bsdf::lobes::microfacet_t* p) {
-    type[lobes] = t;
-    flags[lobes] = p->refract ? bsdf::TRANSMIT : bsdf::REFLECT;
-    weight[lobes] = c;
-
-    const auto index = lobes*sizeof(param_t);
-    auto param = (bsdf::lobes::microfacet_t*) &params[index];
-
-    memcpy(param, p, sizeof(bsdf::lobes::microfacet_t));
-    param->precompute();
-
-    ++lobes;
+  inline void add_microfacet_lobe(type_t t, const Imath::Color3f& c, const bsdf::lobes::microfacet_t* p) {
+    add_lobe(t, c, p);
+    flags[lobes-1] |= p->refract ? bsdf::TRANSMIT : bsdf::REFLECT;
   }
 
   bool is_reflective(uint32_t i) const {
@@ -89,7 +89,15 @@ struct bsdf_t {
     return (flags[i] & bsdf::TRANSMIT) == bsdf::TRANSMIT;
   }
 
+  static bool is_diffuse(uint32_t flags) {
+    return (flags & bsdf::DIFFUSE) == bsdf::DIFFUSE;
+  }
+
   static bool is_specular(uint32_t flags) {
     return (flags & bsdf::SPECULAR) == bsdf::SPECULAR;
+  }
+
+  static bool is_glossy(uint32_t flags) {
+    return (flags & bsdf::GLOSSY) == bsdf::GLOSSY;
   }
 };

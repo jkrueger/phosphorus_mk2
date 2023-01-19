@@ -26,4 +26,14 @@ namespace fresnel {
 
     return 1.0f;
   }
+
+  inline float schlick_weight(float cos_theta) {
+    const auto m = std::clamp(1.0f - cos_theta, 0.0f, 1.0f);
+    return (m * m) * (m * m) * m;
+  }
+
+  inline Imath::Color3f schlick(const Imath::Color3f& c, float cosi) {
+    float weight = schlick_weight(cosi);
+    return (1.0f - weight) * c +  weight * Imath::Color3f(1.0f);
+  }
 }

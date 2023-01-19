@@ -3,7 +3,7 @@ shader
 diffuse_bsdf_node
   [[ string help = "Lambertian diffuse BSDF shader" ]]
 (
-  color Cs = 1
+  color Cs = 0
     [[ string help = "Base material color" ]],
 
   normal shadingNormal = N

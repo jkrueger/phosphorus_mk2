@@ -38,6 +38,10 @@ namespace blender {
     return id && id.is_a(&RNA_Material);
   }
 
+  inline Imath::V3f get_column(const Imath::M44f& m, int n) {
+    return Imath::V3f(m[0][n], m[1][n], m[2][n]);
+  }
+
   inline Imath::V3f get_row(const Imath::M44f& m, int n) {
     return Imath::V3f(m[n][0], m[n][1], m[n][2]);
   }
@@ -181,7 +185,7 @@ namespace blender {
       normal_transform.invert();
       normal_transform.transpose();
 
-      auto mesh = new mesh_t();
+      auto mesh = new mesh_t(util::ray_visibility(object));
       mesh_t::builder_t::scoped_t builder(mesh->builder());
 
       if (use_loop_normals) {
@@ -261,6 +265,11 @@ namespace blender {
 
       for (auto& set : sets) {
         const auto material = scene.material(set.first);
+        
+        // material will always be present, since empty, or faulty materials
+        // will be imported as a default diffuse material
+
+        std::cout << "\tMaterial: " << material->name;
 
         if (material->has_attribute("geom:tangent")) {
           generate_tangents = true;
@@ -270,6 +279,12 @@ namespace blender {
           generate_uvs = true;
         }
 
+        if (material->is_emitter()) {
+          std::cout << ", is an emitter"; 
+        }
+
+        std::cout << std::endl;
+
         builder->add_face_set(material, set.second);
       }
 
@@ -278,7 +293,6 @@ namespace blender {
       if (generate_uvs && blender_mesh.uv_layers.length() != 0) {
         BL::Mesh::uv_layers_iterator l;
         blender_mesh.uv_layers.begin(l);
-        std::cout << "Importing UV map coordinates: " << l->data.length() << std::endl;
         //  TODO: allow multiple UV map layers
         // for (l!=blender_mesh.uv_layers.end(); ++l) {
           BL::Mesh::loop_triangles_iterator f;
@@ -321,16 +335,127 @@ namespace blender {
       return mesh;
     }
 
+    /* blender does automatic conversion between nodes types, so we have to autoamtically
+     * insert conversion ndoes in the tree, if the input, and output types don't match */
+    std::optional<std::string>
+    convert_socket_types(
+      BL::NodeSocket& from
+    , BL::NodeSocket& to
+    , material_t::builder_t::scoped_t& builder)
+    {
+      switch(from.type()) {
+        case BL::NodeSocket::type_RGBA:
+          switch (to.type()) {
+            case BL::NodeSocket::type_VALUE:
+            {
+              const std::string name = "convert_" + from.node().name() + "_" + to.node().name();
+              builder->shader("luminance_node", name, "surface");
+              return name;
+            }
+            default:
+              std::cout << "FIXME: No conversion from color to input socket type" << std::endl;
+              break;
+          }
+          break;
+        default:
+          std::cout << "FIXME: No conversion defined for output socket type" << std::endl;
+      }
+
+      return {};
+    }
+
+    void map_inputs(
+      BL::ShaderNode& node
+    , const shader::compiler_t* compiler
+    , std::unordered_map<void*, BL::NodeLink>& links
+    , std::unordered_map<void*, shader::socket_t>& outputs
+    , std::vector<std::function<void (material_t::builder_t::scoped_t&)>>& linkers
+    , material_t::builder_t::scoped_t& builder)
+    {
+      BL::Node::inputs_iterator socket;
+      for (node.inputs.begin(socket); socket!=node.inputs.end(); ++socket) {
+
+        const auto mappings = compiler->input_socket(*socket);
+        if (mappings.size() == 0) {
+          continue;
+        }
+
+        std::optional<std::string> name;
+
+        auto guard = links.find(socket->ptr.data);
+
+        if (guard != links.end()) {
+          auto link = guard->second;
+
+          auto from_socket  = link.from_socket();
+          auto from_mapping = outputs.find(from_socket.ptr.data);
+
+          if (from_mapping == outputs.end()) {
+            std::cout 
+              << "\tCan't find mapping for output socket: " 
+              << from_socket.identifier()
+              << "\' for shader: " 
+              << from_socket.node().name()
+              << std::endl;
+            continue;
+          }
+
+          if (from_socket.type() != socket->type()) {
+            if (const auto converter = convert_socket_types(from_socket, *socket, builder)) {
+              name = converter.value();
+
+              linkers.push_back([=](material_t::builder_t::scoped_t& builder) {
+                builder->connect(
+                  from_mapping->second.name(), "in",
+                  from_mapping->second.node(), name.value());
+              });
+            }
+          }
+
+          for (auto& to_mapping : mappings) {
+            const auto node  = name ? name.value() : from_mapping->second.node();
+            const auto param = name ? "out" : from_mapping->second.name();
+
+            std::cout << "Connecting: " << param << " to " << to_mapping.name() << std::endl;
+
+            linkers.push_back([=](material_t::builder_t::scoped_t& builder) {
+              builder->connect(
+                param, to_mapping.name(),
+                node, to_mapping.node()
+              );
+            });
+          }
+        }
+      }
+    }
+
+    void map_outputs(
+      BL::ShaderNode& node
+    , const shader::compiler_t* compiler
+    , std::unordered_map<void*, shader::socket_t>& outputs) 
+    {
+      BL::Node::outputs_iterator socket;
+      for (node.outputs.begin(socket); socket!=node.outputs.end(); ++socket) {
+
+        if (const auto& mapping = compiler->output_socket(*socket)) {
+          outputs.insert(std::make_pair(socket->ptr.data, std::move(mapping.value())));
+        }
+      }
+    }
+
     void shader_tree(
       BL::ShaderNodeTree& tree
     , BL::Depsgraph& graph
     , BL::Scene& scene
     , material_t::builder_t::scoped_t& builder)
     {
-      std::unordered_map<std::string, const shader::compiler_t*> compilers;
+      std::unordered_map<void*, BL::NodeLink> links;
+      std::unordered_map<void*, shader::socket_t> outputs;
 
       std::unordered_map<void*, std::list<PointerRNA>> in;
       std::unordered_map<void*, std::list<PointerRNA>> out;
+
+      std::vector<std::function<void (material_t::builder_t::scoped_t&)>> linkers;
 
       // we have to do a topological sort on the nodes, because OSL expects
       // them to get created in the order the links go through the node tree
@@ -340,6 +465,8 @@ namespace blender {
         if (!link->is_valid()) {
           continue;
         }
+
+        links.insert(std::make_pair(link->to_socket().ptr.data, *link));
 
         auto from = link->from_socket().node();
         auto to = link->to_socket().node();
@@ -376,85 +503,66 @@ namespace blender {
         sorted.push_back(node);
       }
 
-      for (auto i=sorted.begin(); i!=sorted.end(); ++i) {
-        BL::ShaderNode node(*i);
+      for (auto& i : sorted) {
+        BL::ShaderNode node(i);
         if (node.is_a(&RNA_ShaderNodeOutputMaterial) ||
             node.is_a(&RNA_ShaderNodeOutputWorld)) {
           continue;
         }
         else if (node.is_a(&RNA_ShaderNodeGroup)) {
-          // TODO: log not supported
+          std::cout << "Compiling group: " << node.name() << std::endl;
+
+          BL::ShaderNodeTree node_tree = BL::ShaderNodeTree(((BL::NodeGroup) node).node_tree());
+          shader_tree(node_tree, graph, scene, builder);
+
+          if (const auto compiler = shader::compiler_t::factory(node)) {
+            map_inputs(node, compiler, links, outputs, linkers, builder);
+            map_outputs(node, compiler, outputs);
+
+            compiler->compile(node, builder, scene);
+
+          }
         }
         else if (node.is_a(&RNA_NodeGroupInput)) {
-          // TODO: log not supported
+          std::cout << "Compiling group input: " << node.name() << std::endl;
+          if (const auto compiler = shader::compiler_t::factory(node)) {
+            map_outputs(node, compiler, outputs);
+            
+            compiler->compile(node, builder, scene);
+          }
         }
         else if (node.is_a(&RNA_NodeGroupOutput)) {
-          // TODO: log not supported
+          std::cout << "Compiling group output: " << node.name() << std::endl;
+          if (const auto compiler = shader::compiler_t::factory(node)) {
+            map_inputs(node, compiler, links, outputs, linkers, builder);
+
+            compiler->compile(node, builder, scene);
+
+          }
         }
         else {
           if (const auto compiler = shader::compiler_t::factory(node)) {
+            std::cout << "Compiling: " << node.name() << std::endl;
+
+            map_inputs(node, compiler, links, outputs, linkers, builder);
+            map_outputs(node, compiler, outputs);
+
             compiler->compile(node, builder, scene);
-            compilers.insert({node.name(), compiler});
           }
         }
       }
 
       if (auto output_node = tree.get_output_node(2)) {
+        std::cout << "Compiling: " << output_node.name() << std::endl;
         if (const auto compiler = shader::compiler_t::factory(output_node)) {
+          map_inputs(output_node, compiler, links, outputs, linkers, builder);
           compiler->compile(output_node, builder, scene);
-          compilers.insert({output_node.name(), compiler});
         }
       }
 
-      for (tree.links.begin(link); link!=tree.links.end(); ++link) {
-        if (!link->is_valid()) {
-          continue;
-        }
-
-        auto from_socket = link->from_socket();
-        auto to_socket = link->to_socket();
-
-        auto from_compiler = compilers.find(from_socket.node().name());
-        auto to_compiler = compilers.find(to_socket.node().name());
-
-        if (from_compiler == compilers.end() || to_compiler == compilers.end()) {
-          std::cout 
-            << "Can't find compilers for nodes: (" 
-            << from_socket.node().name() << ", " 
-            << to_socket.node().name() << ")" 
-            << std::endl;
-          continue;
-        }
-        
-        const auto outputSocket = from_compiler->second->output_socket(from_socket);
-        const auto inputSockets = to_compiler->second->input_socket(to_socket);
-
-        if (!outputSocket) {
-          std::cout 
-            << "Can't find output socket \'" 
-            << from_socket.identifier() 
-            << "\' for shader: " 
-            << link->from_socket().node().name() 
-            << std::endl;
-          continue;
-        }
-
-        if (inputSockets.empty()) {
-          std::cout 
-            << "Can't find input socket \'" 
-            << to_socket.identifier() 
-            << "\' for shader: " 
-            << link->to_socket().node().name() 
-            << std::endl;
-          continue;
-        }
-
-        for (auto& socket : inputSockets) {
-          builder->connect(
-            outputSocket.value().name(), socket.name(),
-            outputSocket.value().node(), socket.node()
-          );
-        }
+      // link up nodes
+      for (auto linker : linkers) {
+        linker(builder);
       }
     }
 
@@ -505,6 +613,14 @@ namespace blender {
         {
           BL::AreaLight blender_area_light(blender_light);
 
+          PointerRNA clight = RNA_pointer_get(&blender_area_light.ptr, "cycles");
+          bool is_portal = RNA_boolean_get(&clight, "is_portal") ? true : false;
+
+          if (is_portal) {
+            std::cout << "\tSkipping portal light" << std::endl;
+            return nullptr;
+          }
+
           auto dir = -get_row(to_world, 2);
           dir.normalize();
 
@@ -529,9 +645,8 @@ namespace blender {
           scene.add(material->name, material);
 
           Imath::V3f dir = -get_row(to_world, 2);
-          std::cout << "SUN: " << dir << std::endl;
 
-          scene.add(light_t::make_distant(material, dir));
+          scene.add(light_t::make_distant(material, dir, blender_sun_light.angle()));
           break;
         }
         default:
@@ -581,8 +696,19 @@ namespace blender {
           }
           else {
             std::cout
-              << "Skipping material without shader tree: "
+              << "Setting default for material without shader tree: "
               << material.name() << std::endl;
+
+            material_t* out = new material_t(material.name());
+            {
+              std::unique_ptr<material_t::builder_t> builder(out->builder());
+              builder->parameter("Cs", Imath::Color3f(1, 1, 1));
+              builder->shader("diffuse_bsdf_node", "diffuse", "surface");
+              builder->shader("material_node", material.name(), "surface");
+              builder->connect("Cout", "Cs", "diffuse", material.name());
+            }
+
+            scene.add(material.name(), out);
           }
         }
       }
@@ -663,6 +789,8 @@ namespace blender {
       scene.camera.fov = camera.angle();
       scene.camera.sensor_width = camera.sensor_width();
       scene.camera.sensor_height = camera.sensor_height();
+      scene.camera.clip_near = camera.clip_start();
+      scene.camera.clip_far = camera.clip_end();
 
       if (camera.dof() && camera.dof().use_dof()) {
         float fstop = camera.dof().aperture_fstop();

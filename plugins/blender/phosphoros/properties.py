@@ -34,6 +34,12 @@ class PhosphorosRenderSettings(bpy.types.PropertyGroup):
         default=9,
     )
 
+    render_diffuse_scene: BoolProperty(
+        name="Render Diffuse Scene",
+        description="Render the scene as if every surface is a diffuse reflector",
+        default=False,
+    )
+
     @classmethod
     def register(cls):
         bpy.types.Scene.phosphoros = PointerProperty(

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+set -ex
+
+IMATH_REPO="git@github.com:AcademySoftwareFoundation/Imath.git"
+IMATH_VERSION="v3.1.6"
+IMATH_BUILD_TYPE=${IMATH_BUILD_TYPE:=Release}
+
+SOURCE_DIR="$PWD/deps/imath"
+INSTALL_DIR="$PWD/dist"
+
+echo "Building Imath"
+
+mkdir -p deps && true
+mkdir -p dist && true
+
+if [[ ! -e ${SOURCE_DIR} ]]; then
+    git clone $IMATH_REPO $SOURCE_DIR
+fi
+
+pushd $SOURCE_DIR
+git checkout -f ${IMATH_VERSION}
+
+mkdir -p build && true
+cd build
+
+cmake -DCMAKE_BUILD_TYPE="$IMATH_BUILD_TYPE" \
+      -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+      ..
+
+make
+make install
+
+popd
+
+echo "Finished Imath build"

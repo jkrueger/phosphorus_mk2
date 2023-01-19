@@ -5,6 +5,8 @@
 #include <Imath/ImathMatrix.h>
 #pragma clang diagnostic pop
 
+#include <limits>
+
 /* The camera data model, used by the rest of the rendering 
  * system */
 struct camera_t {
@@ -16,6 +18,7 @@ struct camera_t {
   float sensor_width;
   float sensor_height;
   float aperture_radius;
+  float clip_near, clip_far;
 
   struct film_t {
     uint32_t width;
@@ -32,6 +35,8 @@ struct camera_t {
     , sensor_width(36.0f)
     , sensor_height(24.0f)
     , aperture_radius(0.0f)
+    , clip_near(0.0f)
+    , clip_far(std::numeric_limits<float>::max())
   {}
 
   inline bool is_pinhole() const {

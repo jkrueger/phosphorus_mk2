@@ -7,6 +7,8 @@
 #include <set>
 #include <vector>
 
+#include <sys/mman.h>
+
 namespace accel {
   struct mbvh_t::details_t {
     typedef mbvh::node_t<mbvh_t::width> node_t;
@@ -44,6 +46,11 @@ namespace accel {
       bvh->triangles = triangles.data();
 
       bvh->num_triangles = triangles.size();
+
+      // set memory protection to read only on bvh from here on out, 
+      // to detect memory corruption
+      mprotect(bvh->root, nodes.size() * sizeof(nodes[0]), PROT_READ);
+      mprotect(bvh->triangles, triangles.size() * sizeof(triangles[0]), PROT_READ);
     }
 
     uint32_t make_node() {
@@ -66,12 +73,12 @@ namespace accel {
       const triangle_t* tris[mbvh_t::width];
 
       for (auto i=begin; i<end; i+=mbvh_t::width) {
-	auto num = std::min(8u, (uint32_t)(end-i));
-	for (auto j=0; j<num; ++j) {
-	  tris[j] = &things[primitives[i+j].index];
-	}
-	triangles.emplace_back(tris, num);
-	size += num;
+      	auto num = std::min(8u, (uint32_t)(end-i));
+      	for (auto j=0; j<num; ++j) {
+      	  tris[j] = &things[primitives[i+j].index];
+      	}
+      	triangles.emplace_back(tris, num);
+      	size += num;
       }
 
       return off;

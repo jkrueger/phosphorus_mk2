@@ -25,13 +25,26 @@ namespace blender {
   namespace shader {
 
     struct generic_node_t;
+    struct input_node_t;
+    struct property_node_t;
+    struct light_path_node_t;
+
     struct glossy_node_t;
     struct refraction_node_t;
     struct glass_node_t;
+
+    struct layer_weight_node_t;
+    struct math_node_t;
     struct mix_rgb_node_t;
+    struct rgb_curves_node_t;
+    struct color_ramp_node_t;
 
     struct image_texture_node_t;
     struct env_texture_node_t;
+
+    struct group_node_t;
+    struct group_input_node_t;
+    struct group_output_node_t;
 
     /* represents a shader node/parameter name pair, that is used
      * to link up shader nodes */
@@ -70,10 +83,16 @@ namespace blender {
 
       inline std::string from_blender_blend_type(int bd) {
         switch(bd) {
+        case BL::ShaderNodeMixRGB::blend_type_MIX:
+          return "mix";
         case BL::ShaderNodeMixRGB::blend_type_MULTIPLY:
           return "mul";
         case BL::ShaderNodeMixRGB::blend_type_ADD:
           return "add";
+        case BL::ShaderNodeMixRGB::blend_type_DARKEN:
+          return "darken";
+        case BL::ShaderNodeMixRGB::blend_type_LIGHTEN:
+          return "lighten";
         default:
           std::cout << "Unsupported blend type. Defaulting to mul" << std::endl;
           return "mul";
@@ -153,16 +172,33 @@ namespace blender {
 
       static const generic_node_t add_shader;
       static const generic_node_t mix_shader;
+      static const input_node_t const_color;
+      static const property_node_t tex_coordinate;
+      static const property_node_t object_info;
+      static const light_path_node_t light_path;
+      static const property_node_t geometry;
+      static const layer_weight_node_t layer_weight;
+      static const math_node_t math;
       static const mix_rgb_node_t mix_rgb;
+      static const rgb_curves_node_t rgb_curves;
+      static const color_ramp_node_t color_ramp;
+      static const generic_node_t transform_point;
+      static const generic_node_t transform_vector;
+      static const generic_node_t invert;
+      static const generic_node_t split;
+      static const generic_node_t combine;
+      static const generic_node_t hsv;
       static const generic_node_t luminance;
+      static const generic_node_t gamma;
       static const generic_node_t fresnel;
+      static const generic_node_t principled_bsdf;
       static const generic_node_t diffuse_bsdf;
       static const glossy_node_t glossy_bsdf;
       static const glass_node_t glass_bsdf;
       static const generic_node_t sheen_bsdf;
       static const generic_node_t transparent_bsdf;
       static const refraction_node_t refraction_bsdf;
-      static const generic_node_t emission_bsdf;
+      static const generic_node_t emission;
       static const generic_node_t background;
       static const image_texture_node_t image_texture;
       static const env_texture_node_t env_texture;
@@ -171,6 +207,9 @@ namespace blender {
       static const generic_node_t musgrave_noise_3d;
       static const generic_node_t normal_map;
       static const generic_node_t blackbody;
+      static const group_node_t group;
+      static const group_input_node_t group_input;
+      static const group_output_node_t group_output;
       static const generic_node_t material;
     };
 
@@ -252,6 +291,171 @@ namespace blender {
         }
     };
 
+    /* A node that has a user supplied value */
+    struct input_node_t : generic_node_t {
+      std::string socket;
+
+      input_node_t()
+        : generic_node_t()
+      {}
+
+      input_node_t(
+          const std::string& shader
+        , const std::string& socket
+        , const std::vector<mapping_t>& outputs
+        , const std::vector<std::string>& attributes = {})
+      : generic_node_t(shader, {}, outputs, attributes)
+      , socket(socket)
+      {}
+
+      virtual void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
+        if (auto output = node.outputs[socket]) {
+          set_default(output, "in", builder);          
+        }
+        else {
+          std::cout << "Can't set output: " << socket << " of node" << node.name() << std::endl; 
+        }
+
+        for (const auto& attribute : attributes) {
+          builder->add_attribute(attribute);
+        }
+
+        builder->shader(shader, node.name(), "surface");
+      }
+    };
+
+    /* A node that supplies input from renderer properties (texture coordinates, ...) 
+       TODO: convert to template, so optional inbput value can be of arbitrary type */
+    struct property_node_t : compiler_t {
+      struct property_t {
+        std::string shader;
+        std::string socket;
+
+        std::optional<std::string> value;
+
+        property_t(const std::string& shader, const std::string& socket, const std::optional<std::string>& value = {})
+          : shader(shader)
+          , socket(socket)
+          , value(value)
+        {}
+      };
+
+      std::vector<property_t> outputs;
+
+      property_node_t(
+          const std::vector<property_t>& outputs)
+       : outputs(outputs)
+      {}
+
+      virtual void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
+        for (auto out : outputs) {
+          if (out.value) {
+            builder->parameter("in", out.value.value());
+          }
+
+          builder->shader(out.shader, node.name() + "." + out.socket, "surface");
+        }
+      }
+
+      sockets_t input_socket(BL::NodeSocket& socket) const 
+      { 
+        return sockets_t();
+      }
+
+      std::optional<socket_t> output_socket(BL::NodeSocket& socket) const {
+        const auto guard = std::find_if(
+          outputs.begin(), outputs.end(), [&](const auto& property) -> bool {
+            return property.socket == socket.identifier();
+          });
+
+        if (guard != outputs.end()) {
+          return socket_t{ socket.node().name() + "." + guard->socket, "out" };
+        }
+
+        return {};
+      }
+    };
+
+    struct light_path_node_t : compiler_t {
+      light_path_node_t()
+      {}
+
+      virtual void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
+        BL::Node::outputs_iterator out;
+        for (node.outputs.begin(out); out!=node.outputs.end(); ++out) {
+          if (out->is_linked()) {
+            if (out->name() == "Is Diffuse") builder->parameter("in", "diffuse");
+            else if (out->name() == "Is Specular") builder->parameter("in", "specular");
+            else if (out->name() == "Is Glossy") builder->parameter("in", "glossy");
+            else if (out->name() == "Is Camera") builder->parameter("in", "camera");
+            else if (out->name() == "Is Shadow") builder->parameter("in", "shadow");
+
+            builder->shader("input/raytype_node", node.name() + "." + out->identifier(), "surface");
+          }
+        }
+      }
+
+      sockets_t input_socket(BL::NodeSocket& socket) const 
+      { 
+        return sockets_t();
+      }
+
+      std::optional<socket_t> output_socket(BL::NodeSocket& socket) const {
+        return socket_t{ socket.node().name() + "." + socket.identifier(), "out" };
+      }
+    };
+
+    struct math_node_t : public compiler_t {
+      void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
+        BL::ShaderNodeMath math_node(node.ptr);
+
+        set_default_from(node, "Value", "a", builder);
+        set_default_from(node, "Value_001", "b", builder);
+
+        switch (math_node.operation()) {
+          case BL::ShaderNodeMath::operation_ADD:
+            builder->shader("math/add_node", node.name(), "surface");
+            break;
+          case BL::ShaderNodeMath::operation_SUBTRACT:
+            builder->shader("math/sub_node", node.name(), "surface");
+            break;
+          case BL::ShaderNodeMath::operation_MULTIPLY:
+            builder->shader("math/mul_node", node.name(), "surface");
+            break;
+          case BL::ShaderNodeMath::operation_DIVIDE:
+            builder->shader("math/div_node", node.name(), "surface");
+            break;
+          case BL::ShaderNodeMath::operation_MAXIMUM:
+            builder->shader("math/max_node", node.name(), "surface");
+            break;
+          case BL::ShaderNodeMath::operation_MINIMUM:
+            builder->shader("math/min_node", node.name(), "surface");
+            break;
+          default:
+            std::cout << "Math operation not supported: " << math_node.operation() << std::endl;
+        }
+      }
+
+      sockets_t input_socket(BL::NodeSocket& socket) const 
+      {
+        std::cout << "ID: " << socket.identifier() << ", NAME: " << socket.name() << std::endl;
+
+        if (socket.identifier() == "Value") {
+          return sockets_t{{ socket.node().name(), "a" }};
+        }
+
+        if (socket.identifier() == "Value_001") {
+          return sockets_t{{ socket.node().name(), "b" }};
+        }
+
+        return sockets_t();
+      }
+
+      std::optional<socket_t> output_socket(BL::NodeSocket& socket) const {
+        return socket_t{ socket.node().name(), "out" };
+      }  
+    };
+
     struct mix_rgb_node_t : public generic_node_t {
       mix_rgb_node_t()
        : generic_node_t("mix_color_node", {{ "Fac", "fac" }, { "Color1", "A" }, { "Color2", "B" }}, {{ "Color", "Cout" }})
@@ -262,6 +466,107 @@ namespace blender {
 
         builder->parameter("operation", details::from_blender_blend_type(mix_node.blend_type()));
         generic_node_t::compile(node, builder, scene);
+      }
+    };
+
+    struct color_ramp_node_t : public generic_node_t {
+      color_ramp_node_t()
+       : generic_node_t("color_ramp_node",
+          /* inputs */ {{ "Fac", "fac" }}, 
+          /* outputs */ {{ "Color", "out" }})
+      {}
+
+      void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
+        BL::ShaderNodeValToRGB ramp_node(node);
+        BL::ColorRamp color_ramp(ramp_node.color_ramp());
+
+        std::vector<Imath::Color3f> ramp; ramp.resize(256);
+        std::vector<float> alpha; alpha.resize(256);
+
+        for (auto i=0; i<256; ++i) {
+          float color[4];
+
+          color_ramp.evaluate((float)i / (float)(255), color);
+          ramp[i]  = Imath::V3f(color[0], color[1], color[2]);
+          alpha[i] = color[3];
+        }
+
+        builder->parameter("ramp_color", ramp);
+        generic_node_t::compile(node, builder, scene);
+      }
+    };
+
+    struct rgb_curves_node_t : public generic_node_t {
+      rgb_curves_node_t()
+       : generic_node_t("rgb_curves_node",
+          /* inputs */ {{ "Fac", "fac" }, { "Color", "in" }}, 
+          /* outputs */ {{ "Color", "out" }})
+      {}
+
+      void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
+        BL::ShaderNodeValToRGB ramp_node(node);
+        BL::ColorRamp color_ramp(ramp_node.color_ramp());
+
+        std::vector<Imath::Color3f> ramp; ramp.resize(256);
+        std::vector<float> alpha; alpha.resize(256);
+
+        for (auto i=0; i<256; ++i) {
+          float color[4];
+
+          color_ramp.evaluate((float)i / (float)(255), color);
+          ramp[i]  = Imath::V3f(color[0], color[1], color[2]);
+          alpha[i] = color[3];
+        }
+
+        builder->parameter("ramp_color", ramp);
+        generic_node_t::compile(node, builder, scene);
+      }
+    };
+
+    struct layer_weight_node_t : public compiler_t {
+      std::string layer(BL::Node node, const std::string& n) const {
+        return node.name() + "." + n;
+      }
+
+      std::string layer(BL::NodeSocket& socket, const std::string& n) const {
+        return layer(socket.node(), n);
+      }
+
+      void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
+        BL::ShaderNodeBsdfGlossy lw_node(node.ptr);
+
+        BL::NodeSocket fresnel = lw_node.outputs[0];
+        BL::NodeSocket facing  = lw_node.outputs[1];
+
+        if (fresnel.is_linked()) {
+          set_default_from(node, "Blend", "in", builder);
+          builder->shader("input/artistic_ior_node", layer(node, "ior"), "surface");
+          builder->shader("fresnel_dielectric_node", layer(node, "out"), "surface");
+
+          builder->connect("out", "eta", "input/facing_node", "fresnel_dielectric_node");
+        }
+
+        if (facing.is_linked()) {
+          builder->shader("input/facing_node", layer(node, "facing"), "surface");
+
+          set_default_from(node, "Blend", "fac", builder);
+          builder->shader("math/bias_node", layer(node, "out"), "surface");
+
+          builder->connect("out", "fac", "input/facing_node", "math/bias_node");
+        }
+      }
+
+      sockets_t input_socket(BL::NodeSocket& socket) const 
+      { 
+        if (socket.name() == "Blend") {
+          return{ { layer(socket, "bias"), "fac" } };
+        }
+
+        return sockets_t();
+      }
+
+      std::optional<socket_t> output_socket(BL::NodeSocket& socket) const {
+        return socket_t{ layer(socket, "out"), "out" };
       }
     };
 
@@ -378,11 +683,11 @@ namespace blender {
       };
 
       texture_file_node_t()
-       : generic_node_t(node_t<T>::value, {}, {{ "Color", "Cout"}})
+       : generic_node_t(node_t<T>::value, {{"Vector", "uv"}}, {{ "Color", "Cout"}})
       {}
 
       texture_file_node_t(const std::vector<std::string>& attributes)
-       : generic_node_t(node_t<T>::value, {}, {{ "Color", "Cout"}}, attributes)\
+       : generic_node_t(node_t<T>::value, {{"Vector", "uv"}}, {{ "Color", "Cout"}}, attributes)\
       {}
 
       void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
@@ -439,5 +744,80 @@ namespace blender {
 
     struct env_texture_node_t : texture_file_node_t<BL::ShaderNodeTexEnvironment> 
     {};
+
+    struct group_node_t : compiler_t {
+      virtual void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const {
+        BL::Node::inputs_iterator in;
+        for (node.inputs.begin(in); in!=node.inputs.end(); ++in) {
+          set_default(*in, "in", builder);
+          builder->shader(passthrough_shader(*in), in->identifier(), "surface");
+        }
+
+        BL::Node::outputs_iterator out;
+        for (node.outputs.begin(out); out!=node.outputs.end(); ++out) {
+          builder->shader(passthrough_shader(*out), out->identifier(), "surface");
+        }
+      }
+
+      inline std::string passthrough_shader(BL::NodeSocket& socket) const {
+        const auto& type = socket.type();
+        switch(type) {
+        case BL::NodeSocket::type_VALUE:
+          return "passthrough_float_node";
+        case BL::NodeSocket::type_INT:
+          return "passthrough_int_node";
+        case BL::NodeSocket::type_RGBA:
+          return "passthrough_color_node";
+        case BL::NodeSocket::type_VECTOR:
+          return "passthrough_vector_node";
+        case BL::NodeSocket::type_STRING:
+          return "passthrough_string_node";
+        case BL::NodeSocket::type_SHADER:
+          return "passthrough_shader_node";
+        default:
+          std::cout
+            << "Don't know how to passthrough parameter of type: "
+            << type
+            << std::endl;
+          break;
+        }
+
+        return "";
+      }
+
+      virtual sockets_t input_socket(BL::NodeSocket& socket) const {
+        return sockets_t( {{ socket.identifier(), "in" }} );
+      }
+
+      virtual std::optional<socket_t> output_socket(BL::NodeSocket& socket) const {
+        return socket_t{ socket.identifier(), "out" };
+      }
+    };
+ 
+    struct group_input_node_t : compiler_t {
+      virtual void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const
+      {}
+
+      virtual sockets_t input_socket(BL::NodeSocket& socket) const {
+        return sockets_t();
+      }
+
+      virtual std::optional<socket_t> output_socket(BL::NodeSocket& socket) const {
+        return socket_t{ socket.identifier(), "out" };
+      }
+    };
+
+    struct group_output_node_t : compiler_t {
+      virtual void compile(BL::ShaderNode& node, material_t::builder_t::scoped_t& builder, BL::Scene& scene) const
+      {}
+
+      virtual sockets_t input_socket(BL::NodeSocket& socket) const {
+        return sockets_t({{ socket.identifier(), "in" }});
+      }
+
+      virtual std::optional<socket_t> output_socket(BL::NodeSocket& socket) const {
+        return {};
+      }
+    };
   }
 }

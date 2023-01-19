@@ -65,17 +65,21 @@ namespace blender {
      * on disk, that is optimized for lookup, and colorspace converted. returns the file system path
      * to the texture */
     static std::string make(const std::string& path, const std::string& colorspace) {
-      std::cout << "FROM FILE" << std::endl;
-
-      const auto filename = fs::path(colorspace + "_" + path).stem().replace_extension(".tiff");
+      const auto filename = fs::path(path).stem().replace_extension(".tiff");
       const auto output = fs::temp_directory_path() / filename;
+
+      // TODO: make caching optional, and check if 
+      if (fs::exists(output)) {
+        std::cout << "\tUsing cached image" << std::endl;
+        return output.string();
+      }
 
       OIIO::ImageBuf image(path);
       OIIO::ImageSpec config;
       config.attribute("maketx:incolorspace", colorspace);
       config.attribute("maketx:outcolorspace", "scene_linear");
       config.attribute("maketx:filtername", "lanczos3");
-      config.attribute("maketx:colorconfig", blender::session_t::resources + "/2.90/datafiles/colormanagement/config.ocio");
+      config.attribute("maketx:colorconfig", blender::session_t::resources + "/3.3/datafiles/colormanagement/config.ocio");
 
       std::stringstream ss;
 
@@ -96,8 +100,6 @@ namespace blender {
       , OIIO::TypeDesc type
       , const std::string& colorspace) 
     {
-      std::cout << "FROM BUFFER" << std::endl;
-
       const auto filename = fs::path(colorspace + "_" + name).stem().replace_extension(".tiff");
       const auto output = fs::temp_directory_path() / filename;
 
@@ -105,7 +107,7 @@ namespace blender {
       config.attribute("maketx:incolorspace", colorspace);
       config.attribute("maketx:outcolorspace", "scene_linear");
       config.attribute("maketx:filtername", "lanczos3");
-      config.attribute("maketx:colorconfig", blender::session_t::resources + "/2.90/datafiles/colormanagement/config.ocio");
+      config.attribute("maketx:colorconfig", blender::session_t::resources + "/3.3/datafiles/colormanagement/config.ocio");
 
       OIIO::ImageBuf image(config, pixels);
 

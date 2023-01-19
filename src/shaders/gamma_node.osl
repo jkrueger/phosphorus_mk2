@@ -1,0 +1,10 @@
+shader 
+gamma_node
+(
+  color in = 0.8, 
+  float gamma = 1.0, 
+  output color out = 0.0
+)
+{
+  out = pow(in, gamma);
+}

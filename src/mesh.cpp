@@ -87,10 +87,11 @@ struct builder_impl_t : public mesh_t::builder_t {
   }
 };
 
-mesh_t::mesh_t()
+mesh_t::mesh_t(uint32_t visibility)
   : details(new details_t())
   , flags(UvPerVertex | NormalsPerVertex)
   , num_faces(0)
+  , visibility(visibility)
 {}
 
 mesh_t::~mesh_t() {
@@ -305,6 +306,10 @@ const Imath::V3f& triangle_t::b() const {
 
 const Imath::V3f& triangle_t::c() const {
   return mesh->vertices[mesh->faces[face+2]];
+}
+
+uint32_t triangle_t::visibility() const {
+  return mesh->visibility; // TODO: allow overrides per material set
 }
 
 Imath::V3f triangle_t::barycentric_to_point(const Imath::V2f& uv) const {

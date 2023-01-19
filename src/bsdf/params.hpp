@@ -3,6 +3,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-register"
 #include <Imath/ImathVec.h>
+#include <Imath/ImathColor.h>
 #include <OpenImageIO/ustring.h>
 #pragma clang diagnostic pop
 
@@ -21,9 +22,39 @@ namespace bsdf {
   };
 
   namespace lobes {
+    struct empty_params_t
+    {
+      static const uint32_t flags = REFLECT;
+
+      void precompute() {}
+    };
+
+    struct transparent_params_t
+    {
+      static const uint32_t flags = TRANSMIT | SPECULAR;
+
+      void precompute() {}
+    };
+
     struct diffuse_t : public lobe_t {
       static const uint32_t flags = REFLECT | DIFFUSE;
       
+      inline void precompute() {
+      }
+    };
+
+    struct translucent_t : public lobe_t {
+      static const uint32_t flags = TRANSMIT | DIFFUSE;
+      
+      inline void precompute() {
+      }
+    };
+
+    struct disney_retro_t : public lobe_t {
+      static const uint32_t flags = REFLECT | DIFFUSE;
+      
+      float roughness;
+
       inline void precompute() {
       }
     };
@@ -97,6 +128,19 @@ namespace bsdf {
           + 0.0171201f * x * x * x
           + 0.000640711f * x * x * x * x;
       }
+    };
+
+    struct disney_microfacet_t : public lobe_t {
+      static const uint32_t flags = GLOSSY | REFLECT;
+
+      float xalpha;
+      float yalpha;
+      float eta;
+      float metallic;
+      Imath::Color3f cspec0;
+
+      inline void precompute() 
+      {}
     };
 
     struct sheen_t : public lobe_t  {

@@ -112,6 +112,7 @@ namespace blender {
       renderer.options.samples_per_pixel = RNA_int_get(&pscene, "samples_per_pixel");
       renderer.options.paths_per_sample = RNA_int_get(&pscene, "paths_per_sample");
       renderer.options.path_depth = RNA_int_get(&pscene, "max_path_depth");
+      renderer.options.render_diffuse_scene = RNA_boolean_get(&pscene, "render_diffuse_scene");
     }
 
     void init_sub_systems(const std::string& path) {
@@ -210,7 +211,6 @@ namespace blender {
 
   void session_t::render(BL::Depsgraph& depsgraph) {
     if (!details->has_lights()) {
-      // TODO: log no lights
       std::cout << "No lights" << std::endl;
       return;
     }
