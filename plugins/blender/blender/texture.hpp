@@ -79,7 +79,7 @@ namespace blender {
       config.attribute("maketx:incolorspace", colorspace);
       config.attribute("maketx:outcolorspace", "scene_linear");
       config.attribute("maketx:filtername", "lanczos3");
-      config.attribute("maketx:colorconfig", blender::session_t::resources + "/3.1/datafiles/colormanagement/config.ocio");
+      config.attribute("maketx:colorconfig", blender::session_t::resources + "/3.3/datafiles/colormanagement/config.ocio");
 
       std::stringstream ss;
 
@@ -107,7 +107,7 @@ namespace blender {
       config.attribute("maketx:incolorspace", colorspace);
       config.attribute("maketx:outcolorspace", "scene_linear");
       config.attribute("maketx:filtername", "lanczos3");
-      config.attribute("maketx:colorconfig", blender::session_t::resources + "/3.1/datafiles/colormanagement/config.ocio");
+      config.attribute("maketx:colorconfig", blender::session_t::resources + "/3.3/datafiles/colormanagement/config.ocio");
 
       OIIO::ImageBuf image(config, pixels);
 

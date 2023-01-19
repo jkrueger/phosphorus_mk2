@@ -57,7 +57,7 @@ namespace blender {
           channel->get(x, y, pixels.data() + index);
           
           // set alpha to one for now, as the renderer doesn't produce any 
-          // alpha output for now
+          // alpha output
           if (channel->name == render_buffer_t::PRIMARY) {
             pixels[index + 3] = 1.0f;
           }
